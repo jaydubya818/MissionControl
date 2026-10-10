@@ -1425,7 +1425,7 @@ export const start = mutation({
     if (!releasedWorkOrder) throw new Error("Release at least one approved WorkOrder before starting the Mission");
     assertTransition(mission, "IN_PROGRESS");
     const now = Date.now();
-    await ctx.db.patch(mission._id, { state: "IN_PROGRESS", updatedAt: now, blockingReason: undefined, requiredHumanAction: undefined });
+    await ctx.db.patch(mission._id, { capabilityAuthorities: capabilityAdmission?.authorities, state: "IN_PROGRESS", updatedAt: now, blockingReason: undefined, requiredHumanAction: undefined });
     const updated = await ctx.db.get(mission._id);
     if (updated) await logMissionEvent(ctx, { mission: updated, eventType: "MISSION_STARTED", actorType: "HUMAN", actorId: args.actorId, summary: "Mission execution started", idempotencyKey: args.idempotencyKey });
     return { mission: updated, created: true };

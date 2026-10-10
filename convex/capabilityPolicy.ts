@@ -26,7 +26,7 @@ export async function prepareFenceAcknowledgment(envelope: SignedPolicyMessage) 
   if (!binding || !['myeve', 'relay'].includes(hint.authority)) throw Error('CAPABILITY_INSTALLATION_UNQUALIFIED');
   const fence = await verifyPolicyMessage(envelope, binding.sourceKeys[hint.authority]);
   if (fence.kind !== 'FENCE') throw Error('CAPABILITY_FENCE_REQUIRED');
-  const { kind: _kind, capabilityId: _capability, operation: _operation, ...identity } = fence;
+  const { kind: _kind, capabilityId: _capability, operation: _operation, controls: _controls, ...identity } = fence;
   return signPolicyMessage({ ...identity, kind: 'FENCE_ACK', fenceHash: await policyMessageHash(fence) }, binding.acknowledgmentKey);
 }
 
@@ -46,9 +46,12 @@ export const receiveFence = internalMutation({
       q.eq('memberId', binding.ownerMemberId).eq('projectId', binding.projectId)).unique();
     if (enrollment && (enrollment.installationId !== binding.installationId || enrollment.incarnation !== binding.incarnation))
       throw Error('CAPABILITY_ENROLLMENT_CHANGED');
-    if (!enrollment) await ctx.db.insert('capabilityEnrolledOwners', { memberId: binding.ownerMemberId,
-      projectId: binding.projectId, installationId: binding.installationId, incarnation: binding.incarnation });
     const scope = capabilityPolicyScope(message);
+    const policyScopes = [...new Set([...(enrollment?.policyScopes ?? []), scope])];
+    if (policyScopes.length > 64) throw Error('CAPABILITY_ENROLLMENT_RECONCILIATION_REQUIRED');
+    if (enrollment) await ctx.db.patch(enrollment._id, { policyScopes });
+    if (!enrollment) await ctx.db.insert('capabilityEnrolledOwners', { memberId: binding.ownerMemberId,
+      projectId: binding.projectId, installationId: binding.installationId, incarnation: binding.incarnation, policyScopes });
     const current = await ctx.db.query('capabilityPolicyFences').withIndex('by_scope', q => q.eq('scope', scope)).unique();
     const fenceHash = await policyMessageHash(message);
     if (current) {
@@ -58,10 +61,28 @@ export const receiveFence = internalMutation({
         return current.acknowledgment;
       }
     }
-    const { kind: _kind, capabilityId, operation, ...identity } = message;
+    const { kind: _kind, capabilityId, operation, controls = [], ...identity } = message;
     const ack = await verifyPolicyMessage(acknowledgment, binding.acknowledgmentKey);
     assertPolicyIdentity(ack, identity);
     if (ack.kind !== 'FENCE_ACK' || ack.fenceHash !== fenceHash) throw Error('CAPABILITY_ACK_MISMATCH');
+    // Retain restrictive high-water marks after later enable/disable messages.
+    // This records policy intent only; it is never resource-stop evidence.
+    // Relay epochs invalidate admission freshness; a single-lease revoke is not owner-wide control.
+    const restrictive = message.authority === 'myeve' ? [...controls] : [];
+    if (message.authority === 'myeve' && (operation === 'pause' || operation === 'revoke')) restrictive.push({ capabilityId, operation,
+      version: message.version, policyId: message.policyId });
+    for (const intent of restrictive) {
+      const control = await ctx.db.query('capabilityWorkControls').withIndex('by_control', q =>
+        q.eq('scope', scope).eq('capabilityId', intent.capabilityId).eq('operation', intent.operation)).unique();
+      if (control && control.version > intent.version) continue;
+      if (control && control.version === intent.version) {
+        if (control.policyId !== intent.policyId) throw Error('CAPABILITY_CONTROL_CONFLICT');
+        continue;
+      }
+      const value = { ...intent, scope, fenceHash };
+      if (control) await ctx.db.replace(control._id, value);
+      else await ctx.db.insert('capabilityWorkControls', value);
+    }
     const row = { ...identity, scope, capabilityId, operation, fenceHash, acknowledgment };
     if (current) await ctx.db.replace(current._id, row);
     else await ctx.db.insert('capabilityPolicyFences', row);

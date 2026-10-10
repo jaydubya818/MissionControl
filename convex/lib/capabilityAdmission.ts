@@ -1,3 +1,4 @@
+import { assertCapabilityWorkAuthority } from './capabilityWorkControl';
 import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
 import { v } from 'convex/values';
@@ -39,6 +40,7 @@ export async function requireCapabilityAdmission(ctx: MutationCtx, record: Admis
     generation: input.generation, nativeSnapshot: input.nativeSnapshot, args: nativeArgs });
   let budgetMicros = Number.MAX_SAFE_INTEGER;
   let sourcePermitHash = '';
+  const authorities: Array<{ scope: string; version: number; policyId: string; capabilityId: string }> = [];
   for (const authority of ['myeve', 'relay'] as const) {
     const permit = await verifyPolicyMessage(input.permits[authority], binding.sourceKeys[authority]);
     if (permit.kind !== 'PERMIT' || permit.authority !== authority) throw Error('CAPABILITY_PERMIT_REQUIRED');
@@ -59,9 +61,10 @@ export async function requireCapabilityAdmission(ctx: MutationCtx, record: Admis
     if (consumed) throw Error('CAPABILITY_REFERENCE_CONSUMED');
     await ctx.db.insert('capabilityAdmissionReferences', { scope, referenceId: permit.referenceId,
       workId: input.workId, missionId: input.missionId, version: permit.version, policyId: permit.policyId, actionDigest });
+    authorities.push({ scope, version: permit.version, policyId: permit.policyId, capabilityId: input.capabilityId });
     budgetMicros = Math.min(budgetMicros, permit.budgetMicros);
   }
-  return { budgetMicros };
+  return { budgetMicros, authorities };
 }
 
 
@@ -74,5 +77,8 @@ export async function requireWorkOrderCapabilityAdmission(ctx: MutationCtx, work
     args, capabilityId: 'enterprise.fleet', nativeSnapshot: { mission, workOrder }, permits: args.capabilityPermits as CapabilityPermits | undefined,
   } : undefined);
   if (admission && mission?.state !== 'IN_PROGRESS') throw Error('CAPABILITY_ADMITTED_MISSION_REQUIRED');
+  if (admission && !mission?.capabilityAuthorities?.length) throw Error('CAPABILITY_MISSION_LINEAGE_RECONCILIATION_REQUIRED');
+  if (!existingAdmission && mission) await assertCapabilityWorkAuthority(ctx, mission);
+  if (admission) admission.authorities.push(...(mission?.capabilityAuthorities ?? []));
   return admission;
 }

@@ -74,8 +74,8 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   await invoke(['env', 'set', 'MC_CAPABILITY_BINDINGS_JSON', JSON.stringify([binding])]);
   const identity = { ownerId: binding.ownerId, organizationId: binding.organizationId, installationId: binding.installationId, backendId: binding.backendId, incarnation: binding.incarnation, enrollmentVersion: 1 };
   const fences = {};
-  async function fence(authority, version, operation) {
-    const message = { ...identity, kind: 'FENCE', authority, version, policyId: `${authority}-${version}`, capabilityId: 'missioncontrol', operation };
+  async function fence(authority, version, operation, controls, capabilityId = 'missioncontrol') {
+    const message = { ...identity, kind: 'FENCE', authority, version, policyId: `${authority}-${version}`, capabilityId, operation, ...(controls ? { controls } : {}) };
     const envelope = await signPolicyMessage(message, authority === 'myeve' ? sourceKey : relayKey);
     const response = await fetch(`http://127.0.0.1:${sitePort}/capability-control/fence`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ envelope }) });
     if (response.status !== 200) { const diagnostics = await fetch(url + '/api/stream_function_logs?cursor=0', { headers: { Authorization: 'Convex ' + admin }, signal: AbortSignal.timeout(5000) }); const data = await diagnostics.json(); log.push(JSON.stringify(data.entries?.filter(entry => entry.error || entry.logLines?.length).map(entry => ({ identifier: entry.identifier, error: entry.error, logLines: entry.logLines })))); }
@@ -110,6 +110,13 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   const parentOnly = { ...parent, capabilityId: 'missioncontrol', requiredCapabilities: ['work', 'missioncontrol'] };
   const wrongCapability = { myeve: await signPolicyMessage(parentOnly, sourceKey), relay: await signPolicyMessage({ ...JSON.parse(valid.relay.message), capabilityId: 'missioncontrol', requiredCapabilities: ['work', 'missioncontrol'], sourcePermitHash: await policyMessageHash(parentOnly) }, relayKey) };
   client.setAdminAuth(admin, { subject: 'synthetic-owner', issuer: 'https://synthetic.invalid', tokenIdentifier: 'synthetic|owner' });
+  const proposal = await client.action(makeFunctionReference('capabilityChallenges:create'), { ...args, budgetMicros: 0 });
+  const generatedChallenge = await verifyPolicyMessage(proposal.challenge, backendKey);
+  assert.equal(generatedChallenge.kind, 'CHALLENGE');
+  assert.equal(generatedChallenge.incarnation, binding.incarnation);
+  assert.equal(generatedChallenge.actionDigest, parent.actionDigest);
+  assert.deepEqual(proposal.nativeArgs, args);
+  checks.push('native owner-authenticated challenge signs exact snapshot and incarnation');
   await assert.rejects(mutate('workOrders:dispatchServiceInternal', { ...fleetArgs, capabilityPermits: fleetPermits }), /ADMITTED_MISSION_REQUIRED/);
   checks.push('fleet admission cannot implicitly start an unadmitted Mission');
   await assert.rejects(mutate('missions:start', args), /POLICY_REVALIDATION/);
@@ -118,6 +125,30 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   assert.equal(admitted.created, true); assert.equal(admitted.mission.state, 'IN_PROGRESS');
   assert.equal((await mutate('missions:start', { ...args, capabilityPermits: valid })).created, false);
   checks.push('authenticated exact-owner positive native Mission admission and idempotent retry');
+  const originalAuthorities = admitted.mission.capabilityAuthorities;
+  await mutate('qualificationFixture:patch', { id: first.missionId, value: { capabilityAuthorities: [] } });
+  const legacyArgs = { workOrderId: first.workOrderId, actorType: 'SYSTEM', idempotencyKey: 'legacy-parent' };
+  const legacyProof = await permits(first.missionId, legacyArgs, first.workOrderId, 'enterprise.fleet', {
+    mission: await query('qualificationFixture:read', { id: first.missionId }), workOrder: await query('qualificationFixture:read', { id: first.workOrderId }) });
+  await assert.rejects(mutate('workOrders:dispatchServiceInternal', { ...legacyArgs, capabilityPermits: legacyProof }), /MISSION_LINEAGE_RECONCILIATION_REQUIRED/);
+  await mutate('qualificationFixture:patch', { id: first.missionId, value: { capabilityAuthorities: originalAuthorities } });
+  checks.push('new fleet admission cannot erase unresolved legacy Mission control lineage');
+  const delegatedArgs = { workOrderId: first.workOrderId, actorType: 'HUMAN', idempotencyKey: 'delegated-challenge',
+    workflowId: 'synthetic-qualified-workflow', executionEnvironment: 'LOCAL', executorHostId: 'synthetic-local-host' };
+  const delegatedChallenge = await client.action(makeFunctionReference('capabilityChallenges:create'), {
+    missionId: first.missionId, workOrderId: first.workOrderId, idempotencyKey: delegatedArgs.idempotencyKey,
+    budgetMicros: 10000, dispatch: delegatedArgs });
+  assert.deepEqual(delegatedChallenge.nativeArgs, delegatedArgs);
+  const delegatedMessage = await verifyPolicyMessage(delegatedChallenge.challenge, backendKey);
+  assert.equal(delegatedMessage.capabilityId, 'enterprise.fleet');
+  assert.equal(delegatedMessage.actionDigest, await admissionActionDigest({ workId: first.workOrderId, missionId: first.missionId,
+    generation: now, nativeSnapshot: { mission: await query('qualificationFixture:read', { id: first.missionId }),
+      workOrder: await query('qualificationFixture:read', { id: first.workOrderId }) }, args: delegatedArgs }));
+  await assert.rejects(client.action(makeFunctionReference('capabilityChallenges:create'), {
+    missionId: first.missionId, workOrderId: first.workOrderId, idempotencyKey: 'different-command', budgetMicros: 10000, dispatch: delegatedArgs }), /CHALLENGE_INVALID/);
+  checks.push('delegated challenge signs canonical dispatch fields and bounded budget without granting execution');
+
+
   const secondArgs = { missionId: second.missionId, idempotencyKey: 'stale-start' };
   const old = await permits(second.missionId, secondArgs);
   await mutate('qualificationFixture:patch', { id: second.missionId, value: { objective: 'Changed scope at unchanged timestamp' } });
@@ -130,6 +161,7 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   checks.push('disable fences stale permits, preserves admitted Mission, denies legacy WorkOrder bypass');
   client.setAdminAuth(admin, { subject: 'foreign-owner', issuer: 'https://synthetic.invalid', tokenIdentifier: 'synthetic|foreign' });
   await assert.rejects(mutate('missions:start', args));
+  await assert.rejects(client.action(makeFunctionReference('capabilityChallenges:create'), { ...args, budgetMicros: 0 }));
   checks.push('cross-owner Mission replay denied');
   client.setAdminAuth(admin);
   assert.equal((await query('qualificationFixture:rows', { table: 'capabilityAdmissionReferences' })).length, 2);
@@ -144,6 +176,60 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   if (results[0].status === 'fulfilled') assert.equal(raceMission.state, 'IN_PROGRESS');
   else { assert.equal(raceMission.state, 'READY'); await assert.rejects(mutate('missions:start', { ...raceArgs, capabilityPermits: racePermits }), /CAPABILITY/); }
   checks.push('real Convex admission/fence race commits only in serial order');
+  const runId = 'capability-active-writer';
+  const authority = { scope: JSON.stringify(['myeve', binding.ownerId, binding.organizationId, binding.installationId, binding.backendId, binding.incarnation]), version: 1, policyId: 'myeve-1', capabilityId: 'enterprise.fleet' };
+  const runDocId = await insert('workflowRuns', { tenantId, projectId, missionId: first.missionId,
+    workOrderId: first.workOrderId, runId, workflowId: 'synthetic-no-execution', status: 'RUNNING',
+    currentStepIndex: 0, totalSteps: 1, steps: [{ stepId: 'bounded', status: 'RUNNING', retryCount: 0 }],
+    context: {}, initialInput: '', startedAt: now, reservedCostUsd: 12, capabilityAuthorities: [authority] });
+  await mutate('workflowRuns:updateContext', { runId, context: { beforeControl: true } });
+  await fence('myeve', 5, 'pause');
+  await assert.rejects(mutate('workflowRuns:claimExecution', { runId, leaseId: 'stale', ownerId: 'stale', dispatchMode: 'MANUAL' }), /CAPABILITY_PAUSE/);
+  await assert.rejects(mutate('workflowRuns:updateContext', { runId, context: { bypass: true } }), /CAPABILITY_PAUSE/);
+  await fence('myeve', 6, 'revoke');
+  await fence('myeve', 6, 'revoke');
+  for (const [name, args] of [
+    ['workflowRuns:updateContext', { runId, context: { bypass: true } }],
+    ['workflowRuns:advance', { runId }],
+    ['workflowRuns:incrementRetry', { runId, stepIndex: 0 }],
+    ['workflowRuns:updateStatus', { runId, status: 'CANCELED' }],
+    ['workflowRuns:recordEvent', { workflowRunId: runDocId, eventType: 'RUN_RESUMED' }],
+  ]) await assert.rejects(mutate(name, args), /CAPABILITY_AUTHORITY_FENCED/);
+  assert.equal((await mutate('factory/attempts:renewInternal', { workflowRunId: runDocId, leaseId: 'stale', ownerId: 'stale', leaseDurationMs: 1000 })).renewed, false);
+  await fence('myeve', 7, 'enable');
+  await assert.rejects(mutate('workflowRuns:updateContext', { runId, context: { revived: true } }), /CAPABILITY_AUTHORITY_FENCED/);
+  const preservedRun = await query('qualificationFixture:read', { id: runDocId });
+  assert.equal(preservedRun.reservedCostUsd, 12);
+  assert.equal(preservedRun.status, 'RUNNING');
+  assert.deepEqual(preservedRun.context, { beforeControl: true });
+  checks.push('pause prevents reclaim; revoke fences native stale writers across later enable without clearing reservation or claiming resource stop');
+  const { _id: _runId, _creationTime: _created, ...legacy } = preservedRun;
+  delete legacy.capabilityAuthorities;
+  const legacyId = await insert('workflowRuns', { ...legacy, runId: 'legacy-capability-writer' });
+  await assert.rejects(mutate('workflowRuns:updateContext', { runId: 'legacy-capability-writer', context: { bypass: true } }), /LEGACY_AUTHORITY_PENDING_BACKEND/);
+  assert.equal((await query('qualificationFixture:read', { id: legacyId })).reservedCostUsd, 12);
+  await insert('workflowRuns', { ...legacy, runId: 'later-capability-writer', capabilityAuthorities: [{ ...authority, version: 7, policyId: 'myeve-7' }] });
+  await fence('relay', 2, 'revoke');
+  await mutate('workflowRuns:updateContext', { runId: 'later-capability-writer', context: { relayEpochOnly: true } });
+  await fence('myeve', 9, 'disable', [{ capabilityId: 'work', operation: 'revoke', version: 8, policyId: 'myeve-8' }], 'memory');
+  await assert.rejects(mutate('workflowRuns:updateContext', { runId: 'later-capability-writer', context: { lostRevoke: true } }), /AUTHORITY_FENCED/);
+  checks.push('superseded revoke reaches writers, Relay generic epoch does not revoke unrelated Work, legacy lineage remains pending');
+
+  if (process.env.CAPABILITY_COMPOSED_RELAY_ROOT && process.env.CAPABILITY_COMPOSED_MYEVE_ROOT) {
+    const fixture = join(directory, 'composed-fixture.json');
+    await writeFile(fixture, JSON.stringify({ url, sitePort, admin, cli, binding, sourceKey, relayKey, backendKey,
+      tenantId, projectId, ownerMemberId, teamId, myeveRoot: process.env.CAPABILITY_COMPOSED_MYEVE_ROOT }), { mode: 0o600 });
+    const relayRoot = process.env.CAPABILITY_COMPOSED_RELAY_ROOT;
+    for (const policyKind of ['platform', 'ordinary']) {
+    const child = await execFile(process.execPath, [join(relayRoot, 'node_modules/tsx/dist/cli.mjs'),
+      '--tsconfig', join(relayRoot, 'tsconfig.json'), join(relayRoot, 'scripts/qualify-capability-composed.mjs'), fixture, policyKind],
+      { cwd: relayRoot, env: { ...env, HOME: process.env.HOME, CAPABILITY_TEST_POSTGRES_BIN: process.env.CAPABILITY_TEST_POSTGRES_BIN,
+        NODE_ENV: 'test', CAPABILITY_COMPOSED_BROWSER: process.env.CAPABILITY_COMPOSED_BROWSER }, maxBuffer: 5_000_000 });
+    process.stdout.write(child.stdout); process.stderr.write(child.stderr);
+    }
+    await invoke(['env', 'set', 'MC_CAPABILITY_BINDINGS_JSON', JSON.stringify([binding])]);
+    checks.push('composed PostgreSQL source and native Relay delivery/admission proof qualification');
+  }
   await invoke(['env', 'remove', 'MC_CAPABILITY_BINDINGS_JSON']);
   await invoke(['env', 'remove', 'MC_CAPABILITY_INSTALLATION_ID']);
   client.setAdminAuth(admin, { subject: 'synthetic-owner', issuer: 'https://synthetic.invalid', tokenIdentifier: 'synthetic|owner' });

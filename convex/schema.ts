@@ -2024,6 +2024,9 @@ export const schemaTablesPartOne = {
   // SOFTWARE FACTORY: WORK ORDERS
   // -------------------------------------------------------------------------
   missions: defineTable({
+    capabilityAuthorities: v.optional(v.array(v.object({
+      scope: v.string(), version: v.number(), policyId: v.string(), capabilityId: v.string(),
+    }))),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     idempotencyKey: v.optional(v.string()),
@@ -5288,6 +5291,9 @@ export const schemaTablesPartTwo = {
   // WORKFLOW RUNS (Execution State for Multi-Agent Workflows)
   // -------------------------------------------------------------------------
   workflowRuns: defineTable({
+    capabilityAuthorities: v.optional(v.array(v.object({
+      scope: v.string(), version: v.number(), policyId: v.string(), capabilityId: v.string(),
+    }))),
     // ARM: Tenant scope (optional, backfill later)
     tenantId: v.optional(v.id("tenants")),
     // Identity

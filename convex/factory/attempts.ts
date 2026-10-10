@@ -1,3 +1,4 @@
+import { assertCapabilityWorkAuthority, capabilityWorkRestriction } from '../lib/capabilityWorkControl';
 import { resolveCurrentAttemptExecutionProfile, executionProfileProjectionFromFactoryVersion, hasAnyExecutionProfileBinding } from "../lib/attemptExecutionProfile";
 import { NO_INFERENCE_CONSTRAINT, isNoInferenceConstraint } from "../lib/offlineExecutionPolicy";
 import { v } from "convex/values";
@@ -545,6 +546,7 @@ export const claimInternal = internalMutation({
     const now = Date.now();
     const run = await ctx.db.get(args.workflowRunId);
     if (!run) throw new Error("Factory attempt not found.");
+    await assertCapabilityWorkAuthority(ctx, run);
     if (args.requiredAttemptPurpose && (run.attemptPurpose ?? "IMPLEMENTATION") !== args.requiredAttemptPurpose) {
       throw new Error(`Attempt capability is not valid for ${run.attemptPurpose ?? "IMPLEMENTATION"}.`);
     }
@@ -1154,7 +1156,7 @@ export const authorizePublicationInternal = internalMutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     const run = await ctx.db.get(args.workflowRunId);
-    if (!run || !factoryAttemptMutationIsAuthorized(run)
+    if (!run || (!factoryAttemptMutationIsAuthorized(run) || !!await capabilityWorkRestriction(ctx, run))
       || !activeLeaseMatches({
         lease: run.lease,
         leaseId: args.leaseId,
@@ -1351,7 +1353,7 @@ export const renewInternal = internalMutation({
     if (run && args.requiredAttemptPurpose && (run.attemptPurpose ?? "IMPLEMENTATION") !== args.requiredAttemptPurpose) {
       return { renewed: false as const, reason: "attempt-purpose-mismatch" };
     }
-    if (!run || !factoryAttemptMutationIsAuthorized(run)) {
+    if (!run || (!factoryAttemptMutationIsAuthorized(run) || !!await capabilityWorkRestriction(ctx, run))) {
       return { renewed: false as const, reason: run?.cancellationRequestedAt ? "cancellation-requested" : "attempt-not-running" };
     }
     if (!await factoryLeaseRegistrationIsCurrent(ctx, run)) {
@@ -1467,6 +1469,8 @@ export const reportInternal = internalMutation({
         return { retained: true, duplicate: true, authoritative: false, artifactId: existing._id };
       }
       const issues = await offlineAttemptAuthorityIssues(ctx, run, args, Date.now());
+      const capabilityRestriction = await capabilityWorkRestriction(ctx, run);
+      if (capabilityRestriction) issues.push(capabilityRestriction);
       if (!await factoryLeaseRegistrationIsCurrent(ctx, run)) issues.push("WORKER_REGISTRATION_NOT_CURRENT");
       const artifactId = await ctx.db.insert("runArtifacts", {
         tenantId: run.tenantId, projectId: run.projectId, missionId: run.missionId,
@@ -1484,7 +1488,7 @@ export const reportInternal = internalMutation({
       // and publication mutations. No Task, Attempt or verification state changes.
       return { retained: true, duplicate: false, authoritative: false, artifactId };
     }
-    if (!run || (run.attemptPurpose ?? "IMPLEMENTATION") !== "IMPLEMENTATION" || !factoryAttemptMutationIsAuthorized(run)
+    if (!run || (run.attemptPurpose ?? "IMPLEMENTATION") !== "IMPLEMENTATION" || (!factoryAttemptMutationIsAuthorized(run) || !!await capabilityWorkRestriction(ctx, run))
       || !activeLeaseMatches({
         lease: run.lease,
         leaseId: args.leaseId,
@@ -1996,6 +2000,8 @@ export const reportVerificationInternal = internalMutation({
         return { retained: true, duplicate: true, authoritative: false, artifactId: existing._id };
       }
       const issues = await offlineAttemptAuthorityIssues(ctx, run, args, now);
+      const capabilityRestriction = await capabilityWorkRestriction(ctx, run);
+      if (capabilityRestriction) issues.push(capabilityRestriction);
       if (!await factoryLeaseRegistrationIsCurrent(ctx, run)) issues.push("WORKER_REGISTRATION_NOT_CURRENT");
       const artifactId = await ctx.db.insert("runArtifacts", {
         tenantId: run.tenantId, projectId: run.projectId, missionId: run.missionId,
@@ -2012,7 +2018,7 @@ export const reportVerificationInternal = internalMutation({
       });
       return { retained: true, duplicate: false, authoritative: false, artifactId };
     }
-    if (!factoryAttemptMutationIsAuthorized(run)
+    if ((!factoryAttemptMutationIsAuthorized(run) || !!await capabilityWorkRestriction(ctx, run))
       || !activeLeaseMatches({
         lease: run.lease,
         leaseId: args.leaseId,
@@ -2948,7 +2954,8 @@ export const recoverLocalCandidate = mutation({
       structuredResultClaimWorkerSessionId: previousClaim.metadata.workerSessionId,
       structuredResultClaimWorkerGeneration: previousClaim.metadata.workerGeneration,
     });
-    const recoveryAttemptId = await ctx.db.insert("workflowRuns", recoveryAttempt);
+    await assertCapabilityWorkAuthority(ctx, failedAttempt);
+    const recoveryAttemptId = await ctx.db.insert("workflowRuns", { ...recoveryAttempt, capabilityAuthorities: failedAttempt.capabilityAuthorities });
     await ctx.db.patch(failedAttempt._id, {
       ...sourcePatch,
       retryDecision: {
@@ -3090,7 +3097,8 @@ export async function retryVerificationHandler(ctx: MutationCtx, args: {
       const continuation = buildVerificationCandidateContinuation({ failedAttempt: sourceAttempt,
         continuationRunId, requestedAt: now, actorId, reason,
         failedVerificationAttemptId: String(failedAttempt._id), failedVerificationRunId: String(verificationRun!._id) });
-      const continuationId = await ctx.db.insert("workflowRuns", continuation);
+      await assertCapabilityWorkAuthority(ctx, sourceAttempt);
+      const continuationId = await ctx.db.insert("workflowRuns", { ...continuation, capabilityAuthorities: sourceAttempt.capabilityAuthorities });
       const { subjectId: _subjectId, digest: _digest, ...subjectInput } = subject;
       const continuedSubject = subject.version === 2
         ? createPrepublicationGitVerificationSubject({ ...subjectInput, sourceAttemptId: String(continuationId) } as any)
@@ -3524,7 +3532,9 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   }
   // The initial insert and the manifest patch are one serializable mutation.
   // No claim can observe the intermediate row without its frozen authority.
+  await assertCapabilityWorkAuthority(ctx, sourceAttempt);
   const workflowRunId = await ctx.db.insert("workflowRuns", {
+    capabilityAuthorities: sourceAttempt.capabilityAuthorities,
     tenantId: workOrder.tenantId,
     runId,
     workflowId: workflow.workflowId,

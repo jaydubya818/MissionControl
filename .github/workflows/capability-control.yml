@@ -41,4 +41,4 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm run ci:prepare
       - run: pnpm exec tsc --noEmit -p convex/tsconfig.json
-      - run: pnpm exec vitest run convex/__tests__/capabilityAdmission.test.ts convex/__tests__/capabilityAdmissionBoundaries.test.ts convex/__tests__/workOrderDispatch.test.ts
+      - run: pnpm exec vitest run convex/__tests__/capabilityAdmission.test.ts convex/__tests__/capabilityAdmissionBoundaries.test.ts convex/__tests__/workOrderDispatch.test.ts convex/__tests__/capabilityWorkControl.test.ts convex/__tests__/factoryAttempt.test.ts convex/__tests__/offlineAttemptBudget.test.ts convex/__tests__/offlineEvidenceIngress.test.ts convex/__tests__/workflowExecutionControl.test.ts convex/__tests__/workflowRunState.test.ts

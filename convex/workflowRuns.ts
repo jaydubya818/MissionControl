@@ -1,3 +1,6 @@
+import type { Id } from './_generated/dataModel';
+import type { MutationCtx } from './_generated/server';
+import { assertCapabilityWorkAuthority } from './lib/capabilityWorkControl';
 /**
  * Workflow Runs — Convex Functions
  * 
@@ -323,11 +326,13 @@ async function appendReceiptArtifactLink(ctx: any, verificationReceiptId: any, a
   await ctx.db.patch(verificationReceiptId, { linkedRunArtifactIds: linked });
 }
 
-function assertWorkflowExecutionFence(
-  run: { lease?: { leaseId: string; ownerId: string; expiresAt: number } },
+async function assertWorkflowExecutionFence(
+  ctx: Pick<MutationCtx, 'db'>,
+  run: { lease?: { leaseId: string; ownerId: string; expiresAt: number }; capabilityAuthorities?: import('./lib/capabilityWorkControl').CapabilityWorkAuthority[]; workOrderId?: Id<'workOrders'>; missionId?: Id<'missions'> },
   leaseId?: string,
   ownerId?: string,
 ) {
+  await assertCapabilityWorkAuthority(ctx, run);
   if (!run.lease) return;
   if (!workflowLeaseMatches({ lease: run.lease as any, leaseId, ownerId, now: Date.now() })) {
     throw new Error("Workflow execution lease is missing, mismatched, or expired.");
@@ -775,6 +780,7 @@ export const claimExecution = mutation({
       .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
       .first();
     if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
+    await assertCapabilityWorkAuthority(ctx, run);
     if (!run.projectId) return { claimed: false as const, reason: "workspace-required" };
     if (run.factoryDefinitionVersionId || run.executionManifestDigest) {
       return { claimed: false as const, reason: "factory-worker-owned" };
@@ -926,7 +932,7 @@ export const heartbeatExecution = mutation({
       .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
       .first();
     if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
-    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    await assertWorkflowExecutionFence(ctx, run, args.leaseId, args.ownerId);
     if (!run.projectId || !run.lease) throw new Error("Workflow run has no active workspace lease.");
     const costDeltaUsd = args.costDeltaUsd ?? 0;
     if (!Number.isFinite(costDeltaUsd) || costDeltaUsd < 0) {
@@ -989,7 +995,7 @@ export const checkpointExecution = mutation({
       .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
       .first();
     if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
-    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    await assertWorkflowExecutionFence(ctx, run, args.leaseId, args.ownerId);
     return await createExecutionCheckpoint(ctx, {
       run,
       leaseId: args.leaseId,
@@ -1013,7 +1019,7 @@ export const releaseExecution = mutation({
       .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
       .first();
     if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
-    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    await assertWorkflowExecutionFence(ctx, run, args.leaseId, args.ownerId);
     const checkpoint = await createExecutionCheckpoint(ctx, {
       run,
       leaseId: args.leaseId,
@@ -1225,6 +1231,7 @@ export const recordEvent = mutation({
     const access = await requireAuthorizedDeliveryScope(ctx, run.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
     if (!access) throw new Error("Event writes require an authorized workspace.");
 
+    if (args.eventType === 'RUN_RESUMED') await assertCapabilityWorkAuthority(ctx, run);
     const result = await insertRunEvent(ctx, {
       ...args,
       workOrderId: run.workOrderId,
@@ -1405,7 +1412,7 @@ export const updateStep = mutation({
     if (!run) {
       throw new Error(`Workflow run not found: ${args.runId}`);
     }
-    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    await assertWorkflowExecutionFence(ctx, run, args.leaseId, args.ownerId);
     
     const steps = [...run.steps];
     const step = steps[args.stepIndex];
@@ -1588,6 +1595,7 @@ export const advance = mutation({
       throw new Error(`Workflow run not found: ${args.runId}`);
     }
     
+    await assertCapabilityWorkAuthority(ctx, run);
     const nextIndex = run.currentStepIndex + 1;
     
     if (nextIndex >= run.totalSteps) {
@@ -1773,7 +1781,7 @@ export const updateStatus = mutation({
     if (!run) {
       throw new Error(`Workflow run not found: ${args.runId}`);
     }
-    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    await assertWorkflowExecutionFence(ctx, run, args.leaseId, args.ownerId);
 
     if (run.lease && ["COMPLETED", "FAILED", "CANCELED", "PAUSED"].includes(args.status)) {
       await createExecutionCheckpoint(ctx, {
@@ -1941,7 +1949,7 @@ export const updateContext = mutation({
     if (!run) {
       throw new Error(`Workflow run not found: ${args.runId}`);
     }
-    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    await assertWorkflowExecutionFence(ctx, run, args.leaseId, args.ownerId);
     
     await ctx.db.patch(run._id, {
       context: { ...run.context, ...args.context },
@@ -1970,7 +1978,7 @@ export const incrementRetry = mutation({
     if (!run) {
       throw new Error(`Workflow run not found: ${args.runId}`);
     }
-    assertWorkflowExecutionFence(run, args.leaseId, args.ownerId);
+    await assertWorkflowExecutionFence(ctx, run, args.leaseId, args.ownerId);
     
     const steps = [...run.steps];
     const step = steps[args.stepIndex];

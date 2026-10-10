@@ -3,7 +3,9 @@ export type PolicyIdentity = {
   installationId: string; backendId: string; incarnation: string;
   enrollmentVersion: number; version: number; policyId: string;
 };
+export type WorkControl = { capabilityId: string; operation: 'pause' | 'revoke'; version: number; policyId: string };
 export type Fence = PolicyIdentity & {
+  controls?: WorkControl[];
   kind: 'FENCE'; capabilityId: string; operation: 'enable' | 'disable' | 'pause' | 'revoke' | 'set_budget';
 };
 export type FenceAck = PolicyIdentity & { kind: 'FENCE_ACK'; fenceHash: string };
@@ -14,7 +16,8 @@ export type AdmissionPermit = PolicyIdentity & {
   issuedAt: number; expiresAt: number;
   sourcePermitHash: string;
 };
-export type PolicyMessage = Fence | FenceAck | AdmissionPermit;
+export type AdmissionChallenge = Omit<AdmissionPermit, 'kind' | 'requiredCapabilities' | 'agentRevision' | 'sourcePermitHash'> & { kind: 'CHALLENGE' };
+export type PolicyMessage = Fence | FenceAck | AdmissionPermit | AdmissionChallenge;
 export type SignedPolicyMessage = { message: string; keyId: string; signature: string };
 export type PolicyKey = { keyId: string; jwk: JsonWebKey };
 
@@ -24,6 +27,8 @@ const fields = {
   FENCE: ['capabilityId', 'operation'], FENCE_ACK: ['fenceHash'],
   PERMIT: ['referenceId', 'capabilityId', 'requiredCapabilities', 'registryVersion', 'agentId',
     'agentRevision', 'workId', 'missionId', 'workGeneration', 'actionDigest', 'budgetMicros', 'issuedAt', 'expiresAt', 'sourcePermitHash'],
+  CHALLENGE: ['referenceId', 'capabilityId', 'registryVersion', 'agentId', 'workId', 'missionId',
+    'workGeneration', 'actionDigest', 'budgetMicros', 'issuedAt', 'expiresAt'],
 };
 const numeric = new Set(['enrollmentVersion', 'version', 'agentRevision', 'workGeneration', 'budgetMicros', 'issuedAt', 'expiresAt']);
 const fail = (): never => { throw new Error('CAPABILITY_PROTOCOL_INVALID'); };
@@ -32,9 +37,23 @@ export function parsePolicyMessage(value: unknown): PolicyMessage {
   const row = value as Record<string, unknown>;
   if (!Object.prototype.hasOwnProperty.call(fields, String(row.kind))) return fail();
   const keys = ['kind', ...identityKeys, ...fields[row.kind as keyof typeof fields]];
+  if (row.kind === 'FENCE' && row.controls !== undefined) keys.push('controls');
   if (Object.keys(row).length !== keys.length || Object.keys(row).some(key => !keys.includes(key))) return fail();
   for (const key of keys) {
-    if (key === 'requiredCapabilities') {
+    if (key === 'controls') {
+      if (!Array.isArray(row.controls) || row.controls.length > 72) return fail();
+      const seen = new Set<string>();
+      for (const item of row.controls) {
+        if (!item || typeof item !== 'object' || Object.keys(item).sort().join(',') !== 'capabilityId,operation,policyId,version'
+          || typeof item.capabilityId !== 'string' || !item.capabilityId.length || item.capabilityId.length > 100
+          || !['pause', 'revoke'].includes(item.operation) || !Number.isSafeInteger(item.version)
+          || item.version < 1 || item.version > Number(row.version)
+          || typeof item.policyId !== 'string' || !item.policyId.length || item.policyId.length > 255) return fail();
+        const identity = JSON.stringify([item.capabilityId, item.operation]);
+        if (seen.has(identity)) return fail();
+        seen.add(identity);
+      }
+    } else if (key === 'requiredCapabilities') {
       if (!Array.isArray(row[key]) || !row[key].length || row[key].length > 36
         || row[key].some(item => typeof item !== 'string' || !item.length || item.length > 100)
         || new Set(row[key]).size !== row[key].length) return fail();
@@ -49,6 +68,10 @@ export function parsePolicyMessage(value: unknown): PolicyMessage {
     || Number(row.expiresAt) <= Number(row.issuedAt) || Number(row.expiresAt) - Number(row.issuedAt) > 30_000
     || !/^[a-f0-9]{64}$/.test(String(row.actionDigest)))) return fail();
   if (row.kind === 'FENCE_ACK' && !/^[a-f0-9]{64}$/.test(String(row.fenceHash))) return fail();
+  if (row.kind === 'CHALLENGE' && (row.authority !== 'myeve' || Number(row.budgetMicros) > 1e12
+    || Number(row.expiresAt) <= Number(row.issuedAt) || Number(row.expiresAt) - Number(row.issuedAt) > 30_000
+    || !/^[a-f0-9]{64}$/.test(String(row.actionDigest))
+    || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(String(row.referenceId)))) return fail();
   if (row.kind === 'PERMIT' && (row.authority === 'myeve' ? row.sourcePermitHash !== 'SELF'
     : !/^[a-f0-9]{64}$/.test(String(row.sourcePermitHash)))) return fail();
   return Object.fromEntries(keys.map(key => [key, row[key]])) as PolicyMessage;
