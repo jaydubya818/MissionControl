@@ -2041,6 +2041,7 @@ export const schemaTablesPartOne = {
   // SOFTWARE FACTORY: WORK ORDERS
   // -------------------------------------------------------------------------
   enterpriseAppConnections: defineTable({
+    resultScope: v.optional(v.object({ missionId:v.id("missions"), planId:v.id("missionPlans"), planRevision:v.number(), planDigest:v.string() })),
     tenantId: v.id("tenants"), projectId: v.id("projects"), ownerId: v.id("operators"),
     ownerMemberId: v.id("orgMembers"), owningTeamId: v.id("scrumTeams"),
     applicationId: v.literal("myeve-sofie-readiness-v1"), keyId: v.string(),

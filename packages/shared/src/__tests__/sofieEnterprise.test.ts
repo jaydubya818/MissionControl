@@ -13,6 +13,11 @@ describe('Sofie enterprise preparation',()=>{
     for(const selector of [{intentKey:null,proposalId:null},{intentKey:'intent',proposalId:'proposal'},{intentKey:'intent',proposalId:null,authorized:true}])
       expect(()=>validateEnterpriseRequest({operation:'enterprise.inspect',connectionId:'c',...selector})).toThrow();
   });
+  it('requires an exact Plan digest for completed Result reads and rejects authority fields',()=>{
+    const result={operation:'enterprise.result',connectionId:'c',missionId:'m',expectedPlanDigest:'sha256:'+'1'.repeat(64)};
+    expect(validateEnterpriseRequest(result)).toEqual(result);
+    for(const patch of [{expectedPlanDigest:null},{ownerId:'other'},{grant:'execute'},{qualityGate:'PASS'}])expect(()=>validateEnterpriseRequest({...result,...patch})).toThrow();
+  });
   it('parses an inspectable zero-authority proposal',()=>expect(validateEnterpriseRequest(request)).toEqual(request));
   it.each([
     {...request,ownerId:'spoof'}, {...request,proposal:{...proposal,budgetMicrousd:1}}, {...request,proposal:{...proposal,workstreams:['Only one']}},

@@ -81,9 +81,11 @@ try {
   });
   const missionId=submitted.response.missionId;result.submission=submitted;
   const read={operation:'enterprise.read',connectionId,proposalId,missionId,expectedPlanDigest:null};
+  await check('unbound-connection-cannot-read-completed-Result',()=>assert.rejects(()=>send(sign({operation:'enterprise.result',connectionId,missionId,expectedPlanDigest:'sha256:'+'0'.repeat(64)}))));
+  await check('draft-Mission-cannot-create-Result-scope',()=>assert.rejects(()=>mutate('sofieEnterprise:connect',{...connectArgs,missionId})));
   result.initialStatus=await send(sign(read));assert.equal(result.initialStatus.response.mission.state,'DRAFT');
   assert.equal(result.initialStatus.response.resultProof.status,'NOT_AVAILABLE');
-  assert.equal(result.initialStatus.response.resultProof.reason,'COMPLETED_RESULT_CONSUMPTION_NOT_QUALIFIED');assert.equal(result.initialStatus.response.workOrders.length,0);
+  assert.equal(result.initialStatus.response.resultProof.reason,'COMPLETED_RESULT_REQUIRES_SCOPED_READ');assert.equal(result.initialStatus.response.workOrders.length,0);
   await check('lost-submit-ack-restart',async()=>{await db.restart();const retry=await send(sign(submit));assert.equal(retry.response.missionId,missionId);assert.equal(retry.response.created,false)});
   await check('changed-mission-identity-denied',()=>assert.rejects(()=>send(sign({...read,missionId:s.projectId}))));
   await check('changed-proposal-digest-denied',()=>assert.rejects(()=>send(sign({...submit,proposalDigest:'sha256:'+'0'.repeat(64)}))));

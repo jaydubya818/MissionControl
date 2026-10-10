@@ -1,3 +1,4 @@
+import { projectEnterpriseResult, resultMissionScope } from './lib/sofieEnterpriseResult';
 import { v } from 'convex/values';
 import { action, internalMutation, mutation } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
@@ -44,7 +45,7 @@ async function currentConnection(ctx: MutationCtx, id: Id<'enterpriseAppConnecti
 }
 
 export const connect = mutation({
-  args: { projectId: v.id('projects'), ownerMemberId: v.id('orgMembers'), owningTeamId: v.id('scrumTeams'), expiresAt: v.number() },
+  args: { missionId: v.optional(v.id('missions')), projectId: v.id('projects'), ownerMemberId: v.id('orgMembers'), owningTeamId: v.id('scrumTeams'), expiresAt: v.number() },
   handler: async (ctx, args) => {
     const project = await readiness(ctx, args.projectId);
     const access = await requireWorkspaceAccess(ctx, project.tenantId!, project._id, { permission: COMPANY_PERMISSIONS.ASSIGN_DELIVERY });
@@ -53,10 +54,12 @@ export const connect = mutation({
     if (!member || member.operatorId !== access.membership.operatorId || member.projectId !== project._id) return denied();
     const keyId = process.env.MC_SOFIE_APPLICATION_KEY_ID;
     if (!keyId || !Number.isSafeInteger(args.expiresAt) || args.expiresAt <= Date.now() || args.expiresAt > Date.now() + 3600000) return denied();
-    const id = await ctx.db.insert('enterpriseAppConnections', { ...args, tenantId: project.tenantId!, ownerId: access.membership.operatorId,
+    const { missionId, ...connectionArgs } = args;
+    const resultScope = missionId ? (await resultMissionScope(ctx, { projectId:project._id, tenantId:project.tenantId!, ownerId:access.membership.operatorId }, missionId)).scope : undefined;
+    const id = await ctx.db.insert('enterpriseAppConnections', { ...connectionArgs, ...(resultScope ? {resultScope} : {}), tenantId: project.tenantId!, ownerId: access.membership.operatorId,
       applicationId: SOFIE_APPLICATION, keyId, createdAt: Date.now() });
     await currentConnection(ctx, id);
-    return { connectionId: id, applicationId: SOFIE_APPLICATION, capabilities: ['enterprise.propose', 'enterprise.submit', 'enterprise.read', 'enterprise.inspect'], executionAuthority: 'NONE' };
+    return { connectionId: id, applicationId: SOFIE_APPLICATION, ...(resultScope ? {resultScope} : {}), capabilities: ['enterprise.propose', 'enterprise.submit', 'enterprise.read', 'enterprise.inspect', ...(resultScope ? ['enterprise.result'] : [])], executionAuthority: 'NONE' };
   },
 });
 
@@ -87,7 +90,13 @@ export const command = action({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
     await authorizeSofieApplicationCommand(args);
-    return ctx.runMutation(makeFunctionReference<'mutation'>('sofieEnterprise:apply'), args);
+    const response = await ctx.runMutation(makeFunctionReference<'mutation'>('sofieEnterprise:apply'), args);
+    if (args.envelope.capability !== 'enterprise.result') return response;
+    const authentication = { commandId:args.envelope.commandId, requestDigest:args.envelope.payloadDigest, expiresAt:Math.min(args.envelope.expiresAt,response.response.freshUntil) };
+    const key = await crypto.subtle.importKey('raw',new TextEncoder().encode(process.env.MC_SOFIE_APPLICATION_SECRET!),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+    const bytes = new TextEncoder().encode(enterpriseDigest({...response,authentication}));
+    const signature = 'sha256:' + Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,bytes)), b=>b.toString(16).padStart(2,'0')).join('');
+    return {...response,authentication:{...authentication,signature}};
   },
 });
 
@@ -113,7 +122,9 @@ export const apply = internalMutation({
     if (receipt && (receipt.serviceId !== SOFIE_APPLICATION || receipt.payloadDigest !== args.envelope.payloadDigest
       || receipt.claimedProjectId !== project._id || receipt.claimedRepositoryId !== args.envelope.repositoryId || receipt.capability !== request.operation)) return denied();
     let response: any;
-    if (request.operation === 'enterprise.inspect') {
+    if (request.operation === 'enterprise.result') {
+      response = await projectEnterpriseResult(ctx, connection, request.missionId as Id<'missions'>, request.expectedPlanDigest);
+    } else if (request.operation === 'enterprise.inspect') {
       const proposal = request.proposalId
         ? await ctx.db.get(request.proposalId as Id<'enterpriseMissionProposals'>)
         : await ctx.db.query('enterpriseMissionProposals').withIndex('by_connection_intent', q => q.eq('connectionId', connection._id).eq('intentKey', request.intentKey!)).unique();
@@ -191,7 +202,7 @@ async function projectMission(ctx: MutationCtx, mission: Doc<'missions'>, expect
     plans: plans.slice(0,20).map(p => ({ id:p._id, revision:p.revisionNumber, status:p.status, digest:enterpriseDigest(p), isCurrent:mission.currentPlanId===p._id })),
     workOrders, blockers: [mission.blockingReason, ...workOrders.map(w => w.blockingIssue)].filter(Boolean),
     needsYou: mission.requiredHumanAction ?? (['DRAFT','PLANNING','AWAITING_PLAN_APPROVAL'].includes(mission.state) ? 'Prepare and approve a canonical Plan before execution.' : null),
-    resultProof: { status: 'NOT_AVAILABLE', reason: 'COMPLETED_RESULT_CONSUMPTION_NOT_QUALIFIED', references: proof },
+    resultProof: { status: 'NOT_AVAILABLE', reason: 'COMPLETED_RESULT_REQUIRES_SCOPED_READ', references: proof },
     truncated: rows.length > 100 || proofRows.length > 100 || plans.length > 20, executionAuthority: 'NONE',
     explanation: 'Factory success is evidence. Enterprise acceptance requires the current canonical Quality Contract and independent verification. This response grants no execution or spending authority.' };
 }

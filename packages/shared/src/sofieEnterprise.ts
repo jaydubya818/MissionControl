@@ -1,11 +1,12 @@
 import { canonicalJson, sha256Hex } from './canonicalDigest';
 
 export const SOFIE_APPLICATION = 'myeve-sofie-readiness-v1';
-export const SOFIE_CAPABILITIES = ['enterprise.propose', 'enterprise.submit', 'enterprise.read', 'enterprise.inspect'] as const;
+export const SOFIE_CAPABILITIES = ['enterprise.propose', 'enterprise.submit', 'enterprise.read', 'enterprise.inspect', 'enterprise.result'] as const;
 export interface EnterpriseProposal {
   title: string; objective: string; workstreams: string[]; milestones: string[]; stopCondition: string; budgetMicrousd: 0;
 }
 export type EnterpriseRequest =
+  | { operation: 'enterprise.result'; connectionId: string; missionId: string; expectedPlanDigest: string }
   | { operation: 'enterprise.inspect'; connectionId: string; intentKey: string | null; proposalId: string | null }
   | { operation: 'enterprise.propose'; connectionId: string; intentKey: string; proposal: EnterpriseProposal }
   | { operation: 'enterprise.submit'; connectionId: string; proposalId: string; proposalDigest: string }
@@ -38,6 +39,10 @@ function hash(value: unknown): string {
 }
 export function validateEnterpriseRequest(value: unknown): EnterpriseRequest {
   const operation = (value as { operation?: unknown } | null)?.operation;
+  if (operation === 'enterprise.result') {
+    const r = object(value, ['operation','connectionId','missionId','expectedPlanDigest']);
+    return { operation, connectionId:text(r.connectionId,200), missionId:text(r.missionId,200), expectedPlanDigest:hash(r.expectedPlanDigest) };
+  }
   if (operation === 'enterprise.inspect') {
     const r = object(value, ['operation','connectionId','intentKey','proposalId']);
     if ((r.intentKey === null) === (r.proposalId === null)) throw Error('ENTERPRISE_REQUEST_INVALID');
