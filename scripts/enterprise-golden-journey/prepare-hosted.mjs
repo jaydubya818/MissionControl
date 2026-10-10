@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { lock, sha256 } from './evidence.mjs';
+import { prepareQualifiedDocker } from './qualified-docker.mjs';
 const suite = process.argv[2], temp = process.env.RUNNER_TEMP;
 assert.ok(temp && process.env.GITHUB_ENV, 'Hosted ephemeral runner required');
 const run = (cmd, args, options = {}) => execFileSync(cmd, args, { stdio: 'inherit', ...options });
@@ -22,7 +23,8 @@ assert.equal(sha256(await readFile(archive)), lock.convexLinuxArchive.sha256);
 await mkdir(convex); run('unzip', ['-q', archive, '-d', convex]);
 run('chmod', ['+x', join(convex, 'convex-local-backend')]);
 await set('MC_COMPATIBILITY_CONVEX_BINARY', join(convex, 'convex-local-backend'));
-await set('MC_GOLDEN_DOCKER', '/usr/bin/docker');
+await set('MC_GOLDEN_DOCKER', ['native-execution', 'hybrid-mission', 'security-recovery'].includes(suite)
+  ? await prepareQualifiedDocker(temp) : '/usr/bin/docker');
 if (['delegated-execution', 'hybrid-mission'].includes(suite)) {
   const partner = join(temp, 'golden-myfactory'), fixture = join(temp, 'golden-fixture.git');
   await checkout('MyFactory', lock.myFactory, partner);
