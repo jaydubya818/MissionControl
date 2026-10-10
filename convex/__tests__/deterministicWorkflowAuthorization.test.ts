@@ -17,10 +17,21 @@ describe("deterministic workflow entry-point authority", () => {
   );
   it.each([undefined, "workspace-1"])("rejects generic deterministic run creation with project %s", async projectId => {
     const insert = vi.fn();
-    const context = { db: { query: () => ({ withIndex: () => ({ first: async () => ({
-      active: true, contractVersion: "factory-workflow-contract/v2", steps: [{ kind: "DETERMINISTIC" }],
-    }) }) }), insert } };
+    const context = { db: { query: (table: string) => {
+      const query = { first: async () => table === "capabilityEnrolledOwners" ? null : ({
+        active: true, contractVersion: "factory-workflow-contract/v2", steps: [{ kind: "DETERMINISTIC" }],
+      }), withIndex: () => query };
+      return query;
+    }, insert } };
     await expect(handler(start)(context, { workflowId: "synthetic-render", projectId })).rejects.toThrow("canonical WorkOrder");
+    expect(insert).not.toHaveBeenCalled();
+  });
+  it.each([undefined, "workspace-1"])("rejects generic creation for an enrolled installation with project %s", async projectId => {
+    const insert = vi.fn();
+    const query = { first: async () => ({ installationId: "isolated" }), withIndex: () => query };
+    const context = { db: { query: () => query, insert } };
+    await expect(handler(start)(context, { workflowId: "synthetic-render", projectId }))
+      .rejects.toThrow("CAPABILITY_CANONICAL_DISPATCH_REQUIRED");
     expect(insert).not.toHaveBeenCalled();
   });
 });
