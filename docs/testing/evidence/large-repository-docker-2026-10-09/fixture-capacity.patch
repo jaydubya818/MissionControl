@@ -1,0 +1,11 @@
+--- apps/orchestration-server/src/__tests__/fixtures/bedrockProfileFixture.ts
++++ apps/orchestration-server/src/__tests__/fixtures/.large-profile-fixture.ts
+@@ -31,7 +31,7 @@
+     providerProfileVersion: "1",
+     profileKey: "bedrock-offline",
+   });
+-  p.machine = { ...p.machine, image: identity.image, cpu: 1, memoryMb: 512 };
++  p.machine = { ...p.machine, image: identity.image, cpu: 1, memoryMb: 2048 };
+   p.supervisor.transport = "DOCKER_STDIN";
+   p.credentials.inference = "NONE";
+   p.network.egress = "RESTRICTED_ALLOWLIST";

@@ -367,7 +367,7 @@ export const promoteExactRoute = mutation({
       const implementationPolicy = (sourceWorkOrder?.metadata as any)?.implementationPolicy;
       const workOrderEstimatedCostUsd = (sourceWorkOrder?.metadata as any)?.estimatedCostUsd;
       if (!sourceWorkOrder || sourceWorkOrder.projectId !== route.projectId
-        || sourceWorkOrder.approvalStatus !== "APPROVED"
+        || (sourceWorkOrder.approvalStatus !== "APPROVED" && sourceWorkOrder.approvalStatus !== "NOT_REQUIRED")
         || sourceWorkOrder.currentRevisionNumber !== args.costPolicy.source.workOrderRevisionNumber
         || sourceWorkOrder.missionPlanId !== args.costPolicy.source.missionPlanId
         || !sourceWorkOrder.repositoryId

@@ -75,3 +75,8 @@ describe("governed MCP control-plane identity", () => {
     expect(schemaSource).toContain('.index("by_attempt_grant_phase", ["workflowRunId", "toolGrantId", "phase"])');
   });
 });
+
+ it.each([qualificationFixtureToolVersionSnapshot(implementationDigest), context7ToolVersionSnapshot()])("binds new snapshots to the patched SDK and rejects old qualification identity", snapshot => {
+   expect(snapshot.sdk.version).toBe("1.31.0");
+   expect(mcpToolVersionIssues({ ...snapshot, sdk: { ...snapshot.sdk, version: "1.26.0" } })).toContain("tool-version-substituted");
+ });

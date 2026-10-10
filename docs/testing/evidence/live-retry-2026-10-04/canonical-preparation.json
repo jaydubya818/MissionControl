@@ -1,0 +1,211 @@
+{
+  "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+  "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+  "modelCatalogId": "g17vsp03wznkp08cxw6rpd641x8fppc0",
+  "scopeResult": {
+    "overlaps": [],
+    "scopeId": "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb",
+    "success": true
+  },
+  "codeScopeId": "jx7jr1rmgavhzsmxwrx8xw4ajh8fp3vb",
+  "missionCreated": true,
+  "existingActiveResearchLabOrgMembers": 0,
+  "ownerTeamDecision": "APPROVED_BY_OPERATOR",
+  "ownerMemberId": "rx7dzve8axhw1vy9rj6447h9ah8fpmzp",
+  "owningTeamId": "kh7m6t6fmwg6h06qh7bhevvt5d8fqgdn",
+  "teamMembershipId": "kn7jbyb3mja3vv7sz4578cvzkh8fqnx6",
+  "ownerTeamEstablishedAt": "2026-10-05T04:13:54.749Z",
+  "missionId": "gs7qk5q10e4v3v5td71pedhrvx8fqmvg",
+  "missionState": "READY",
+  "planId": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+  "planStatus": "APPROVED",
+  "ownershipReadbackVerifiedAt": "2026-10-05T04:16:12.512Z",
+  "workflowId": "yx76qfjav3cghrhrtaw4apyc8x8fp4tf",
+  "workflowSlug": "live-verification-retry-runbook-v1",
+  "planWorkflowBound": true,
+  "planSubmitted": true,
+  "workOrderIds": [
+    "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+  ],
+  "modelRoutePromoted": {
+    "modelCatalogId": "g17vsp03wznkp08cxw6rpd641x8fppc0",
+    "qualificationDigest": "sha256:01b8a77c349245b1a951e8a0d100e52f2d62187f7595ed1dc475e1b8966208c8",
+    "routeDigest": "sha256:7298d9ef168f087e078859f97cab4f50f7f234ed5368b80fdab553fad0cba856"
+  },
+  "executionProfileId": "w17gv4yxte8f65x91gdcx0m62h8fp7d4",
+  "executionProfileQualified": {
+    "executionProfileId": "w17gv4yxte8f65x91gdcx0m62h8fp7d4",
+    "profileDigest": "sha256:1b6e67ee17abb665a274a3b634e0702dde8002735b345e979ee11d5672f99aab",
+    "qualificationDigest": "sha256:be34baf67735b23c4994e084185feee0712b89d2b8afe0694556ff35837d7e96"
+  },
+  "classification": {
+    "dataClassification": "PUBLIC",
+    "success": true
+  },
+  "repositoryValidation": {
+    "project": {
+      "_creationTime": 1785221984061.684,
+      "_id": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+      "defaultPolicy": "Governed research",
+      "description": "Governed research workspace for software-factory, dark-factory, and agentic engineering practices.",
+      "githubBranch": "main",
+      "githubRepo": "jaydubya818/MissionControl",
+      "name": "Software Factory Research Lab",
+      "nextTaskNumber": 132,
+      "owner": "Research Director",
+      "purpose": "Continuously research, analyze, compare, and test emerging software-factory, dark-factory, and agentic software-engineering practices using Mission Control as the governed execution and validation platform.",
+      "repositoryStatus": "READY",
+      "repositoryValidatedAt": 1791174443275,
+      "slug": "software-factory-research-lab",
+      "status": "ACTIVE",
+      "taskPrefix": "SFRL",
+      "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n"
+    },
+    "success": true
+  },
+  "writerTemplate": {
+    "_creationTime": 1791174443285.614,
+    "_id": "k1787hgg6ydfm3wfz1hk638bps8fpkxq",
+    "active": true,
+    "createdAt": 1791174443285,
+    "description": "One bounded documentation candidate; no approval or publication authority.",
+    "name": "Verification retry runbook writer",
+    "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "slug": "live-retry-runbook-writer-v1",
+    "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+    "updatedAt": 1791174443285
+  },
+  "writerVersion": {
+    "_creationTime": 1791174443298.59,
+    "_id": "k57045m10atfz9ajhax8tqkvzd8fp71x",
+    "createdAt": 1791174443298,
+    "genome": {
+      "modelConfig": {
+        "modelId": "openai/gpt-4.1-mini",
+        "provider": "openrouter"
+      },
+      "promptBundleHash": "86817f5c53985685b5104d8be85b7f5041b2535ff1dca1fe69a7f38fb1752dd0",
+      "provenance": {
+        "createdAt": 1791174443296,
+        "createdBy": "development:local-operator",
+        "source": "operator-authorized-live-retry-pilot"
+      },
+      "toolManifestHash": "sha256:7a6ee25ba6ea51c142de52a33bc02807e9822f69c30edddd9b1f7bf0f561bdc9"
+    },
+    "genomeHash": "0b7f4815a4f7e3b1456a05f7e74e6e1d31a749f8f4ffbd9c9b4253e13e9e8804",
+    "notes": "Operator-authorized documentation pilot, exact Fab/OpenRouter configuration, one file and one attempt.",
+    "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "status": "APPROVED",
+    "templateId": "k1787hgg6ydfm3wfz1hk638bps8fpkxq",
+    "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+    "updatedAt": 1791174443298,
+    "version": 1
+  },
+  "policy": {
+    "_creationTime": 1791174443308.127,
+    "_id": "sd7aya62d3xr6a24n9rhmyz1z98fqpkg",
+    "active": true,
+    "createdAt": 1791174443308,
+    "metadata": {
+      "workOrderId": "yh786ydmsxnztmr4dm7654xwjd8fq2kp"
+    },
+    "name": "Runbook pilot: one attempt, draft only",
+    "priority": 100,
+    "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "rules": {
+      "maxAttempts": 1,
+      "maxResourceCostUsd": 4.49,
+      "merge": false,
+      "publication": "HUMAN_APPROVED_DRAFT_ONLY"
+    },
+    "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+    "updatedAt": 1791174443308
+  },
+  "contextVerifierId": "z57cvx2g7yjd07gazqfx4s5kbh8fq7z1",
+  "environment": {
+    "_creationTime": 1791174443324.536,
+    "_id": "p173wbyt3bz4153f59a5636n8s8fqrtf",
+    "description": "Local managed worker checkout for the bounded documentation pilot.",
+    "name": "Research Lab runbook pilot",
+    "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+    "type": "dev"
+  },
+  "factoryDefinitionId": "md7t93bxm0f2y6x9c9j7k20ted8ckfge",
+  "factoryVersionId": "m97vkr166w1neyekk2mn2heqan8fqpyc",
+  "readinessAssessmentId": "mh7j01e61717nnv8bs5xbhb6598fq024",
+  "verifierRouteId": "g17y2nrfmekfw9n13x823tk6wd8fpcnm",
+  "verifierRouteAdmission": {
+    "modelCatalogId": "g17y2nrfmekfw9n13x823tk6wd8fpcnm",
+    "qualificationDigest": "sha256:2d395ed8d8642e6acfd2177b6a5006a4167eecaa9844858cd532e8dbf960b331",
+    "routeDigest": "sha256:c61677b3682e398da5a7e16c9f56bb30686f9563b409ddf11ad44d1e305fdb8c"
+  },
+  "verifierProfile": {
+    "created": true,
+    "executionProfileId": "w17ha56nc0vrqap07zb8311n598fpzab"
+  },
+  "verifierProfileAdmission": {
+    "executionProfileId": "w17ha56nc0vrqap07zb8311n598fpzab",
+    "profileDigest": "sha256:f6777ed8d4db09e69ec7c35bed06bda56b9f59839e321e6c6f3b56f3568e9740",
+    "qualificationDigest": "sha256:9a9edb0b637e2bdfe7faa3e146a23286d095989406b58ffe38cc20806c3d4bed"
+  },
+  "verifierTemplate": {
+    "_creationTime": 1791175020311.656,
+    "_id": "k17859z68tdsjfzsnytdbcta698fpp9h",
+    "active": true,
+    "createdAt": 1791175020311,
+    "description": "Separate immutable-candidate verification; no model calls.",
+    "name": "Runbook command verifier",
+    "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "slug": "live-retry-command-verifier-v1",
+    "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+    "updatedAt": 1791175020311
+  },
+  "verifierAgentVersion": {
+    "_creationTime": 1791175020322.138,
+    "_id": "k576x0ds5edtx56cv3j831dz598fpp8e",
+    "createdAt": 1791175020322,
+    "genome": {
+      "modelConfig": {
+        "modelId": "gpt-5.6-terra",
+        "provider": "openai"
+      },
+      "promptBundleHash": "sha256:6fc55d6967a89cdb6fdcb5cae612d626be78eb4ccfe8e81c25cc2d4678424064",
+      "provenance": {
+        "createdAt": 1791175020320,
+        "createdBy": "development:local-operator",
+        "source": "operator-authorized-command-verification"
+      },
+      "toolManifestHash": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06"
+    },
+    "genomeHash": "6443115509b39c5c7f2debfb146e8e6da508c6bacc7ea294f1f33f4a70e8e7a2",
+    "notes": "VERIFICATION-only profile; the worker executes the frozen command without model invocation.",
+    "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "status": "APPROVED",
+    "templateId": "k17859z68tdsjfzsnytdbcta698fpp9h",
+    "tenantId": "wx7ajfqrhbjn1rxfz4tc32mekx8b639n",
+    "updatedAt": 1791175020322,
+    "version": 1
+  },
+  "verifierWorkflowId": "yx7015711wmnym6ehkgyt3wxms8fpsg9",
+  "verifierFactoryId": "md7ks0e4ch2t38t8z11yen1rsx8fpw38",
+  "verifierFactoryVersionId": "m97wsq92tpqeq0zemd3mces3kn8fp4cj",
+  "producerActivated": true,
+  "verifierActivated": true,
+  "missionStarted": true,
+  "dispatchBlocker": "Mission WorkOrder is not dispatchable (corrective-iteration-limit)",
+  "workerStoppedForReview": true,
+  "iterationFixDeployed": false,
+  "iterationFixApproval": "AUTOMATIC_REVIEW_REJECTED_REQUIRES_OPERATOR_APPROVAL",
+  "preQualificationTaskId": "wh729nzcc229w6v149wm3w4yxh8fqe5m",
+  "taskId": "wh79y470dxfj65et3r6rcz214s8fq02p",
+  "taskASSIGNED": true,
+  "taskREADY": true,
+  "producerAttemptId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt",
+  "dispatchCreated": true,
+  "producerStatus": "FAILED",
+  "producerFailure": "TURN_LIMIT; no candidate or changed files",
+  "producerRetryCount": 0,
+  "qualificationStatus": "INCOMPLETE_NO_BROADER_DEPLOYMENT",
+  "workerStatus": "STOPPED_AFTER_RESTART_PROOF",
+  "workOrderRevisionNumber": 2
+}

@@ -1,0 +1,55 @@
+{
+  "files": 4155,
+  "bytes": 218747055,
+  "evidenceBytes": 186074523,
+  "largestFiles": [
+    {
+      "path": "docs/testing/evidence/software-factory-plan/mission-detail-route-trace.json",
+      "bytes": 30125973
+    },
+    {
+      "path": "docs/testing/evidence/task-attempt-scheduler/task-attempt-scheduler-trace.zip",
+      "bytes": 22939934
+    },
+    {
+      "path": "docs/testing/evidence/task-workorder-linkage/task-workorder-linkage-trace.zip",
+      "bytes": 19712787
+    },
+    {
+      "path": "docs/testing/evidence/automation-control-plane-v1-ui/browser-trace.zip",
+      "bytes": 12152058
+    },
+    {
+      "path": "docs/testing/evidence/docs-workspace-routing/docs-001-workspace-routing-trace.zip",
+      "bytes": 10579607
+    },
+    {
+      "path": "docs/testing/evidence/task-drawer-contrast/intermediate-light-transition-failure-trace.zip",
+      "bytes": 9173782
+    },
+    {
+      "path": "docs/testing/evidence/automation-control-plane-v1/browser-trace.zip",
+      "bytes": 7619866
+    },
+    {
+      "path": "docs/testing/evidence/remote-sandbox-hardening-v1/image-sbom.spdx.json",
+      "bytes": 5011707
+    },
+    {
+      "path": "docs/testing/evidence/mission-draft-routing/mission-draft-routing-trace.zip",
+      "bytes": 3968831
+    },
+    {
+      "path": "docs/testing/evidence/mission-control-docs/docs-invalid-workspace-trace.zip",
+      "bytes": 623883
+    },
+    {
+      "path": "docs/testing/evidence/mission-control-docs/docs-ui-journey-trace.zip",
+      "bytes": 505913
+    },
+    {
+      "path": "docs/testing/evidence/production-factory-pilot-v3/run-results.json",
+      "bytes": 449551
+    }
+  ]
+}

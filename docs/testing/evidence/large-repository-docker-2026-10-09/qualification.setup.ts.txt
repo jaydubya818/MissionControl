@@ -1,0 +1,4 @@
+import {vi} from 'vitest';
+vi.mock('../dockerSandboxProvider.js',()=>import('../.large-profile-provider.js'));
+vi.mock('./fixtures/bedrockProfileFixture.js',()=>import('./fixtures/.large-profile-fixture.js'));
+vi.mock('../dockerBedrockIdentity.js',async(load)=>{const actual=await load<typeof import('../dockerBedrockIdentity.js')>();return {...actual,DOCKER_BEDROCK_CANDIDATE_IDENTITY:{...actual.DOCKER_BEDROCK_CANDIDATE_IDENTITY,image:'mission-control/local-large-repository@sha256:7a36977d9b1449d2dae436e4b184326f0ef48b5873019c583911f6d95d9afda8',imageId:'sha256:7a36977d9b1449d2dae436e4b184326f0ef48b5873019c583911f6d95d9afda8'}};});

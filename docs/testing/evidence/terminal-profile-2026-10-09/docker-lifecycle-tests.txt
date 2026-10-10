@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server
+
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  09:16:34
+   Duration  37.80s (transform 405ms, setup 19ms, import 665ms, tests 37.00s, environment 0ms)
+

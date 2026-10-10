@@ -1,0 +1,100 @@
+{
+  "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+  "missionId": "gs7qk5q10e4v3v5td71pedhrvx8fqmvg",
+  "idempotencyKey": "live-retry-runbook-plan-20261004-v1",
+  "summary": "One documentation-only WorkOrder. Produce a concise verification-retry runbook, verify the exact candidate, retain failed evidence, obtain human draft-publication approval, and prove worker restart without producer replay.",
+  "rollbackApproach": "Stop execution, revoke any live credential, retain evidence and the candidate branch, and close an unwanted draft PR only on operator instruction. Never merge.",
+  "estimatedCostUsd": 4.49,
+  "assertions": [
+    {
+      "assertionId": "runbook",
+      "title": "The runbook accurately explains verification retries",
+      "outcome": "The runbook accurately explains verification retries",
+      "verificationMethod": "MANUAL",
+      "passCondition": "A reviewer confirms eligibility, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and recovery states against current source.",
+      "requiredEvidence": "Exact candidate SHA, separate verifier Attempt and semantic review evidence",
+      "requiresIndependentValidation": true,
+      "waiverAllowed": false
+    },
+    {
+      "assertionId": "restart",
+      "title": "Worker restart preserves evidence without producer replay",
+      "outcome": "Worker restart preserves evidence without producer replay",
+      "verificationMethod": "TEST",
+      "passCondition": "After a controlled restart, candidate SHA and evidence remain unchanged and the completed producer is not dispatched again.",
+      "requiredEvidence": "Before/after worker session IDs, canonical Attempt states and inference receipts",
+      "requiresIndependentValidation": true,
+      "waiverAllowed": false
+    },
+    {
+      "assertionId": "draft-publication",
+      "title": "Publication ends at a draft PR with human approval",
+      "outcome": "Publication ends at a draft PR with human approval",
+      "verificationMethod": "MANUAL",
+      "passCondition": "The approved candidate is published as a draft PR; no merge occurs.",
+      "requiredEvidence": "Human publication decision, GitHub draft flag, branch/head SHA and PR URL",
+      "requiresIndependentValidation": true,
+      "waiverAllowed": false
+    }
+  ],
+  "workOrderBlueprints": [
+    {
+      "id": "verification-retry-runbook",
+      "title": "Write the verification retry operator runbook",
+      "desiredOutcome": "Write only docs/operations/verification-retry-runbook.md, with accurate retry prerequisites, evidence retention, independent verification, fresh approval and failure/recovery instructions.",
+      "sequence": 1,
+      "role": "WORKER",
+      "isMutating": true,
+      "priority": 3,
+      "riskLevel": "LOW",
+      "branchStrategy": "isolated-draft-pr",
+      "constraints": [
+        "Only docs/operations/verification-retry-runbook.md may change",
+        "No merge, deployment, automatic retry or unrelated changes",
+        "Component qualification is not canonical verification or approval"
+      ],
+      "requiredApprovals": [
+        "Human approval of the exact candidate before draft publication"
+      ],
+      "estimatedCostUsd": 4.49,
+      "implementationPolicy": {
+        "allowedCommands": [
+          "Read scoped repository source",
+          "Write the allowed runbook file",
+          "Run the frozen independent documentation check"
+        ],
+        "independentVerification": {
+          "executable": "node",
+          "args": [
+            "-e",
+            "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+          ],
+          "category": "CONTRACT_TEST",
+          "commandClass": "TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "timeoutMs": 10000
+        },
+        "maxFilesChanged": 1,
+        "maxLinesChanged": 300,
+        "maxCostUsd": 4.49,
+        "maxAttempts": 1,
+        "timeoutMinutes": 10,
+        "stopCondition": "Stop after candidate capture for independent verification; block on unknown cost, stale authority or exhausted budget."
+      },
+      "dependsOnBlueprintIds": [],
+      "assertionIds": [
+        "runbook",
+        "restart",
+        "draft-publication"
+      ],
+      "workflowId": "live-verification-retry-runbook-v1"
+    }
+  ],
+  "metadata": {
+    "authorization": "Operator-approved single documentation pilot",
+    "componentEvidence": "docs/testing/evidence/live-retry-2026-10-04",
+    "executionAdmission": "PENDING_EXACT_WORKER_CONFIGURATION_QUALIFICATION"
+  },
+  "planId": "gn7htsghr19e1yeschmc1hmbgh8fqp4d",
+  "expectedDraftVersion": 1
+}

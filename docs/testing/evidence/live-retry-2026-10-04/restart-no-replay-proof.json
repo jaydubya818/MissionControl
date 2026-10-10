@@ -1,0 +1,38 @@
+{
+  "result": "PASS",
+  "scope": "Terminal failed producer does not replay after worker restart. Successful-candidate recovery not exercised.",
+  "beforeAttemptIds": [
+    "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+  ],
+  "afterAttemptIds": [
+    "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+  ],
+  "runtimeStateSha256Unchanged": "7e66e7763d9e60f76c8c16f05e1ac0f7a27a796ecdedcf2e55e12ac4ce19a5c9",
+  "modelCallsBefore": 8,
+  "modelCallsAfter": 8,
+  "retries": 0,
+  "workerAfter": {
+    "enabled": true,
+    "activeRunIds": [],
+    "completedCount": 0,
+    "failedCount": 0,
+    "lastPollAt": 1791180138095,
+    "lastError": null,
+    "credentialsConfigured": true,
+    "reconciliationEnabled": true,
+    "cleanupHealth": {
+      "inspected": 0,
+      "activeSandboxes": 0,
+      "healthy": 0,
+      "orphaned": 0,
+      "reconciled": 0,
+      "failed": 0,
+      "activeEphemeralCredentials": 0,
+      "unreconciledCostUsd": 0,
+      "lastReconciledAt": 1791180123115,
+      "failures": []
+    }
+  },
+  "oldLauncherPid": 32510,
+  "newLauncherLog": "Live runbook worker launcher PID 84693"
+}

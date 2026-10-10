@@ -498,8 +498,51 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v60**. Version 60 adds the
-authenticated repository code-scope update used by pinned Factory dispatch.
+Current public client/backend runtime contract: **v61**. Version 61 adds authenticated observed-cost
+reconciliation for terminal Fab Attempts. SDK-qualified MCP snapshots now bind
+to version 1.31.0 and require fresh qualification before activation.
+
+### Local Research Lab retry qualification
+
+October 8 follow-up reconciled the failed Attempt's observed cost to $0.0102412
+without releasing its reservation. The pinned Fab runtime cannot snapshot this
+repository, so it now rejects that setup before credential minting. A compatible
+executor must be qualified before another run. See the
+[follow-up evidence](docs/testing/evidence/retry-followup-2026-10-08/README.md).
+
+Zero allowed retries permits one initial execution with no retry Attempts.
+Commit `33e3612` fixes that Mission dispatch boundary while preserving positive
+retry-limit behavior. It is applied only to local Research Lab.
+
+Post-commit qualification passed 1,491 Convex tests and 766 orchestration tests.
+A real zero-retry dispatch created and executed exactly one Attempt. Duplicate
+dispatch and worker restart created no additional Attempt. The producer failed
+at its turn limit without a candidate, so end-to-end qualification remains
+incomplete. No broader deployment is approved. See the
+[retry qualification status and limitations](docs/operations/live-retry-dispatch-review.md)
+and [retained evidence](docs/testing/evidence/live-retry-2026-10-04/README.md).
+
+Replacement executor checks passed 153 focused tests, including eight local
+Docker cases with synthetic provider responses. The governed Codex Bedrock
+candidate passed the small fixture; the full repository was subsequently
+rejected by its input-size limit. Full-repository execution and live qualification
+remain incomplete. See [full-tree failure and next decision](docs/testing/evidence/full-repository-docker-2026-10-08/README.md). No paid inference or image promotion
+occurred. See [candidate evidence and next gates](docs/testing/evidence/executor-selection-2026-10-08/README.md).
+
+The approved October 9 local capacity experiment passed the full-tree synthetic
+edit and patch capture with 256 MiB input, 1 GiB workspace and 2 GiB RAM. It also
+passed 67 boundary checks. Runtime defaults remain unchanged. The terminal-status discrepancy was fixed
+and the full-tree test now reports SUCCESS. Canonical local admission and live
+approval gates remain. See [larger-profile
+evidence](docs/testing/evidence/large-repository-docker-2026-10-09/README.md).
+
+The latest October 9 follow-up passed 1,501 Convex tests, 813 orchestration tests,
+both typechecks and four full-repository Docker lifecycle cases with synthetic
+responses. Canonical local admission validation is implemented and applied only
+to Research Lab; no profile is registered or activated. Exact AWS route checks
+await SSO refresh, and live qualification remains incomplete. See the
+[local application and qualification evidence](docs/testing/evidence/local-admission-2026-10-09/README.md).
+See [configuration, current price review and draft budget](docs/operations/research-lab-large-profile.md).
 
 ### Factory Deployed Engineer qualification environment
 

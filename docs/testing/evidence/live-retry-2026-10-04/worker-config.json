@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "repository": "/Users/jaywest/.codex/worktrees/live-retry-runbook/MissionControl",
+  "provider": "openrouter",
+  "model": "openai/gpt-4.1-mini",
+  "credential": {
+    "id": "live-retry-runbook-broker-v1",
+    "owner": "local:501",
+    "provider": "openrouter",
+    "scope": {
+      "kind": "repository",
+      "root": "/Users/jaywest/.codex/worktrees/live-retry-runbook/MissionControl"
+    },
+    "source": {
+      "kind": "broker"
+    }
+  },
+  "writableFiles": [
+    "docs/operations/verification-retry-runbook.md"
+  ],
+  "checks": [
+    {
+      "id": "runbook-structure",
+      "argv": [
+        "/opt/homebrew/Cellar/node@24/24.18.1/bin/node",
+        "-e",
+        "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+      ]
+    }
+  ],
+  "acceptanceCriteria": [
+    "Document eligible NOT_VERIFIED/BLOCKED verification retries, unchanged candidate/revision/contract, retained failed evidence, independent verification, fresh approval, and failure/recovery."
+  ],
+  "maxTurns": 8,
+  "timeoutMs": 600000,
+  "checkTimeoutMs": 10000
+}

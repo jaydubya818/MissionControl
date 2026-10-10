@@ -34,6 +34,14 @@ export function canTransitionMission(from: MissionState, to: MissionState) {
   return TRANSITIONS[from].includes(to);
 }
 
+export function missionIterationAuthorized(correctiveIterations: number, maxCorrectiveIterations: number) {
+  return Number.isInteger(correctiveIterations) && Number.isInteger(maxCorrectiveIterations)
+    && correctiveIterations >= 0 && maxCorrectiveIterations >= 0
+    && (maxCorrectiveIterations === 0
+      ? correctiveIterations === 0
+      : correctiveIterations < maxCorrectiveIterations);
+}
+
 export function validateMissionWorkOrderDispatch(args: {
   missionState: MissionState;
   workOrderRole?: Extract<MissionRole, "WORKER" | "VALIDATOR">;

@@ -1,0 +1,38 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl
+
+ ❯ convex/__tests__/missionGovernance.test.ts (16 tests | 2 failed) 6ms
+     × dispatches only an authorized iteration (0 corrections, limit 0) 4ms
+     × dispatches only an authorized iteration (1 corrections, limit 1) 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/__tests__/missionGovernance.test.ts > mission governance > dispatches only an authorized iteration (0 corrections, limit 0)
+ FAIL  convex/__tests__/missionGovernance.test.ts > mission governance > dispatches only an authorized iteration (1 corrections, limit 1)
+AssertionError: expected { ok: false, …(1) } to deeply equal { ok: true }
+
+- Expected
++ Received
+
+  {
+-   "ok": true,
++   "ok": false,
++   "reason": "corrective-iteration-limit",
+  }
+
+ ❯ convex/__tests__/missionGovernance.test.ts:19:11
+     17|         predecessorHandoffValid: true, budgetRemaining: true,
+     18|         correctiveIterationsRemaining: missionIterationAuthorized(iter…
+     19|       })).toEqual(allowed ? { ok: true } : { ok: false, reason: "corre…
+       |           ^
+     20|     },
+     21|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 14 passed (16)
+   Start at  21:40:10
+   Duration  134ms (transform 20ms, setup 0ms, import 27ms, tests 6ms, environment 0ms)
+

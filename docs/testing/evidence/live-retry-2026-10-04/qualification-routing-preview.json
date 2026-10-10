@@ -1,0 +1,243 @@
+{
+  "activePolicy": {
+    "_creationTime": 1785277931843.326,
+    "_id": "g97xm23qyz25tnp1q9ewjasxsx8bcxkv",
+    "canaryPercent": 0,
+    "createdAt": 1785277931843,
+    "createdBy": "operator",
+    "defaultModelId": "operator-default",
+    "fallbackChain": [
+      "operator-powerful"
+    ],
+    "killSwitch": false,
+    "name": "Workspace routing policy",
+    "projectId": "sn71gskbdemgf4z1trt9zdmm5h8bde69",
+    "rules": [
+      {
+        "id": "low-risk-engineering-fast",
+        "modelId": "operator-fast",
+        "order": 0,
+        "riskLevel": "LOW",
+        "taskType": "ENGINEERING"
+      }
+    ],
+    "safeFallbackModelId": "operator-powerful",
+    "status": "ACTIVE",
+    "updatedAt": 1785277931843,
+    "updatedBy": "operator",
+    "version": 2
+  },
+  "budgetAuthorization": {
+    "approvedWorkOrderCapUsd": 4.49,
+    "budgetSource": "WORK_ORDER_IMPLEMENTATION_POLICY",
+    "estimatedReservationUsd": 4.49,
+    "missionBudgetRemainingUsd": 4.49,
+    "plannedEstimateUsd": 4.49,
+    "priorCommittedUsd": 0,
+    "remainingBeforeReservationUsd": 4.49,
+    "schema": "work-order-cost-authorization/v1"
+  },
+  "cutoffAt": 1791179808930,
+  "policy": {
+    "evidenceWindowDays": 30,
+    "guardedAutoEnabled": false,
+    "guardedAutoPromoted": false,
+    "maximumEstimatedCostUsd": 4.49,
+    "minimumEvidenceCoverage": 0.6,
+    "minimumScoreMargin": 5,
+    "minimumVerifiedAttempts": 5,
+    "mode": "ADVISORY",
+    "policyVersion": 2
+  },
+  "result": {
+    "algorithmVersion": "execution-routing/v1",
+    "appliedTupleKey": "m97vkr166w1neyekk2mn2heqan8fqpyc:factory-v1-3c589a56",
+    "candidates": [
+      {
+        "eligible": true,
+        "evidence": {
+          "attemptCount": 0,
+          "cutoffAt": 1791179808930,
+          "repositoryAttemptCount": 0,
+          "verifiedAttemptCount": 0,
+          "windowStartedAt": 1788587808930
+        },
+        "evidenceCoverage": 0,
+        "metrics": [
+          {
+            "metric": "verifiedSuccessRate",
+            "observed": false,
+            "weight": 30
+          },
+          {
+            "metric": "firstPassSuccessRate",
+            "observed": false,
+            "weight": 20
+          },
+          {
+            "metric": "retryAvoidanceRate",
+            "observed": false,
+            "weight": 10
+          },
+          {
+            "metric": "timeToVerifiedCandidateMs",
+            "observed": false,
+            "weight": 10
+          },
+          {
+            "metric": "totalCostPerVerifiedSuccessUsd",
+            "observed": false,
+            "weight": 10
+          },
+          {
+            "metric": "contextMissAvoidanceRate",
+            "observed": false,
+            "weight": 5
+          },
+          {
+            "metric": "qualityGateAvoidanceRate",
+            "observed": false,
+            "weight": 10
+          },
+          {
+            "metric": "cancellationFailureAvoidanceRate",
+            "observed": false,
+            "weight": 5
+          }
+        ],
+        "rejectionCodes": [],
+        "rejectionReasons": [],
+        "tuple": {
+          "backend": "persistent-worker",
+          "budget": {
+            "maxAttempts": 1,
+            "maxCostUsd": 4.49,
+            "maxRuntimeMinutes": 10
+          },
+          "factoryConfigurationDigest": "factory-v1-3c589a56",
+          "factoryDefinitionId": "md7t93bxm0f2y6x9c9j7k20ted8ckfge",
+          "factoryDefinitionVersionId": "m97vkr166w1neyekk2mn2heqan8fqpyc",
+          "factoryVersion": 1,
+          "harness": {
+            "adapter": "fab",
+            "capabilityManifestDigest": "sha256:7a6ee25ba6ea51c142de52a33bc02807e9822f69c30edddd9b1f7bf0f561bdc9",
+            "maturity": "EXPERIMENTAL",
+            "version": "v1"
+          },
+          "model": {
+            "contextWindow": 1047576,
+            "estimatedCostPerRunUsd": 4.49,
+            "modelId": "openai/gpt-4.1-mini",
+            "provider": "openrouter"
+          },
+          "riskBoundary": "GREEN",
+          "tupleKey": "m97vkr166w1neyekk2mn2heqan8fqpyc:factory-v1-3c589a56"
+        }
+      },
+      {
+        "eligible": false,
+        "evidence": {
+          "attemptCount": 0,
+          "cutoffAt": 1791179808930,
+          "repositoryAttemptCount": 0,
+          "verifiedAttemptCount": 0,
+          "windowStartedAt": 1788587808930
+        },
+        "evidenceCoverage": 0,
+        "metrics": [
+          {
+            "metric": "verifiedSuccessRate",
+            "observed": false,
+            "weight": 30
+          },
+          {
+            "metric": "firstPassSuccessRate",
+            "observed": false,
+            "weight": 20
+          },
+          {
+            "metric": "retryAvoidanceRate",
+            "observed": false,
+            "weight": 10
+          },
+          {
+            "metric": "timeToVerifiedCandidateMs",
+            "observed": false,
+            "weight": 10
+          },
+          {
+            "metric": "totalCostPerVerifiedSuccessUsd",
+            "observed": false,
+            "weight": 10
+          },
+          {
+            "metric": "contextMissAvoidanceRate",
+            "observed": false,
+            "weight": 5
+          },
+          {
+            "metric": "qualityGateAvoidanceRate",
+            "observed": false,
+            "weight": 10
+          },
+          {
+            "metric": "cancellationFailureAvoidanceRate",
+            "observed": false,
+            "weight": 5
+          }
+        ],
+        "rejectionCodes": [
+          "WORKFLOW_MISMATCH",
+          "MODEL_NOT_APPROVED",
+          "BUDGET_EXCEEDED",
+          "PRODUCTION_CERTIFICATION_MISSING"
+        ],
+        "rejectionReasons": [
+          "Factory Version does not match the WorkOrder workflow.",
+          "Model is not approved for this WorkOrder.",
+          "Estimated cost exceeds the WorkOrder or routing budget.",
+          "Tuple is not production-certified."
+        ],
+        "tuple": {
+          "backend": "persistent-worker",
+          "budget": {
+            "maxAttempts": 1,
+            "maxCostUsd": 0.01,
+            "maxRuntimeMinutes": 1
+          },
+          "factoryConfigurationDigest": "factory-v1-8dee7bb1",
+          "factoryDefinitionId": "md7ks0e4ch2t38t8z11yen1rsx8fpw38",
+          "factoryDefinitionVersionId": "m97wsq92tpqeq0zemd3mces3kn8fp4cj",
+          "factoryVersion": 1,
+          "harness": {
+            "adapter": "codex",
+            "capabilityManifestDigest": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+            "maturity": "PRODUCTION",
+            "version": "v1"
+          },
+          "model": {
+            "contextWindow": 200000,
+            "estimatedCostPerRunUsd": 4.49,
+            "modelId": "gpt-5.6-terra",
+            "provider": "openai"
+          },
+          "riskBoundary": "GREEN",
+          "tupleKey": "m97wsq92tpqeq0zemd3mces3kn8fp4cj:factory-v1-8dee7bb1"
+        }
+      }
+    ],
+    "explanation": "Advisory mode records the recommendation while the current certified tuple remains authoritative.",
+    "fallbackTupleKey": "m97vkr166w1neyekk2mn2heqan8fqpyc:factory-v1-3c589a56",
+    "guardedAutoApplied": false,
+    "mode": "ADVISORY",
+    "recommendedTupleKey": "m97vkr166w1neyekk2mn2heqan8fqpyc:factory-v1-3c589a56",
+    "status": "SELECTED"
+  },
+  "selectedFactoryDefinitionVersionId": "m97vkr166w1neyekk2mn2heqan8fqpyc",
+  "selectedModel": {
+    "contextWindow": 1047576,
+    "estimatedCostPerRunUsd": 4.49,
+    "modelId": "openai/gpt-4.1-mini",
+    "provider": "openrouter"
+  }
+}

@@ -970,6 +970,7 @@ export class FactoryAttemptWorker {
           await report({
             events: mappedEvents,
             observations: traceObservations,
+            artifacts: executionArtifacts,
             terminal: { status: result.status === "CANCELED" ? "CANCELED" : "FAILED", failureReason: result.error ?? `${adapterCapabilities.displayName} execution failed.` },
           });
           this.failedCount += 1;

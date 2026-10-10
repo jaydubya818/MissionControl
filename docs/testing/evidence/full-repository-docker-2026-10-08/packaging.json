@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+  "sourceTree": "d863864bfd8838e4b5ea3c837ef3a0958422613c",
+  "fixtureCommit": "15005efe2370f052996515fd84dbb73ce1d2a394",
+  "trackedFiles": 4155,
+  "trackedBytes": 218747055,
+  "bundleBytes": 210612519,
+  "workspaceLimitBytes": 134217728,
+  "invocationLimitBytes": 33554432,
+  "providerCalls": 0
+}

@@ -133,6 +133,7 @@ export class FabExecutorAdapter implements HarnessExecutorAdapter<Prepared, Hand
           credential: { ...structuredClone(configured.credential), scope: { kind: "repository", root: request.repositoryRoot } } })
       : configured;
     if (attempt.acceptanceCriteria.length === 0 || config.acceptanceCriteria.length === 0) throw new Error("Fab requires frozen WorkOrder and operator acceptance criteria.");
+    new Repository(config.repository, config.writableFiles).snapshot();
     const redactor = new Redactor();
     const store = new SessionStore(this.options.stateDirectory, config.repository, redactor);
     const session = newSession(config, redactor.text(request.prompt));

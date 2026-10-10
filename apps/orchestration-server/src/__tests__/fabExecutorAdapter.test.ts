@@ -58,6 +58,18 @@ function fixture(options: { attack?: string; hangModel?: boolean; slowCheck?: bo
 }
 
 describe("Fab canonical MC harness conformance", () => {
+  it("rejects repositories beyond the runtime snapshot limit before creating a model", async () => {
+    const f = fixture();
+    for (let index = 0; index < 301; index++) writeFileSync(path.join(f.root, `file-${index}.txt`), "fixture");
+    f.git(["add", "."]);
+    f.git(["commit", "-qm", "Large repository fixture"]);
+    f.context.attempt!.sourceRevision = f.git(["rev-parse", "HEAD"]).trim();
+    const modelFactory = vi.fn();
+    const adapter = new FabExecutorAdapter({ config: f.config, stateDirectory: path.join(f.directory, "large"), modelFactory });
+    await expect(adapter.prepare(f.request, f.context)).rejects.toThrow("300 text files");
+    expect(modelFactory).not.toHaveBeenCalled();
+  });
+
   function openRouterFixture() {
     const f = fixture();
     const config = parseConfig({ ...f.config, provider: "openrouter", model: "openai/gpt-4.1-mini",

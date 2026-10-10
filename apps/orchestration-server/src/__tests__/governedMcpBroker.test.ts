@@ -154,6 +154,26 @@ describe("governed read-only MCP broker", () => {
     expect(context7ToolVersion()).toEqual(controlPlaneContext7ToolVersion());
   });
 
+  it("reports the installed SDK identity and rejects coherent grants for the old SDK before transport", async () => {
+    const installed = JSON.parse(await readFile(resolve(REPO_ROOT, "apps/orchestration-server/node_modules/@modelcontextprotocol/sdk/package.json"), "utf8"));
+    expect(context7ToolVersion().sdk.version).toBe(installed.version);
+    let calls = 0;
+    const value = await fixture({ invoke: async () => { calls += 1; return successfulOutput; } });
+    const old = structuredClone(value.authority.toolVersion.snapshot);
+    Object.assign(old.sdk, { version: "1.26.0" });
+    const digest = mcpToolVersionDigest(old);
+    value.authority.toolVersion.snapshot = old;
+    value.authority.toolVersion.digest = digest;
+    value.authority.grant.snapshot.toolVersionSnapshot = old;
+    value.authority.grant.snapshot.toolVersionDigest = digest;
+    value.request.toolVersionDigest = digest;
+    value.authority.grant.digest = mcpToolGrantDigest(value.authority.grant.snapshot);
+    value.request.toolGrantDigest = value.authority.grant.digest;
+    value.authority.executionProfile.toolGrant = { id: value.authority.grant.id, digest: value.authority.grant.digest, snapshot: value.authority.grant.snapshot };
+    await expect(value.broker.call(brokerInput(value))).rejects.toMatchObject({ code: "SERVER_SUBSTITUTION" });
+    expect(calls).toBe(0);
+  });
+
   it("authorizes only the exact real-service operation, scope, and contract identity offline", async () => {
     const value = await remoteFixture();
     const result = await value.broker.call(brokerInput(value));

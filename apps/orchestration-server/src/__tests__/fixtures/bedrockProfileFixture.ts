@@ -1,3 +1,4 @@
+import { RESEARCH_LAB_DOCKER_PROFILE } from "../../dockerCapacity.js";
 // Pure synthetic composition. Never register or issue this as a live profile.
 import {
   CODEX_BEDROCK_V1_HARNESS_MANIFEST,
@@ -17,21 +18,37 @@ import {
 import { profile, executionManifest } from "./remoteWorkerFixture.js";
 import { bedrockModelRouteBinding } from "../../bedrockModelRouteBinding.js";
 import { fixtureRoute, sha } from "./bedrockBridgeFixture.js";
-import { DOCKER_BEDROCK_CANDIDATE_IDENTITY } from "../../dockerBedrockIdentity.js";
-import { sandboxProfileDigest, stableSandboxResourceName } from "../../sandboxProvider.js";
+import {
+  DOCKER_BEDROCK_CANDIDATE_IDENTITY,
+  RESEARCH_LAB_DOCKER_IDENTITY,
+} from "../../dockerBedrockIdentity.js";
+import {
+  sandboxProfileDigest,
+  stableSandboxResourceName,
+} from "../../sandboxProvider.js";
 export function bedrockProfileFixture(
   baseSha = "a".repeat(40),
   worktree = "/tmp/offline-fixture",
+  localResearchLabLarge = false,
 ) {
   const p: any = profile(),
-    identity = DOCKER_BEDROCK_CANDIDATE_IDENTITY;
+    identity = localResearchLabLarge
+      ? RESEARCH_LAB_DOCKER_IDENTITY
+      : DOCKER_BEDROCK_CANDIDATE_IDENTITY;
   Object.assign(p, {
     provider: "DOCKER",
-    providerProfile: "factory/docker-bedrock/v1",
+    providerProfile: localResearchLabLarge
+      ? RESEARCH_LAB_DOCKER_PROFILE
+      : "factory/docker-bedrock/v1",
     providerProfileVersion: "1",
     profileKey: "bedrock-offline",
   });
-  p.machine = { ...p.machine, image: identity.image, cpu: 1, memoryMb: 512 };
+  p.machine = {
+    ...p.machine,
+    image: identity.image,
+    cpu: 1,
+    memoryMb: localResearchLabLarge ? 2048 : 512,
+  };
   p.supervisor.transport = "DOCKER_STDIN";
   p.credentials.inference = "NONE";
   p.network.egress = "RESTRICTED_ALLOWLIST";
@@ -169,7 +186,11 @@ export function bedrockProfileFixture(
     qualificationDigest: executionProfileQualificationDigest(qualification),
   };
   manifest.causation.workflowRunId = "bedrock-fixture-run";
-  manifest.sandbox.resourceName = stableSandboxResourceName({projectId:"bedrock-offline-fixture",workflowRunId:"bedrock-fixture-run",attemptId:"bedrock-fixture-run"});
+  manifest.sandbox.resourceName = stableSandboxResourceName({
+    projectId: "bedrock-offline-fixture",
+    workflowRunId: "bedrock-fixture-run",
+    attemptId: "bedrock-fixture-run",
+  });
   manifest.compiledPrompt =
     "OFFLINE FIXTURE. Perform the supplied deterministic tool operation and return the required factory JSON result.";
   return {

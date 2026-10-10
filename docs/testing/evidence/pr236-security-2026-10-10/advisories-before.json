@@ -1,0 +1,131 @@
+{
+  "advisories": [
+    {
+      "id": 1193660,
+      "module_name": "@ai-sdk/provider-utils",
+      "title": "@ai-sdk/provider-utils has an Uncontrolled Resource Consumption issue",
+      "severity": "low",
+      "vulnerable_versions": "<3.0.28",
+      "patched_versions": ">=3.0.28",
+      "url": "https://github.com/advisories/GHSA-866g-f22w-33x8",
+      "findings": [
+        {
+          "version": "3.0.21",
+          "paths": [
+            ". > @taskmasterai/cli@1.1.4 > @ai-sdk/anthropic@2.0.66 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > @ai-sdk/google@2.0.54 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > @ai-sdk/openai@2.0.92 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > @ai-sdk/perplexity@2.0.24 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > ai@5.0.137 > @ai-sdk/gateway@2.0.43 > @ai-sdk/provider-utils@3.0.21",
+            ". > @taskmasterai/cli@1.1.4 > ai@5.0.137 > @ai-sdk/provider-utils@3.0.21"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1241209,
+      "module_name": "source-map-js",
+      "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+      "severity": "high",
+      "vulnerable_versions": ">=1.0.0 <1.2.2",
+      "patched_versions": ">=1.2.2",
+      "url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q",
+      "findings": [
+        {
+          "version": "1.2.1",
+          "paths": [
+            ". > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            ". > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > @tailwindcss/vite@4.1.18 > @tailwindcss/node@4.1.18 > source-map-js@1.2.1",
+            "apps/mission-control-ui > @tailwindcss/vite@4.1.18 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > @vitejs/plugin-react@4.7.0 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "apps/mission-control-ui > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/agent-runtime > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/agent-runtime > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/context-router > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/context-router > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/context-tools > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/context-tools > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/coordinator > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/coordinator > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/meetings > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/meetings > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/memory > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/memory > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/model-router > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/model-router > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/policy-engine > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/policy-engine > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/research-adapters > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/research-adapters > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/shared > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/shared > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/state-machine > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/state-machine > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/telegraph > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/telegraph > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/workflow-engine > vitest@4.1.11 > @vitest/mocker@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1",
+            "packages/workflow-engine > vitest@4.1.11 > vite@6.4.3 > postcss@8.5.26 > source-map-js@1.2.1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1241210,
+      "module_name": "proxy-addr",
+      "title": "proxy-addr vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet",
+      "severity": "critical",
+      "vulnerable_versions": ">=1.1.0 <2.0.8",
+      "patched_versions": ">=2.0.8",
+      "url": "https://github.com/advisories/GHSA-jqcg-44mw-7w3h",
+      "findings": [
+        {
+          "version": "2.0.7",
+          "paths": [
+            ". > @taskmasterai/cli@1.1.4 > fastmcp@3.33.0 > @modelcontextprotocol/sdk@1.26.0 > express@5.2.1 > proxy-addr@2.0.7",
+            ". > @taskmasterai/cli@1.1.4 > fastmcp@3.33.0 > @modelcontextprotocol/sdk@1.26.0 > express-rate-limit@8.6.2 > express@5.2.1 > proxy-addr@2.0.7",
+            "apps/orchestration-server > @modelcontextprotocol/sdk@1.26.0 > express@5.2.1 > proxy-addr@2.0.7",
+            "apps/orchestration-server > @modelcontextprotocol/sdk@1.26.0 > express-rate-limit@8.6.2 > express@5.2.1 > proxy-addr@2.0.7"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1241332,
+      "module_name": "shell-quote",
+      "title": "shell-quote: `quote()` command injection via a line terminator in a token after a `{ comment }` token",
+      "severity": "critical",
+      "vulnerable_versions": ">=1.8.4 <1.11.0",
+      "patched_versions": ">=1.11.0",
+      "url": "https://github.com/advisories/GHSA-pqg4-j6r4-53mv",
+      "findings": [
+        {
+          "version": "1.10.0",
+          "paths": [
+            ". > concurrently@8.2.2 > shell-quote@1.10.0"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 1241339,
+      "module_name": "@modelcontextprotocol/sdk",
+      "title": "MCP TypeScript SDK: OAuth client could send credentials to an authorization server chosen by the MCP server",
+      "severity": "high",
+      "vulnerable_versions": ">=1.12.0 <1.31.0",
+      "patched_versions": ">=1.31.0",
+      "url": "https://github.com/advisories/GHSA-6qxp-vccf-f47h",
+      "findings": [
+        {
+          "version": "1.26.0",
+          "paths": [
+            ". > @taskmasterai/cli@1.1.4 > fastmcp@3.33.0 > @modelcontextprotocol/sdk@1.26.0",
+            "apps/orchestration-server > @modelcontextprotocol/sdk@1.26.0"
+          ]
+        }
+      ]
+    }
+  ]
+}

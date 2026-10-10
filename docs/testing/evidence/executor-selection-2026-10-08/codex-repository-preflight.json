@@ -1,0 +1,31 @@
+{
+  "clientDate": "2026-10-08",
+  "adapter": "codex/v1",
+  "health": {
+    "status": "READY",
+    "checkedAt": 1791525689392,
+    "adapter": "codex",
+    "version": "v1"
+  },
+  "baseline": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+  "result": {
+    "root": "/Users/jaywest/.codex/worktrees/live-retry-runbook/MissionControl",
+    "workingDirectory": "/Users/jaywest/.codex/worktrees/live-retry-runbook/MissionControl",
+    "baselineCommit": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+    "headCommit": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+    "headChanged": false,
+    "changedFiles": [],
+    "scopeViolations": []
+  },
+  "configurationIssues": [],
+  "prepare": {
+    "status": "PASS"
+  },
+  "providerExecutions": 0,
+  "spendAuthorization": "NONE",
+  "liveQualification": "NOT_PERFORMED",
+  "limitations": [
+    "Repository and runtime preflight only; no model execution or provider-cost qualification.",
+    "Existing $4.49 reservation remains retained."
+  ]
+}

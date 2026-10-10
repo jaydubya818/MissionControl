@@ -1,0 +1,12 @@
+{
+  "source": "https://aws.amazon.com/bedrock/pricing/",
+  "observedOn": "2026-10-09",
+  "method": "Rendered AWS pricing page, Anthropic tab",
+  "region": "US East (N. Virginia)",
+  "section": "Geo and In-region Cross-region Inference",
+  "model": "Claude Sonnet 4.6",
+  "usdPerMillionInputTokens": 3.3,
+  "usdPerMillionOutputTokens": 16.5,
+  "qualificationStatus": "OBSERVED_NOT_ACTIVATED",
+  "routeCapability": "WAITING_FOR_SSO"
+}

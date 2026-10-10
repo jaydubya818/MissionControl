@@ -34,6 +34,14 @@ it.runIf(process.env.MC_DOCKER_QUALIFICATION === "1")(
         budget = bridgeFixture(),
         m = f.manifest;
       const runId = m.causation.workflowRunId;
+      const twoRequestMaximum = 2 * (
+        budget.price.maximumInputTokens * budget.price.inputNanoUsdPerToken +
+        4096 * budget.price.outputNanoUsdPerToken
+      );
+      budget.binding.maximumProgramNanoUsd = twoRequestMaximum;
+      budget.reservation.maximumNanoUsd = twoRequestMaximum;
+      budget.binding.maximumPhysicalRequests = 2;
+      budget.reservation.maximumRequests = 2;
       Object.assign(budget.binding, {
         workflowRunId: runId,
         leaseId: "fixture-lease",
@@ -211,6 +219,8 @@ it.runIf(process.env.MC_DOCKER_QUALIFICATION === "1")(
       );
       expect(result, JSON.stringify(diagnostics)).not.toBeNull();
       expect(sends).toBe(2);
+      expect(budget.reservation.holds).toHaveLength(2);
+      expect(budget.reservation.holds.reduce((sum, hold) => sum + hold.maximumNanoUsd, 0)).toBe(twoRequestMaximum);
       const bundle = JSON.parse(result!.toString());
       expect(bundle.status).toBe("COMPLETED");
       expect(bundle.structuredResult.status).toBe("COMPLETED");

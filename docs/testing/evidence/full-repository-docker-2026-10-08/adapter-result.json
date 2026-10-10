@@ -1,0 +1,46 @@
+{
+  "packaging": {
+    "sourceCommit": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+    "sourceTree": "d863864bfd8838e4b5ea3c837ef3a0958422613c",
+    "fixtureCommit": "15005efe2370f052996515fd84dbb73ce1d2a394",
+    "trackedFiles": 4155,
+    "trackedBytes": 218747055,
+    "bundleBytes": 210612519,
+    "workspaceLimitBytes": 134217728,
+    "invocationLimitBytes": 33554432,
+    "providerCalls": 0
+  },
+  "providerCalls": 0,
+  "error": "Error: Docker invocation exceeds bounded input.",
+  "diagnostics": {
+    "provider": "factory/docker-bedrock/v1",
+    "terminalState": null,
+    "supervisorProcessRunning": true,
+    "exitCode": null,
+    "failure": null,
+    "accountingReference": null,
+    "stderrTail": null,
+    "policyInspection": {
+      "image": "sha256:56dd9fabaa14ff5c3bd73a6003adcc27d26907a76e0f08f5c0f4b52e83b702f0",
+      "user": "10001:10001",
+      "networkMode": "none",
+      "readonlyRootfs": true,
+      "capabilitiesDropped": [
+        "ALL"
+      ],
+      "securityOptions": [
+        "no-new-privileges"
+      ],
+      "pidMode": "",
+      "memory": 536870912,
+      "cpu": 1000000000,
+      "pids": 64,
+      "tmpfs": {
+        "/tmp": "rw,nosuid,nodev,noexec,size=16777216,uid=10001,gid=10001,mode=0700",
+        "/var/lib/mission-control/attempt": "rw,nosuid,nodev,noexec,size=134217728,uid=10001,gid=10001,mode=0700"
+      },
+      "mounts": [],
+      "privileged": false
+    }
+  }
+}

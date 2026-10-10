@@ -1,0 +1,5 @@
+import {writeFileSync} from 'node:fs';
+import {CodexV1ExecutorAdapter} from '../src/codexExecutorAdapter.js';
+import {HarnessAdapterRegistry} from '../src/harnessAdapterRegistry.js';
+const r=new HarnessAdapterRegistry([new CodexV1ExecutorAdapter()]).requireRegistration({adapter:'codex',version:'v1'});
+writeFileSync('docs/testing/evidence/live-retry-2026-10-04/verifier-runtime.json',JSON.stringify({manifest:r.manifest,capabilityManifestSha256:r.capabilityManifestSha256,effectiveConfigSha256:r.effectiveConfigSha256,runtimeArtifact:r.runtimeArtifact,runtimeArtifactSha256:r.runtimeArtifactSha256},null,2)+'\n');

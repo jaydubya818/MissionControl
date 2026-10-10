@@ -1,0 +1,191 @@
+{
+  "scope": "VERIFICATION_ONLY",
+  "inference": "Verification Attempts execute frozen commands through factoryAttemptWorker, not the model executor.",
+  "tests": {
+    "passed": 766,
+    "skipped": 11,
+    "reference": "/private/tmp/mc-live-orchestration-tests-unrestricted.txt"
+  },
+  "runtime": {
+    "manifest": {
+      "schemaVersion": "harness-capability-manifest/v1",
+      "scope": "ADAPTER_EFFECTIVE",
+      "identity": {
+        "harnessId": "codex-cli",
+        "harnessVersion": "0.146.0",
+        "harnessCommit": "e363b08c9175ac1cbe5893615dd2cb9ddf95043b",
+        "adapterId": "codex",
+        "adapterVersion": "v1"
+      },
+      "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+      "models": {
+        "providerSelection": "UNSUPPORTED",
+        "modelSelection": "SUPPORTED",
+        "supported": [
+          {
+            "provider": "openai",
+            "modelId": "gpt-5.6-terra",
+            "selection": "ADVERTISED",
+            "contextWindowTokens": null,
+            "modalities": [
+              "text"
+            ]
+          },
+          {
+            "provider": "openai",
+            "modelId": "*",
+            "selection": "PASSTHROUGH",
+            "contextWindowTokens": null,
+            "modalities": [
+              "text"
+            ]
+          }
+        ],
+        "reasoningControls": "SUPPORTED"
+      },
+      "filesystem": {
+        "read": "SUPPORTED",
+        "write": "SUPPORTED",
+        "pathAllowlist": "PARTIAL",
+        "changedFileCapture": "SUPPORTED"
+      },
+      "shell": {
+        "available": "SUPPORTED",
+        "commandTimeout": "SUPPORTED",
+        "processTreeCancellation": "PARTIAL",
+        "credentialEnvironmentScrub": "PARTIAL"
+      },
+      "git": {
+        "status": "SUPPORTED",
+        "diff": "SUPPORTED",
+        "commit": "SUPPORTED",
+        "branch": "SUPPORTED",
+        "remotePublication": "UNSUPPORTED"
+      },
+      "browser": {
+        "webSearch": "UNSUPPORTED",
+        "webFetch": "UNSUPPORTED",
+        "interactiveBrowser": "UNSUPPORTED"
+      },
+      "tools": {
+        "native": "SUPPORTED",
+        "mcp": "UNSUPPORTED",
+        "structuredOutput": "SUPPORTED",
+        "telemetry": "SUPPORTED"
+      },
+      "subagents": {
+        "available": "PARTIAL",
+        "parallel": "PARTIAL",
+        "background": "PARTIAL",
+        "eventVisibility": "PARTIAL"
+      },
+      "streaming": {
+        "events": "SUPPORTED",
+        "modelDeltas": "UNSUPPORTED",
+        "durableReplay": "UNSUPPORTED"
+      },
+      "context": {
+        "persistentSessions": "UNSUPPORTED",
+        "resume": "UNSUPPORTED",
+        "fork": "UNSUPPORTED",
+        "compaction": "SUPPORTED",
+        "instructionFiles": "SUPPORTED"
+      },
+      "headless": {
+        "support": "SUPPORTED",
+        "mode": "CLI_JSONL"
+      },
+      "cancellation": {
+        "support": "PARTIAL",
+        "mode": "PROCESS_SIGNAL",
+        "idempotentCleanup": true
+      },
+      "sandbox": {
+        "isolationModes": [
+          "READ_ONLY",
+          "WORKSPACE_WRITE"
+        ],
+        "externalSandboxRecommended": true,
+        "requirements": [
+          "owned-process-group",
+          "repository-worktree",
+          "post-execution-path-audit"
+        ]
+      },
+      "network": {
+        "providerApi": true,
+        "packageInstall": false,
+        "runtimeEgressControl": "PARTIAL",
+        "destinations": [
+          "OpenAI Codex service"
+        ]
+      },
+      "credentials": {
+        "classes": [
+          "codex-chatgpt-auth"
+        ],
+        "passedToToolProcesses": false,
+        "redaction": "PARTIAL"
+      },
+      "telemetry": {
+        "tokens": "SUPPORTED",
+        "cost": "UNSUPPORTED",
+        "toolCalls": "SUPPORTED",
+        "modelRequests": "UNSUPPORTED",
+        "retries": "UNSUPPORTED"
+      },
+      "admission": {
+        "maturity": "PRODUCTION",
+        "executionBackends": [
+          "persistent-worker",
+          "remote-sandbox"
+        ],
+        "requiredExternalControls": [
+          "canonical-worker-lease",
+          "mission-control-sandbox-policy",
+          "repository-scope-reconciliation",
+          "independent-verification",
+          "publication-permit"
+        ],
+        "prohibitedAuthorities": [
+          "worker-leases",
+          "verification-subjects",
+          "verification-plans",
+          "evidence-authority",
+          "github-publication",
+          "acceptance"
+        ]
+      },
+      "limitations": [
+        "Exact model-request and harness-retry counts are not exposed and remain null.",
+        "Cost is not reported under saved ChatGPT authentication and remains null.",
+        "Cancellation uses process signaling rather than an acknowledged in-agent protocol.",
+        "Repository path allowlists are reconciled after execution by Mission Control.",
+        "Only openai/gpt-5.6-terra was exercised in the standalone two-harness conformance run; other model IDs use the existing controlled pass-through route."
+      ]
+    },
+    "capabilityManifestSha256": "sha256:7e8b7435f6dab9a8a9a09b90ae1791110c3593ad1b38cdc48227d18069ec1c06",
+    "effectiveConfigSha256": "94daa9e3e1ee5ce2e3d8ca9116ec29c1a1eb8d78e232d1abb383cbdf2e7d6081",
+    "runtimeArtifact": {
+      "schemaVersion": "harness-runtime-artifact/v1",
+      "kind": "EXECUTABLE",
+      "name": "codex",
+      "version": "0.146.0",
+      "executableSha256": "ae1d3ffe6d48aec6a4dc3f50e7eb8e0d11962485a6a9406c5a7012139383da02",
+      "imageDigest": null
+    },
+    "runtimeArtifactSha256": "sha256:dbd2a09c812ba8b2a5b5425f5386b0c65b2a399e40813374597d20bcfcd855fc"
+  },
+  "repositoryId": "k17wswvrva7ky172eej2w1nj858cbzt7",
+  "command": {
+    "executable": "node",
+    "args": [
+      "-e",
+      "const fs=require('fs');const p='docs/operations/verification-retry-runbook.md';const s=fs.readFileSync(p,'utf8');for(const r of [/NOT_VERIFIED/,/BLOCKED/,/candidate/i,/revision/i,/contract/i,/evidence/i,/approval/i,/restart/i])if(!r.test(s))throw Error('Missing required topic: '+r);if(s.split('\\n').length>300)throw Error('Runbook exceeds 300 lines');if(/\\b(TODO|TBD|PLACEHOLDER)\\b/.test(s))throw Error('Unfinished content');console.log('Required runbook topics present; semantic review remains required');"
+    ],
+    "category": "CONTRACT_TEST",
+    "commandClass": "TEST",
+    "evidenceCategory": "TEST_RESULT",
+    "timeoutMs": 10000
+  }
+}
