@@ -29,7 +29,8 @@ if (!buildArgument || !dockerExecutable || !outputArgument || !['prepare', 'exec
 const build = resolve(buildArgument), output = resolve(outputArgument), repo = process.cwd();
 await mkdir(output);
 const digest = (value: unknown) => `sha256:${sha256Hex(canonicalJson(value))}`;
-const savedEnvironment = Object.fromEntries(['MISSION_CONTROL_SERVICE_ID', 'MISSION_CONTROL_SERVICE_COMMAND_SECRET', 'MC_LOCAL_REPOSITORY_ADMISSION', 'CODEX_WORKER_CHECKOUT_ROOT'].map(k => [k, process.env[k]]));
+const savedEnvironment = Object.fromEntries(['MISSION_CONTROL_SERVICE_ID', 'MISSION_CONTROL_SERVICE_COMMAND_SECRET', 'MC_LOCAL_REPOSITORY_ADMISSION', 'CODEX_WORKER_CHECKOUT_ROOT',
+  'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL'].map(k => [k, process.env[k]]));
 process.env.MISSION_CONTROL_SERVICE_ID = 'native-successor-qualification';
 process.env.MISSION_CONTROL_SERVICE_COMMAND_SECRET = randomBytes(32).toString('hex');
 const db: any = await startFixtureDatabase(repo, { canonicalAccounting: true, nativeExecution: true });
@@ -74,8 +75,10 @@ try {
   const gitEnv = { PATH: process.env.PATH!, HOME: parent, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_TERMINAL_PROMPT: '0' };
   const git = (...args: string[]) => execFileSync('git', args, { cwd: root, env: gitEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   git('init', '-b', 'main');
-  git('config', '--local', 'user.name', 'Synthetic Qualification');
-  git('config', '--local', 'user.email', 'qualification@example.test');
+  // The admitted repository config stays unchanged. Factory Git subprocesses
+  // explicitly admit these identity variables; restore them in final cleanup.
+  process.env.GIT_AUTHOR_NAME = process.env.GIT_COMMITTER_NAME = 'Synthetic Qualification';
+  process.env.GIT_AUTHOR_EMAIL = process.env.GIT_COMMITTER_EMAIL = 'qualification@example.test';
   let sourceFiles = [{ path: '.gitignore', contentDigest: `sha256:${sha256Hex(ignore)}` }, { path: 'README.md', contentDigest: `sha256:${sha256Hex(content)}` }];
   if (mode === 'hybrid') {
     const { rm } = await import('node:fs/promises');
@@ -578,32 +581,35 @@ try {
   state.failedWorkerStatus = worker?.status();
   state.failure = String(error); await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n'); throw error;
 } finally {
-  await worker?.stop(); await adapter?.dispose();
-  const records: any = {};
-  for (const table of ['workflowRuns', 'workOrders', 'runArtifacts', 'verificationReceipts', 'verificationRuns', 'qualityGateDecisions', 'evidenceEnvelopes', 'missionHandoffs', 'validationAssertions']) {
-    records[table] = await query('nativeFixture:inspect', { table }).catch(() => []);
+  try {
+    await worker?.stop(); await adapter?.dispose();
+    const records: any = {};
+    for (const table of ['workflowRuns', 'workOrders', 'runArtifacts', 'verificationReceipts', 'verificationRuns', 'qualityGateDecisions', 'evidenceEnvelopes', 'missionHandoffs', 'validationAssertions']) {
+      records[table] = await query('nativeFixture:inspect', { table }).catch(() => []);
+    }
+    await writeFile(join(output, 'durable-records.json'), JSON.stringify(records, null, 2) + '\n');
+    await resultConsumer?.stop();
+    await db.stop(); await hybridProvider?.f.stop();
+    const admitted = state.repositoryAdmission;
+    if (admitted) {
+      const parent = resolve(admitted.root, '..');
+      const marker = JSON.parse(await readFile(join(parent, 'qualification-owner.json'), 'utf8'));
+      assert.equal(marker.root, admitted.root); assert.equal(marker.fixtureId, admitted.fixtureId);
+      assert.match(parent, /^\/private\/tmp\/mc-local-qualification-[a-f0-9]{32}$/);
+      assert.equal((await lstat(parent)).isSymbolicLink(), false);
+      const archive = join(output, 'candidates.bundle');
+      execFileSync('git', ['-C', admitted.root, 'bundle', 'create', archive, '--all'], { stdio: 'pipe' });
+      state.candidateArchiveDigest = 'sha256:' + sha256Hex(await readFile(archive));
+      await rm(parent, { recursive: true });
+      state.repositoryCleanup = 'VERIFIED';
+    }
+    assert.match(db.root, /\/mc-enterprise-1b-[A-Za-z0-9]+$/);
+    assert.equal((await lstat(db.root)).isSymbolicLink(), false);
+    await db.destroy(); state.databaseCleanup = 'VERIFIED';
+    await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
+  } finally {
+    for (const [key, value] of Object.entries(savedEnvironment)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
   }
-  await writeFile(join(output, 'durable-records.json'), JSON.stringify(records, null, 2) + '\n');
-  await resultConsumer?.stop();
-  await db.stop(); await hybridProvider?.f.stop();
-  const admitted = state.repositoryAdmission;
-  if (admitted) {
-    const parent = resolve(admitted.root, '..');
-    const marker = JSON.parse(await readFile(join(parent, 'qualification-owner.json'), 'utf8'));
-    assert.equal(marker.root, admitted.root); assert.equal(marker.fixtureId, admitted.fixtureId);
-    assert.match(parent, /^\/private\/tmp\/mc-local-qualification-[a-f0-9]{32}$/);
-    assert.equal((await lstat(parent)).isSymbolicLink(), false);
-    const archive = join(output, 'candidates.bundle');
-    execFileSync('git', ['-C', admitted.root, 'bundle', 'create', archive, '--all'], { stdio: 'pipe' });
-    state.candidateArchiveDigest = 'sha256:' + sha256Hex(await readFile(archive));
-    await rm(parent, { recursive: true });
-    state.repositoryCleanup = 'VERIFIED';
-  }
-  assert.match(db.root, /\/mc-enterprise-1b-[A-Za-z0-9]+$/);
-  assert.equal((await lstat(db.root)).isSymbolicLink(), false);
-  await db.destroy(); state.databaseCleanup = 'VERIFIED';
-  await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
-  for (const [key, value] of Object.entries(savedEnvironment)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
 }
 // All worker, image and database cleanup has completed. Convex CLI child
 // transport handles must not keep a finished qualification command resident.

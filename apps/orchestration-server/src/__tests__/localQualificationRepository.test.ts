@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdir, writeFile, rm, symlink, readFile, chmod, link } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { canonicalJson, sha256Hex } from "@mission-control/shared";
 import { attestLocalQualificationRepository } from "../localQualificationRepository.js";
+import { hardenedGitArgs, hardenedGitEnvironment } from "../hardenedGit.js";
 const roots: string[] = [];
-afterEach(async () => { for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
+afterEach(async () => { vi.unstubAllEnvs(); for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true }); });
 async function fixture() {
   const parent = `/private/tmp/mc-local-qualification-${randomBytes(16).toString("hex")}`;
   roots.push(parent); await mkdir(parent, { mode: 0o700 });
@@ -25,6 +26,30 @@ async function fixture() {
 describe("real disposable repository ownership controls", () => {
   it("attests exact owned no-remote source bytes", async () => {
     const f = await fixture(); expect(await attestLocalQualificationRepository(f.binding)).toMatchObject({ noRemotes: true, root: f.root, baselineCommit: f.binding.baselineCommit });
+  });
+  it("commits a candidate with scoped identity while preserving the admitted repository config", async () => {
+    const f = await fixture();
+    const originalConfig = await readFile(`${f.root}/.git/config`, "utf8");
+    for (const role of ["AUTHOR", "COMMITTER"]) {
+      vi.stubEnv(`GIT_${role}_NAME`, "Synthetic Qualification");
+      vi.stubEnv(`GIT_${role}_EMAIL`, "qualification@example.test");
+    }
+    // Match the canonical worker's hardened Git environment with no global config.
+    const candidate = `${f.parent}/candidate`;
+    f.git("worktree", "add", "--detach", candidate, f.binding.baselineCommit);
+    const git = (...args: string[]) => execFileSync("git", hardenedGitArgs(args), {
+      cwd: candidate, env: hardenedGitEnvironment(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    await writeFile(`${candidate}/README.md`, "# Verified synthetic candidate\n");
+    git("add", "README.md"); git("commit", "-m", "Synthetic candidate");
+    expect(git("log", "-1", "--format=%an <%ae>|%cn <%ce>")).toBe(
+      "Synthetic Qualification <qualification@example.test>|Synthetic Qualification <qualification@example.test>");
+    expect(git("rev-parse", "HEAD")).not.toBe(f.binding.baselineCommit);
+    expect(await readFile(`${f.root}/.git/config`, "utf8")).toBe(originalConfig);
+    expect(await attestLocalQualificationRepository(f.binding)).toMatchObject({ noRemotes: true });
+    // Persisting author config is still outside the admitted repository contract.
+    f.git("config", "--local", "user.name", "Synthetic Qualification");
+    await expect(attestLocalQualificationRepository(f.binding)).rejects.toThrow("unadmitted behavior");
   });
   it("rejects unrelated roots and parent traversal", async () => {
     const f = await fixture(); const other = await fixture();
