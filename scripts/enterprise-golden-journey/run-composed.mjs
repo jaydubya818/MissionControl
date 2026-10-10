@@ -35,7 +35,7 @@ try {
   let browserEvidence=consumer?.browser;
   if(!browserEvidence)try{browserEvidence=JSON.parse(await readFile(join(output,'browser/report.json'),'utf8'));}catch{}
   report.execution={native:journey.nativeExecution??'NOT_RUN',hybrid:journey.hybridMission??'NOT_RUN',accounting:journey.nativeDelegatedAccounting??'NOT_RUN',completedResult:consumer?.status??'NOT_RUN',browser:browserEvidence??{status:'NOT_RUN'}};
-  report.status=code!==0?'FAIL':'PARTIAL';
+  report.status=code!==0 || browserEvidence?.status==='FAIL'?'FAIL':'PARTIAL';
   report.blockers=['No browser control is wired to Sofie proposal authorization in the qualified frontends.','Mission creation and acceptance use synthetic authenticated database clients.','Proposal and Result browser steps do not form one end-to-end owner-created Mission.','Deterministic model, native documents and delegated slug utility do not qualify Recruiting UI or live model behavior.','Hosted private native runtime distribution and independent Claude review remain separate gates.'];
   if(journey.failure)report.failure=journey.failure;
 } catch(error){report.status='FAIL';report.failure=String(error);}

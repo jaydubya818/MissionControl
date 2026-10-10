@@ -17,7 +17,7 @@ assert.ok(fixture.includes("await fault(missionId,{owner:s.peerId},['ownerMember
 fixture=fixture.replace("    const beforeRuns=","    await db.anonymous.action('sofieEnterprise:command',signedCommand(config,input));\n    const beforeRuns=");
 fixture=fixture.replace("await fault(missionId,{owner:s.peerId},['ownerMemberId']);","await fault(missionId,{ownerOperatorId:s.peerId});")
   .replace('await fault(missionId,{owner:mission.owner,ownerMemberId:mission.ownerMemberId});','await fault(missionId,{ownerOperatorId:mission.ownerOperatorId});')
-  .replace("    result.completed=completed;", "    result.completed=completed;\n    try {")
+  .replace("    result.completed=completed;", "    result.completed=completed;\n    let sameContext;\n    try {")
   .replace("    await mutate('sofieEnterprise:decide',{projectId:s.projectId,connectionId:connection.connectionId,decision:'REVOKE'});",`    } finally {
     if(process.env.MC_COMPOSED_BROWSER_MODULE) {
       const browser=await import(process.env.MC_COMPOSED_BROWSER_MODULE);
@@ -25,6 +25,7 @@ fixture=fixture.replace("await fault(missionId,{owner:s.peerId},['ownerMemberId'
     }
     }
     await mutate('sofieEnterprise:decide',{projectId:s.projectId,connectionId:connection.connectionId,decision:'REVOKE'});`);
+fixture=fixture.replace('const sameContext=context();','sameContext=context();');
 fixture=fixture.replace('const call=(ctx=context())=>executeEnterpriseTool(input,ctx);', `const call=async(ctx=context())=>{try{return await executeEnterpriseTool(input,ctx);}catch(error){try{await db.anonymous.action('sofieEnterprise:command',signedCommand(config,input));}catch(canonical){console.error('Canonical Result diagnostic:',String(canonical));}throw error;}};`);
 await writeFile(join(target,paths[1]),fixture);
 let transport=await readFile(join(target,paths[2]),'utf8');

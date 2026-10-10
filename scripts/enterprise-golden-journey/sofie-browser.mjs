@@ -22,17 +22,19 @@ export async function qualifySofieBrowser({source,pool,input,owner,db}) {
   const log=await open(join(output,'server.log'),'wx');
   const server=spawn(process.execPath,[require.resolve('next/dist/bin/next'),'dev','--webpack','--hostname','127.0.0.1','--port',String(port)],{cwd:app,env,stdio:['ignore',log.fd,log.fd]});
   const report={schema:'composed-sofie-browser/v1',status:'IN_PROGRESS',checks:[],model:'DETERMINISTIC_FIXTURE',ownerAuthorizationUI:'NOT_IMPLEMENTED',paidOperations:0};
-  let browser;
+  let browser, page;
   const check=async(name,fn)=>{await fn();report.checks.push(name);console.log('PASS browser '+name);};
   try {
-    let ready=false;const deadline=Date.now()+120000;while(Date.now()<deadline){if(server.exitCode!==null)break;try{if((await fetch(`http://127.0.0.1:${port}/login`,{signal:AbortSignal.timeout(5000)})).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,500));}assert.ok(ready,'MyEve browser server ready');
+    let ready=false;const deadline=Date.now()+120000;while(Date.now()<deadline){if(server.exitCode!==null)break;try{if((await fetch(`http://localhost:${port}/login`,{signal:AbortSignal.timeout(5000)})).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,500));}assert.ok(ready,'MyEve browser server ready');
     browser=await chromium.launch({headless:true});
-    const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage();
+    const context=await browser.newContext({viewport:{width:1280,height:900}});page=await context.newPage();
     const posts=[];page.on('request',r=>{if(r.method()==='POST'&&new URL(r.url()).pathname.startsWith('/eve/v1/session'))posts.push(new URL(r.url()).pathname);});
-    await check('anonymous-owner-route-denied',async()=>{const response=await context.request.get(`http://127.0.0.1:${port}/api/threads`);assert.equal(response.status(),401);});
-    await page.goto(`http://127.0.0.1:${port}/login?returnTo=/chat`);
+    await check('anonymous-owner-route-denied',async()=>{const response=await context.request.get(`http://localhost:${port}/api/threads`);assert.equal(response.status(),401);});
+    await page.goto(`http://localhost:${port}/login?returnTo=/chat`);
     await page.getByLabel('Your access password').fill(password);
+    const loginResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/auth/login' && r.request().method()==='POST',{timeout:60000});
     await page.getByRole('button',{name:'Open Sofie',exact:true}).click();
+    const login=await loginResponse;assert.equal(login.status(),200,'Owner login response must succeed');
     await page.waitForURL(url=>url.pathname==='/chat',{timeout:60000});
     await check('actual-password-login-issued-httpOnly-session',async()=>{assert.ok((await context.cookies()).some(c=>c.name==='myeve_session'&&c.httpOnly));});
     await page.getByRole('button',{name:'New thread',exact:true}).click();
@@ -60,7 +62,7 @@ export async function qualifySofieBrowser({source,pool,input,owner,db}) {
     await check('mobile-horizontal-reflow',async()=>assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)));
     report.status=report.accessibility.violations.length || !report.completedResultVisible?'PARTIAL':'PASS';report.sessionRequests=posts;
     report.fullJourney='NOT_RUN';report.remaining=['No owner proposal authorization UI','Mission creation and acceptance are exercised via authenticated database clients, not browser UI','Deterministic model is not live Sofie model qualification'];
-  } catch(error){report.status='FAIL';report.error=String(error);}
+  } catch(error){report.status='FAIL';report.error=String(error);if(page)await page.screenshot({path:join(output,'failure.png'),fullPage:true}).catch(()=>{});}
   finally{await browser?.close();server.kill('SIGTERM');if(server.exitCode===null && server.signalCode===null) await new Promise(r=>server.once('exit',r));await log.close();await writeFile(join(output,'report.json'),JSON.stringify(report,null,2)+'\n');}
   return report;
 }

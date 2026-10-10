@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { startFixtureDatabase } from '../enterprise-compatibility/database.mjs';
@@ -166,9 +166,7 @@ try {
   await writeFile(join(output,'qualification.json'),JSON.stringify(result,null,2)+'\n');
   console.log(JSON.stringify({result:'PASS',checks:checks.length,executionAttempts:0,output}));
 } finally {
-  await db.stop();
-  assert.match(db.root, /\/mc-enterprise-1b-[A-Za-z0-9]+$/);
-  await rm(db.root,{recursive:true,force:true});
+  await db.destroy();
   result.databaseCleanup='VERIFIED';
   await writeFile(join(output,'qualification.json'),JSON.stringify(result,null,2)+'\n');
 }
