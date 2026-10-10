@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import qualification from "../../docs/capability-control/evidence/pricing-20261010/source-review.json";
 import {
   assertProviderPrice,
   assertQualifiedBedrockPrice,
@@ -285,6 +286,7 @@ it('pins the complete qualified Bedrock price at the authority boundary', () => 
     otherBillableDimensions: 'NONE',
   };
   expect(() => assertQualifiedBedrockPrice(qualified, 1_788_000_000_000)).not.toThrow();
+  expect(() => assertQualifiedBedrockPrice(qualified, qualified.expiresAt)).toThrow("PRICE_NOT_BOUNDED");
   const qualifiedFab = { ...qualified, api: 'INVOKE_MODEL' as const };
   expect(liabilityDigest(qualifiedFab)).toBe('sha256:765d485cbf1c66e474e022f7dd34c4387269222763445bc8c9eefcd29e51523e');
   expect(() => assertQualifiedBedrockPrice(qualifiedFab, 1_788_000_000_000)).not.toThrow();
@@ -295,4 +297,22 @@ it('pins the complete qualified Bedrock price at the authority boundary', () => 
     { source: 'https://example.test/substituted' }, { evidenceDigest: sha('f') },
   ]) expect(() => assertQualifiedBedrockPrice({ ...qualified, ...mutation } as ProviderPrice, 1_788_000_000_000))
     .toThrow('BEDROCK_PRICE_NOT_QUALIFIED');
+});
+
+
+it.each(Object.values(qualification.providerPrices))('requires exact successor pricing and its own validity window: $price.api', ({price: record, digest}) => {
+  const successor = record as ProviderPrice;
+  expect(liabilityDigest(successor)).toBe(digest);
+  expect(() => assertQualifiedBedrockPrice(successor, successor.effectiveAt)).not.toThrow();
+  expect(() => assertQualifiedBedrockPrice(successor, successor.effectiveAt - 1)).toThrow('PRICE_NOT_BOUNDED');
+  expect(() => assertQualifiedBedrockPrice(successor, successor.expiresAt)).toThrow('PRICE_NOT_BOUNDED');
+  for (const mutation of [{expiresAt: successor.expiresAt + 1}, {inputNanoUsdPerToken: 1}, {source: 'https://example.test/other'}]) {
+    expect(() => assertQualifiedBedrockPrice({...successor, ...mutation}, successor.effectiveAt)).toThrow('BEDROCK_PRICE_NOT_QUALIFIED');
+  }
+  const held = reserveProviderRequest(request()).reservation;
+  const unknown = settleProviderUsage(held, price, {...usage, classification: 'UNKNOWN'}).reservation;
+  expect(() => settleProviderUsage(unknown, successor, {...usage, expectedReceiptRevision: 1})).toThrow('USAGE_SUBJECT_MISMATCH');
+  const settled = settleProviderUsage(unknown, price, {...usage, expectedReceiptRevision: 1}).reservation;
+  expect(settled.holds[0].state).toBe('SETTLED');
+  expect(settled.scope.priceDigest).toBe(liabilityDigest(price));
 });

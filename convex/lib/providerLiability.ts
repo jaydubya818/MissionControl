@@ -4,9 +4,9 @@ export const PROVIDER_PRICE_SCHEMA = "factory-provider-price/v1" as const;
 export const PROVIDER_RESERVATION_SCHEMA =
   "factory-provider-reservation/v1" as const;
 export const QUALIFIED_BEDROCK_PROVIDER_PRICE_DIGEST =
-  "sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160" as const;
+  "sha256:964a0d4c7d4d3fe75f69bd85ed44a7a6e60c9b2ba8f75aa3cc5f8289abd32592" as const;
 export const QUALIFIED_FAB_BEDROCK_PROVIDER_PRICE_DIGEST =
-  "sha256:765d485cbf1c66e474e022f7dd34c4387269222763445bc8c9eefcd29e51523e" as const;
+  "sha256:55a78f1da07b78d13f8099002f86034a06c8337024db66a756e19c860ff79713" as const;
 export interface ProviderPrice {
   schema: typeof PROVIDER_PRICE_SCHEMA;
   provider: string;
@@ -122,16 +122,16 @@ export function assertProviderPrice(p: ProviderPrice, now: number) {
 }
 export function assertQualifiedBedrockPrice(p: ProviderPrice, now: number) {
   assertProviderPrice(p, now);
-  const expectedDigest = p.api === "CONVERSE"
-    ? QUALIFIED_BEDROCK_PROVIDER_PRICE_DIGEST
+  const expectedDigests = p.api === "CONVERSE"
+    ? [QUALIFIED_BEDROCK_PROVIDER_PRICE_DIGEST, "sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160"]
     : p.api === "INVOKE_MODEL"
-      ? QUALIFIED_FAB_BEDROCK_PROVIDER_PRICE_DIGEST
+      ? [QUALIFIED_FAB_BEDROCK_PROVIDER_PRICE_DIGEST, "sha256:765d485cbf1c66e474e022f7dd34c4387269222763445bc8c9eefcd29e51523e"]
       : null;
   if (
     p.provider !== "aws-bedrock" ||
     p.model !== "anthropic.claude-sonnet-4-6" ||
-    expectedDigest === null ||
-    liabilityDigest(p) !== expectedDigest
+    expectedDigests === null ||
+    !expectedDigests.includes(liabilityDigest(p))
   ) throw new Error("BEDROCK_PRICE_NOT_QUALIFIED");
 }
 export function assertProviderReservation(r: ProviderReservation, now: number) {

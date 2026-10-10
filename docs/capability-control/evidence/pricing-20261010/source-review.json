@@ -1,0 +1,99 @@
+{
+  "schema": "bedrock-pricing-source-review/v2",
+  "observedAt": "2026-10-10",
+  "source": "https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/bedrockfoundationmodels/USD/current/bedrockfoundationmodels.json",
+  "sourceSha256": "sha256:b21cfc4941e346275d9503700a094dc892f838172c41bc2e14c8284d91b1677a",
+  "sourceManifest": {
+    "serviceId": "bedrockfoundationmodels",
+    "accessType": "publish",
+    "esIndex": "plc-bedrockfoundationmodels-usd-20261008235637",
+    "hawkFilePublicationDate": "2026-10-08T23:56:37Z",
+    "ETLIngestionTriggerDate": "2026-10-08T23:56:37Z",
+    "currencyCode": "USD",
+    "source": "bedrockfoundationmodels",
+    "isMapped": "true"
+  },
+  "model": "anthropic.claude-sonnet-4-6",
+  "profile": "us.anthropic.claude-sonnet-4-6",
+  "region": "US East (N. Virginia)",
+  "tier": "Standard Geo Cross Region",
+  "unit": "USD_PER_MILLION_TOKENS",
+  "rates": {
+    "input": {
+      "rateCode": "KPFGPZJ8VWMREGAV.4799GE89SK.6YS6EN2CT7",
+      "price": "3.3000000000",
+      "RegionlessRateCode": "1df5eW363G_S2ASEO4Y3hQsj10sRzHapFTYH180h5-E"
+    },
+    "output": {
+      "rateCode": "GMB9AQ5DYNAGYZEC.4799GE89SK.6YS6EN2CT7",
+      "price": "16.5000000000",
+      "RegionlessRateCode": "B1t1ZXQVLVtikRcOJlLBuqAgzAG6JyKlrtND3CoXwrg"
+    },
+    "cacheWrite5m": {
+      "rateCode": "UZUVWF3P26ENQTZ8.4799GE89SK.6YS6EN2CT7",
+      "price": "4.1250000000",
+      "RegionlessRateCode": "wsNjAReoOYf2BQKMaIigFdUts_ajfpsFaMTX-2__7lI"
+    },
+    "cacheWrite1h": {
+      "rateCode": "Q5UDFRBQA4X5VSXR.4799GE89SK.6YS6EN2CT7",
+      "price": "6.6000000000",
+      "RegionlessRateCode": "oBGBnxjf39jRBx3W9IblHG3-2cUnjtXnBMI2dEYNxYg"
+    },
+    "cacheRead": {
+      "rateCode": "2459RQS6BSFATF92.4799GE89SK.6YS6EN2CT7",
+      "price": "0.3300000000",
+      "RegionlessRateCode": "5NhAVGuGJkYzB-la4toFj0Rz_VJbidUdCPZdZlPUpBs"
+    }
+  },
+  "pageSource": "https://aws.amazon.com/bedrock/pricing/",
+  "modelSource": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-anthropic-claude-sonnet-4-6.html",
+  "pageSourceSha256": "2a6e01228c08f1aa863d8713668a33e61db23b3757e29c194355de21ca02b2c0",
+  "providerPrices": {
+    "CONVERSE": {
+      "price": {
+        "schema": "factory-provider-price/v1",
+        "provider": "aws-bedrock",
+        "model": "anthropic.claude-sonnet-4-6",
+        "api": "CONVERSE",
+        "currency": "USD",
+        "effectiveAt": 1791590400000,
+        "expiresAt": 1792195200000,
+        "source": "https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/bedrockfoundationmodels/USD/current/bedrockfoundationmodels.json",
+        "evidenceDigest": "sha256:b21cfc4941e346275d9503700a094dc892f838172c41bc2e14c8284d91b1677a",
+        "inputNanoUsdPerToken": 3300,
+        "outputNanoUsdPerToken": 16500,
+        "maximumInputTokens": 1000000,
+        "maximumOutputTokens": 4096,
+        "maximumPayloadBytes": 262144,
+        "inputBound": "CONSERVATIVELY_BOUNDED",
+        "outputIncludesReasoning": true,
+        "inclusiveCacheWorstCase": true,
+        "otherBillableDimensions": "NONE"
+      },
+      "digest": "sha256:964a0d4c7d4d3fe75f69bd85ed44a7a6e60c9b2ba8f75aa3cc5f8289abd32592"
+    },
+    "INVOKE_MODEL": {
+      "price": {
+        "schema": "factory-provider-price/v1",
+        "provider": "aws-bedrock",
+        "model": "anthropic.claude-sonnet-4-6",
+        "api": "INVOKE_MODEL",
+        "currency": "USD",
+        "effectiveAt": 1791590400000,
+        "expiresAt": 1792195200000,
+        "source": "https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/bedrockfoundationmodels/USD/current/bedrockfoundationmodels.json",
+        "evidenceDigest": "sha256:b21cfc4941e346275d9503700a094dc892f838172c41bc2e14c8284d91b1677a",
+        "inputNanoUsdPerToken": 3300,
+        "outputNanoUsdPerToken": 16500,
+        "maximumInputTokens": 1000000,
+        "maximumOutputTokens": 4096,
+        "maximumPayloadBytes": 262144,
+        "inputBound": "CONSERVATIVELY_BOUNDED",
+        "outputIncludesReasoning": true,
+        "inclusiveCacheWorstCase": true,
+        "otherBillableDimensions": "NONE"
+      },
+      "digest": "sha256:55a78f1da07b78d13f8099002f86034a06c8337024db66a756e19c860ff79713"
+    }
+  }
+}

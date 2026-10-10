@@ -42,13 +42,20 @@ not a token-estimation formula.
 
 ## Price and maximum liability
 
-The reviewed price artifact is
-[fdlc-bedrock-price-qualified.json](fdlc-bedrock-price-qualified.json). It binds
-the dated Anthropic price source by SHA-256, retains input, output, cache, and
-reasoning rates, disables cache controls and extended reasoning in the admitted
-serializer, and expires on 2026-10-07 for revalidation.
-Its canonical provider-price qualification digest is
-`sha256:ba19028022ec2de109d2863415263b691d13d334618d7f49e7524f3c07e33160`.
+The current pricing-only successor is
+[fdlc-bedrock-price-qualified-20261010-v2.json](fdlc-bedrock-price-qualified-20261010-v2.json).
+The original [qualified record](fdlc-bedrock-price-qualified.json), its source
+hash, and its 2026-10-07 expiry remain unchanged as historical evidence.
+The successor binds AWS's published 2026-10-08 price feed by SHA-256 and
+expires at 2026-10-17 UTC for internal revalidation. Rates, token and payload
+limits, disabled cache/reasoning controls, and spending ceilings are unchanged.
+Its Converse digest is
+`sha256:964a0d4c7d4d3fe75f69bd85ed44a7a6e60c9b2ba8f75aa3cc5f8289abd32592`;
+its InvokeModel digest is
+`sha256:55a78f1da07b78d13f8099002f86034a06c8337024db66a756e19c860ff79713`.
+[Source qualification](../capability-control/evidence/pricing-20261010/source-review.json)
+records exact model, region, tier, and rate keys. This refresh creates no
+execution grant and migrates no reservation, approval or existing Work.
 
 For the first live qualification, the maximum output is 4,096 tokens:
 

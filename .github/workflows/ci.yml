@@ -2,7 +2,7 @@ name: CI — Mission Control
 
 on:
   push:
-    branches: [main, master, 'feat/*', 'bugfix/*', 'sf/*']
+    branches: [main, master, 'feat/*', 'bugfix/*', 'sf/*', 'codex/unified-capability-control-plane']
   pull_request:
     branches: [main, master, 'sf/*']
 
