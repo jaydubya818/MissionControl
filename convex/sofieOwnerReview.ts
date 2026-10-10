@@ -148,18 +148,20 @@ export const inspect = mutation({
     const mission = proposal.missionId
       ? await ctx.db.get(proposal.missionId)
       : null;
-    const detail = mission ? await projectMission(ctx, mission, null) : null;
-    const scope = mission?.currentPlanId
-      ? (await resultMissionScope(ctx, connection, mission._id)).scope
-      : null;
-    const result = scope
-      ? await projectEnterpriseResult(
-          ctx,
-          { ...connection, resultScope: scope },
-          scope.missionId,
-          scope.planDigest,
-        )
-      : null;
+    // Both projections are read-only and start only after ownedProposal has
+    // authenticated the owner. They retain independent currentness checks.
+    const [detail, { scope, result }] = await Promise.all([
+      mission ? projectMission(ctx, mission, null) : Promise.resolve(null),
+      (async () => {
+        const scope = mission?.currentPlanId
+          ? (await resultMissionScope(ctx, connection, mission._id)).scope
+          : null;
+        const result = scope ? await projectEnterpriseResult(
+          ctx, { ...connection, resultScope: scope }, scope.missionId, scope.planDigest,
+        ) : null;
+        return { scope, result };
+      })(),
+    ]);
     return {
       proposalId: proposal._id,
       digest: proposal.digest,
