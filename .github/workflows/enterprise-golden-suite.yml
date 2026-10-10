@@ -45,4 +45,6 @@ jobs:
           name: ${{ inputs.suite }}
           path: golden-evidence/${{ inputs.suite }}
           if-no-files-found: error
+          # The sealed Playwright evidence includes traces/.last-run.json.
+          include-hidden-files: true
           retention-days: 90
