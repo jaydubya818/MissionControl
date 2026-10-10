@@ -122,9 +122,9 @@ export function bridgeFixture() {
         reservation,
         price,
         authority: {
-          attemptId: "attempt",
-          leaseId: "lease",
-          generation: 1,
+          attemptId: binding.workflowRunId,
+          leaseId: binding.leaseId,
+          generation: binding.generation,
           leaseExpiresAt: now + 60000,
           current: true,
           canceled: false,

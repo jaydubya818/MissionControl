@@ -33,6 +33,28 @@ const claimInput = {
 };
 
 describe("read-only workflow operational controls", () => {
+  it.each([0, 1, 2, 3, 9])("permits at most one initial attempt plus %s retries", (maxRetries) => {
+    let attempts = 0;
+    for (let request = 0; request < maxRetries + 3; request++) {
+      const result = evaluateReadOnlyExecutionClaim({
+        ...claimInput,
+        maxRetries,
+        currentAttemptNumber: attempts,
+        claimId: `claim-${request}`,
+        retryOfClaimId: attempts ? `claim-${request - 1}` : undefined,
+        retryReason: attempts ? "Retry after a classified execution failure." : undefined,
+      });
+      if (attempts === 1 + maxRetries) {
+        expect(result).toMatchObject({ ok: false, reason: "attempt-limit-exceeded" });
+      } else {
+        expect(result).toMatchObject({ ok: true, lease: { attemptNumber: attempts + 1 } });
+        if (!result.ok) throw new Error("Expected an authorized attempt");
+        attempts = result.lease.attemptNumber;
+      }
+    }
+    expect(attempts).toBe(1 + maxRetries);
+  });
+
   it("claims once and rejects a duplicate worker", () => {
     const first = evaluateReadOnlyExecutionClaim(claimInput);
     expect(first).toMatchObject({ ok: true, reclaimed: false, timeoutMs: 60_000, lease: { attemptNumber: 1 } });

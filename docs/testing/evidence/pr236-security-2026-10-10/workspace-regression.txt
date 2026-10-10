@@ -1,0 +1,21 @@
+Command: pnpm run ci:test
+Exit: 0
+packages/context-tools test:       Tests  201 passed (201)
+packages/shared test:       Tests  84 passed (84)
+packages/research-adapters test:       Tests  17 passed (17)
+apps/mission-control-ui test:       Tests  371 passed (371)
+packages/meetings test:       Tests  7 passed (7)
+packages/policy-engine test:       Tests  92 passed (92)
+packages/state-machine test:       Tests  52 passed (52)
+packages/model-router test:       Tests  59 passed (59)
+packages/telegraph test:       Tests  17 passed (17)
+packages/coordinator test:       Tests  46 passed (46)
+packages/workflow-engine test:       Tests  221 passed (221)
+packages/context-router test:       Tests  38 passed (38)
+packages/memory test:       Tests  27 passed (27)
+packages/agent-runtime test:       Tests  19 passed (19)
+apps/orchestration-server test:       Tests  813 passed | 11 skipped (824)
+      Tests  1503 passed (1503)
+Additional final broker regression: 17 passed, including one new test.
+Command: pnpm run ci:typecheck
+Exit: 0

@@ -1,0 +1,55 @@
+{
+  "localBackend": "http://127.0.0.1:3214",
+  "fixCommit": "df3241d",
+  "workflowRunId": "ys7bk98j89ry8gjt19y64vqsqh8fpfdt",
+  "first": {
+    "deltaUsd": 0.0102412,
+    "eventIds": [
+      "vd73mbh62v31v3gnekdbjptw758fq5ah",
+      "vd760ffmh2k271xgqqe2dw52zh8fqpnx",
+      "vd74c8xkmzp8xbk19xg79x0wqx8fqcm1",
+      "vd70yy57vfc3jsmbk9x0k165kx8fq15v",
+      "vd7dt15jp8ykt7dmvyzcb800p98fqe7g",
+      "vd7fbc3bassar79ft3np6zfq1n8fqrsz",
+      "vd7ee4xcdkcf84c68hcs5200p18fpm2f",
+      "vd7dehxg3r163a0n1tct3f3w618fpc0f"
+    ],
+    "observedUsd": 0.0102412,
+    "reservationRetainedUsd": 4.49,
+    "spentUsd": 0.0102412
+  },
+  "second": {
+    "deltaUsd": 0,
+    "eventIds": [
+      "vd73mbh62v31v3gnekdbjptw758fq5ah",
+      "vd760ffmh2k271xgqqe2dw52zh8fqpnx",
+      "vd74c8xkmzp8xbk19xg79x0wqx8fqcm1",
+      "vd70yy57vfc3jsmbk9x0k165kx8fq15v",
+      "vd7dt15jp8ykt7dmvyzcb800p98fqe7g",
+      "vd7fbc3bassar79ft3np6zfq1n8fqrsz",
+      "vd7ee4xcdkcf84c68hcs5200p18fpm2f",
+      "vd7dehxg3r163a0n1tct3f3w618fpc0f"
+    ],
+    "observedUsd": 0.0102412,
+    "reservationRetainedUsd": 4.49,
+    "spentUsd": 0.0102412
+  },
+  "before": {
+    "status": "FAILED",
+    "spentUsd": 0,
+    "reservedCostUsd": 4.49
+  },
+  "after": {
+    "status": "FAILED",
+    "spentUsd": 0.0102412,
+    "reservedCostUsd": 4.49,
+    "actualCost": {
+      "reason": "Measured actual-cost telemetry has not been reported for this Attempt.",
+      "status": "UNAVAILABLE"
+    }
+  },
+  "attemptIds": [
+    "ys7bk98j89ry8gjt19y64vqsqh8fpfdt"
+  ],
+  "inferenceCalls": 0
+}

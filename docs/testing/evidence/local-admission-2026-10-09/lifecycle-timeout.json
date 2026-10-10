@@ -1,0 +1,38 @@
+{
+  "sends": 0,
+  "diagnostics": {
+    "provider": "factory/docker-bedrock-research-lab/v1",
+    "terminalState": "TIMEOUT",
+    "supervisorProcessRunning": false,
+    "exitCode": 137,
+    "failure": null,
+    "accountingReference": null,
+    "stderrTail": null,
+    "policyInspection": {
+      "image": "sha256:7a36977d9b1449d2dae436e4b184326f0ef48b5873019c583911f6d95d9afda8",
+      "user": "10001:10001",
+      "networkMode": "none",
+      "readonlyRootfs": true,
+      "capabilitiesDropped": [
+        "ALL"
+      ],
+      "securityOptions": [
+        "no-new-privileges"
+      ],
+      "pidMode": "",
+      "memory": 2147483648,
+      "cpu": 1000000000,
+      "pids": 64,
+      "tmpfs": {
+        "/tmp": "rw,nosuid,nodev,noexec,size=16777216,uid=10001,gid=10001,mode=0700",
+        "/var/lib/mission-control/attempt": "rw,nosuid,nodev,noexec,size=1073741824,uid=10001,gid=10001,mode=0700"
+      },
+      "mounts": [],
+      "privileged": false
+    }
+  },
+  "result": null,
+  "holds": [],
+  "evidenceKind": "OFFLINE_FIXTURE",
+  "paidInferenceCalls": 0
+}

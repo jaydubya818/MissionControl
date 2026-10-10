@@ -1831,7 +1831,7 @@ export async function startFactoryExecution(): Promise<boolean> {
   }
 }
 
-export function startServer() {
+export function startServer(options: { coordinatorEnabled?: boolean } = {}) {
   accountingRuntime.start();
   console.log(`[orchestration] Mission Control Orchestration Server`);
   console.log(`[orchestration] Convex URL: ${CONVEX_URL ? "configured" : "MISSING"}`);
@@ -1842,7 +1842,7 @@ export function startServer() {
 
   startedAt = Date.now();
 
-  if (!OFFLINE_FACTORY_WORKER_ENABLED && !SHADOW_PROVIDER_ONLY) {
+  if (options.coordinatorEnabled !== false && !OFFLINE_FACTORY_WORKER_ENABLED && !SHADOW_PROVIDER_ONLY) {
     tickTimer = setInterval(() => {
       runTick().catch((err) => {
         console.error("[orchestration] Tick loop error:", err);

@@ -1,3 +1,4 @@
+import { isResearchLabDocker, researchLabDockerScopeIssues, assertResearchLabDockerTarget } from "./researchLabDockerScope.js";
 import { computeCanonicalHash } from "./genomeHash.js";
 
 export const DOCKER_ADMISSION_SCHEMA = "factory-docker-sandbox-admission/v1";
@@ -12,14 +13,14 @@ const hash = (x: unknown) => `sha256:${computeCanonicalHash(x)}`;
 /** Docker evidence has no VM, nftables, or provider credential assertions. */
 export function dockerSandboxSnapshotIssues(p: any): string[] {
   const q = p?.dockerQualification,
-    issues: string[] = [];
+    issues: string[] = researchLabDockerScopeIssues(p);
   const imageDigest = String(p?.machine?.image).match(
     /@(sha256:[a-f0-9]{64})$/,
   )?.[1];
   if (
     p?.schema !== "factory-sandbox-profile/v1" ||
     p.provider !== "DOCKER" ||
-    p.providerProfile !== "factory/docker-bedrock/v1" ||
+    (p.providerProfile !== "factory/docker-bedrock/v1" && !isResearchLabDocker(p)) ||
     p.providerProfileVersion !== "1" ||
     p.security !== undefined ||
     p.qualification !== undefined
@@ -64,7 +65,7 @@ export function dockerSandboxSnapshotIssues(p: any): string[] {
     issues.push("docker-policy-invalid");
   if (
     p?.machine?.cpu !== 1 ||
-    p?.machine?.memoryMb !== 512 ||
+    p?.machine?.memoryMb !== (isResearchLabDocker(p) ? 2048 : 512) ||
     !Number.isSafeInteger(p?.runtime?.maxRuntimeMs) ||
     p.runtime.maxRuntimeMs < 60000 ||
     p.runtime.maxRuntimeMs > 900000 ||
@@ -140,6 +141,7 @@ export function dockerSandboxAdmission(
   };
 }
 export function dockerSandboxProductionEligible(profile: any): boolean {
+  try { assertResearchLabDockerTarget(profile?.immutableSnapshot, profile); } catch { return false; }
   const s = profile?.immutableSnapshot,
     a = profile?.admissionSnapshot;
   if (

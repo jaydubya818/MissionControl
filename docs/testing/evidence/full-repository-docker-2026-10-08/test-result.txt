@@ -1,0 +1,30 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server
+
+ ❯ src/__tests__/.full-repository.test.ts (1 test | 1 failed) 1459ms
+   × runs exact Codex Bedrock V3 through no-network Docker and bounded tool cycle 1458ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/.full-repository.test.ts > runs exact Codex Bedrock V3 through no-network Docker and bounded tool cycle
+Error: Docker invocation exceeds bounded input.
+ ❯ DockerSandboxProvider.start src/dockerSandboxProvider.ts:223:51
+    222|         throw new DockerBoundaryError(
+    223|           "POLICY_DENIED",
+    224|           "Bedrock invocation differs from canonical builder.",
+       |                        ^
+    225|         );
+    226|       bridge = this.options.createBedrockBridge(request);
+ ❯ src/__tests__/.full-repository.test.ts:170:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  23:31:14
+   Duration  2.01s (transform 278ms, setup 19ms, import 432ms, tests 1.46s, environment 0ms)
+
+undefined
+/Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --config .executor-selection.config.ts src/__tests__/.full-repository.test.ts

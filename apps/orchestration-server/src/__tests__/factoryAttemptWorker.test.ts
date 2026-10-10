@@ -58,6 +58,18 @@ afterEach(async () => {
 });
 
 describe("FactoryAttemptWorker verification-first lifecycle", () => {
+  it("retains the normalized result when Fab exhausts its turn budget", async () => {
+    const fixture = await runFixture("VERIFIED", { fab: true, durable: true, fabTurnLimit: true });
+    await waitForWorker(() => expect(fixture.worker.status().failedCount).toBe(1));
+    const terminal = fixture.reports.find((packet) => packet.terminal?.status === "FAILED");
+    expect(terminal.artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ metadata: expect.objectContaining({ schema: "harness-result/v1",
+        result: expect.objectContaining({ status: "FAILED", usage: expect.any(Object) }) }) }),
+    ]));
+    expect(fixture.createPullRequest).not.toHaveBeenCalled();
+    await fixture.worker.stop();
+  }, 15_000);
+
   it("keeps the renewable Attempt lease beyond the publication safety window", () => {
     expect(FACTORY_ATTEMPT_LEASE_DURATION_MS).toBe(120_000);
     expect(FACTORY_ATTEMPT_LEASE_DURATION_MS).toBeGreaterThan(60_000);
@@ -725,6 +737,7 @@ async function runFixture(
   serverVerdict: "VERIFIED" | "NOT_VERIFIED" | "REQUIRES_HUMAN_REVIEW",
   options: {
     fab?: boolean;
+    fabTurnLimit?: boolean;
     prepublication?: boolean;
     loseLeaseBeforePublication?: boolean;
     uncertainPublication?: boolean;
@@ -799,7 +812,7 @@ async function runFixture(
           { name: "run_check", arguments: { id: "test" } },
           { name: "finish_candidate", arguments: { summary: "Feature corrected", unresolved: [] } },
         ];
-        const call = calls[fabModelCalls - 1]; if (!call) throw new Error("Unexpected model replay");
+        const call = options.fabTurnLimit ? { name: "list_files", arguments: {} } : calls[fabModelCalls - 1]; if (!call) throw new Error("Unexpected model replay");
         return Response.json({ model: config.model, choices: [{ message: { content: key, tool_calls: [{ id: `call_${fabModelCalls}`, type: "function", function: { name: call.name, arguments: JSON.stringify(call.arguments) } }] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 5 } });
       } });
     },

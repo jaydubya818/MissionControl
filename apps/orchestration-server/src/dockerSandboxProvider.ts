@@ -1,3 +1,5 @@
+import { dockerCapacity, RESEARCH_LAB_DOCKER_PROFILE } from "./dockerCapacity.js";
+import { dockerTerminalState } from "./dockerTerminalState.js";
  import { StringDecoder } from "node:string_decoder";
 import {
   CODEX_BEDROCK_V1_HARNESS_MANIFEST,
@@ -24,6 +26,7 @@ export class DockerBoundaryError extends Error {
   constructor(readonly terminalState: DockerTerminalState, message: string) { super(message); }
 }
 export interface DockerProviderIdentity {
+  capacityProfile?: "research-lab-large/v1";
   image: string;
   imageId: string;
   platform: "linux/amd64";
@@ -61,13 +64,17 @@ export class DockerSandboxProvider implements SandboxProvider {
   readonly kind = "DOCKER" as const;
   private readonly owned = new Map<string, OwnedContainer>();
   private readonly identity: Readonly<DockerProviderIdentity>;
+  private readonly capacity: ReturnType<typeof dockerCapacity>;
    private readonly providerId: string; constructor(identity: DockerProviderIdentity ,
     private readonly options: {
       createBedrockBridge?: (
         request: SandboxStartRequest,
       ) => BedrockInferenceBridge;
     } = {} ) {
-     this.providerId = options.createBedrockBridge
+     this.capacity = dockerCapacity(identity);
+     if (identity.capacityProfile && !options.createBedrockBridge)
+       throw new DockerBoundaryError("POLICY_DENIED", "Research Lab capacity requires the governed Bedrock bridge.");
+     this.providerId = identity.capacityProfile ? RESEARCH_LAB_DOCKER_PROFILE : options.createBedrockBridge
       ? "factory/docker-bedrock/v1"
       : DOCKER_PROVIDER_ID;
     if (
@@ -89,7 +96,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     const errors: string[] = [];
     if (profile.schema !== "factory-sandbox-profile/v1" || profile.provider !== this.kind
       || profile.providerProfile !== this.providerId || profile.providerProfileVersion !== "1"
-      || profile.machine.image !== this.identity.image || profile.machine.cpu !== 1 || profile.machine.memoryMb !== 512
+      || profile.machine.image !== this.identity.image || profile.machine.cpu !== 1 || profile.machine.memoryMb !== this.capacity.memoryMb
       || profile.supervisor.transport !== "DOCKER_STDIN" || profile.supervisor.version !== "mission-control-supervisor/v1"
       || profile.credentials.inference !== "NONE" || profile.credentials.githubAuthority !== "NONE"
       || profile.credentials.providerAuthority !== "NONE" || profile.credentials.repositoryAccess !== "CONTROL_PLANE_SNAPSHOT"
@@ -117,9 +124,9 @@ export class DockerSandboxProvider implements SandboxProvider {
     const id = (await this.docker(["create", "--pull=never", "--platform=linux/amd64", "--name", request.resourceName,
       "--label", `mc.provider=${this.providerId}`, "--label", `mc.lease=${request.attemptLeaseId}`,
       "--label", `mc.manifest=${request.manifestDigest}`, "--user=10001:10001", "--read-only", "--network=none",
-      "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=1", "--memory=512m", "--memory-swap=512m", "--pids-limit=64",
+      "--cap-drop=ALL", "--security-opt=no-new-privileges", "--cpus=1", `--memory=${this.capacity.memoryMb}m`, `--memory-swap=${this.capacity.memoryMb}m`, "--pids-limit=64",
       "--ipc=private", "--cgroupns=private", "--log-driver=none",
-      "--tmpfs", `${ROOT}:rw,nosuid,nodev,noexec,size=134217728,uid=10001,gid=10001,mode=0700`,
+      "--tmpfs", `${ROOT}:rw,nosuid,nodev,noexec,size=${this.capacity.workspaceBytes},uid=10001,gid=10001,mode=0700`,
       "--tmpfs", "/tmp:rw,nosuid,nodev,noexec,size=16777216,uid=10001,gid=10001,mode=0700",
       "--env", `MC_DEADLINE_AT=${request.requestedAt + request.profile.runtime.maxRuntimeMs}`,
       "--env", `HOME=${ROOT}/home`, "--env", "TMPDIR=/tmp", "--env", "LANG=C",
@@ -150,7 +157,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     const [actual] = JSON.parse(await this.docker(["inspect", allocation.providerResourceId]));
     this.assertOwnership(actual, allocation, record.request);
     assertDockerContainerPolicy(actual, this.identity.imageId, record.request ,
-      this.providerId );
+      this.providerId, this.identity );
     record.policyInspection = { image: actual.Image, user: actual.Config.User, networkMode: actual.HostConfig.NetworkMode, readonlyRootfs: actual.HostConfig.ReadonlyRootfs, capabilitiesDropped: actual.HostConfig.CapDrop, securityOptions: actual.HostConfig.SecurityOpt, pidMode: actual.HostConfig.PidMode, memory: actual.HostConfig.Memory, cpu: actual.HostConfig.NanoCpus, pids: actual.HostConfig.PidsLimit, tmpfs: actual.HostConfig.Tmpfs, mounts: actual.Mounts, privileged: actual.HostConfig.Privileged };
     return actual;
   }
@@ -238,7 +245,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       record.inferenceAbort = new AbortController();
     } const config = dockerSupervisorConfig(request);
     const envelope = Buffer.from(JSON.stringify({ schema : bridge ? "factory-docker-duplex/v1" : DOCKER_INVOCATION_SCHEMA, deadlineAt: record.request.requestedAt + record.request.profile.runtime.maxRuntimeMs, leaseId: record.request.attemptLeaseId, config, repository: request.repositoryArchive.toString("base64") }));
-    if (envelope.length > 32 * 1024 * 1024) throw new DockerBoundaryError("INVALID_REQUEST", "Docker invocation exceeds bounded input.");
+    if (envelope.length > this.capacity.inputBytes) throw new DockerBoundaryError("INVALID_REQUEST", "Docker invocation exceeds bounded input.");
     await this.assertContainer(request.allocation);
     if (record.canceled) throw new DockerBoundaryError("FENCED", "Lease canceled before start.");
     const child = spawn(this.identity.dockerPath, this.args(["start", "--attach", "--interactive", request.allocation.providerResourceId]), { env: { PATH: "/usr/bin:/bin", HOME: homedir() }, stdio: "pipe" });
@@ -314,12 +321,21 @@ export class DockerSandboxProvider implements SandboxProvider {
     // Do not persist arbitrary process stderr; it can contain workload data.
     child.stderr.on("data", (chunk: Buffer) => { record.stderrTail = redactSandboxTail((record.stderrTail ?? "") + chunk.toString("utf8")).slice(-4000); }); child.stdin.on("error", () => {});
     child.on("error", () => { record. inferenceAbort?.abort();
-      record. failure = "Docker transport failed"; record.terminalState = "INFRASTRUCTURE_FAILURE"; });
-    child.on("close", (code) => {  frameBuffer += decoder.end();
+      record. failure = "Docker transport failed"; record.terminalState ??= "INFRASTRUCTURE_FAILURE"; });
+    child.on("close", (code) => {
+      frameBuffer += decoder.end();
       record.inferenceAbort?.abort();
       if (bridge && (pendingFrame || frameBuffer.length))
-        record.failure ??= "Bridge exited with incomplete frame"; clearTimeout(record.timer); record.exitCode = code; if (!record.canceled && !record.failure && code === 0 &&
-        (!bridge || finalFrame) ) { record.result = Buffer.concat(chunks); record.terminalState = "WORKLOAD_FAILURE"; } else record.terminalState ??= code === 124 ? "TIMEOUT" : "INFRASTRUCTURE_FAILURE"; });
+        record.failure ??= "Bridge exited with incomplete frame";
+      clearTimeout(record.timer);
+      record.exitCode = code;
+      if (!record.canceled && !record.failure && code === 0 && (!bridge || finalFrame))
+        record.result = Buffer.concat(chunks);
+      record.terminalState = dockerTerminalState({
+        prior: record.terminalState, canceled: record.canceled,
+        failure: record.failure, exitCode: code, result: record.result,
+      });
+    });
     record.timer = setTimeout(() => { record.terminalState = "TIMEOUT"; void this.cancel(request.allocation, "Frozen deadline").catch(() => {}); }, Math.max(1, Math.min(request.executor.timeoutMs, record.request.requestedAt + record.request.profile.runtime.maxRuntimeMs - Date.now())));
      if (bridge) child.stdin.write(Buffer.concat([envelope, Buffer.from("\n")]));
     else child.stdin.end(envelope);
@@ -378,7 +394,8 @@ export class DockerSandboxProvider implements SandboxProvider {
 }
 
 export function assertDockerContainerPolicy(actual: any, image: string, request: SandboxAllocationRequest ,
-  providerId = DOCKER_PROVIDER_ID ) {
+  providerId = DOCKER_PROVIDER_ID, identity?: DockerProviderIdentity ) {
+  const capacity = dockerCapacity(identity ?? {image: "", imageId: image});
   const h = actual.HostConfig; const c = actual.Config;
   const tmpfs = h?.Tmpfs ?? {};
   if (actual.Image !== image || actual.Name !== `/${request.resourceName}` || c?.User !== "10001:10001"
@@ -386,13 +403,13 @@ export function assertDockerContainerPolicy(actual: any, image: string, request:
     || c?.Labels?.["mc.provider"] !== providerId || !h?.ReadonlyRootfs || h.Privileged || h.NetworkMode !== "none"
     || JSON.stringify(h.CapDrop) !== '["ALL"]' || (h.CapAdd?.length ?? 0) !== 0
     || JSON.stringify(h.SecurityOpt) !== '["no-new-privileges"]' || h.PidMode !== "" || h.IpcMode !== "private"
-    || h.CgroupnsMode !== "private" || h.NanoCpus !== 1_000_000_000 || h.Memory !== 536870912 || h.MemorySwap !== 536870912 || h.PidsLimit !== 64
+    || h.CgroupnsMode !== "private" || h.NanoCpus !== 1_000_000_000 || h.Memory !== capacity.memoryMb * 1024 * 1024 || h.MemorySwap !== capacity.memoryMb * 1024 * 1024 || h.PidsLimit !== 64
     || (h.Binds?.length ?? 0) !== 0 || (h.Devices?.length ?? 0) !== 0 || (h.VolumesFrom?.length ?? 0) !== 0
     || (c.Env ?? []).some((entry: string) => !["PATH", "NODE_VERSION", "YARN_VERSION", "HOME", "TMPDIR", "LANG", "MC_DEADLINE_AT"].includes(entry.split("=")[0]))
     || Object.keys(h.PortBindings ?? {}).length !== 0 || (actual.Mounts ?? []).some((m: any) => m.Type !== "tmpfs")
     || JSON.stringify(c.Entrypoint) !== '["node"]' || JSON.stringify(c.Cmd) !== '["/opt/factory/bridge.mjs"]'
     || Object.keys(tmpfs).length !== 2
-    || tmpfs[ROOT] !== "rw,nosuid,nodev,noexec,size=134217728,uid=10001,gid=10001,mode=0700"
+    || tmpfs[ROOT] !== `rw,nosuid,nodev,noexec,size=${capacity.workspaceBytes},uid=10001,gid=10001,mode=0700`
     || tmpfs["/tmp"] !== "rw,nosuid,nodev,noexec,size=16777216,uid=10001,gid=10001,mode=0700") throw new DockerBoundaryError("POLICY_DENIED", "Docker inspection does not match frozen containment policy.");
 }
 

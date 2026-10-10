@@ -1,4 +1,5 @@
 import { assertCapabilityWorkAuthority, capabilityWorkRestriction } from '../lib/capabilityWorkControl';
+import { reconcileFabObservedCost } from "../lib/fabCostPersistence";
 import { resolveCurrentAttemptExecutionProfile, executionProfileProjectionFromFactoryVersion, hasAnyExecutionProfileBinding } from "../lib/attemptExecutionProfile";
 import { NO_INFERENCE_CONSTRAINT, isNoInferenceConstraint } from "../lib/offlineExecutionPolicy";
 import { v } from "convex/values";
@@ -1552,6 +1553,10 @@ export const reportInternal = internalMutation({
           executionManifestDigest: run.executionManifestDigest,
         },
       }));
+    }
+
+    if (run.executorAdapter === "fab" && run.executorVersion === "v1") {
+      await reconcileFabObservedCost(ctx, run);
     }
 
     const trace = await ensureAttemptTrace(ctx, run);
@@ -4867,3 +4872,33 @@ function verificationAuthorityStatusFromPacket(packet: any): "PASS" | "FAIL" | u
   if (!check) return undefined;
   return check.status === "PASS" ? "PASS" : "FAIL";
 }
+
+export const reconcileObservedCost = mutation({
+  args: { workflowRunId: v.id("workflowRuns"), reason: v.string() },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.workflowRunId);
+    const workOrder = run?.workOrderId ? await ctx.db.get(run.workOrderId) : null;
+    if (!run || !workOrder?.tenantId || !workOrder.projectId) throw new Error("Attempt is unavailable or unauthorized.");
+    const access = await requireWorkspaceAccess(ctx, workOrder.tenantId, workOrder.projectId, {
+      permission: COMPANY_PERMISSIONS.UPDATE_DELIVERY,
+    });
+    assertAuthorizedDeliveryRecord(access, workOrder);
+    if (run.projectId !== workOrder.projectId || run.tenantId !== workOrder.tenantId
+      || !["FAILED", "CANCELED", "COMPLETED"].includes(run.status)) {
+      throw new Error("Historical cost reconciliation requires a terminal Attempt in this WorkOrder scope.");
+    }
+    const reason = args.reason.trim();
+    if (!reason || reason.length > 1000) throw new Error("A reconciliation reason of 1 to 1000 characters is required.");
+    const result = await reconcileFabObservedCost(ctx, run);
+    if (result.deltaUsd > 0) {
+      await ctx.db.insert("activities", {
+        tenantId: workOrder.tenantId, projectId: workOrder.projectId,
+        actorType: "HUMAN", action: "ATTEMPT_OBSERVED_COST_RECONCILED",
+        description: reason, targetType: "WORK_ORDER", targetId: workOrder._id,
+        metadata: { workflowRunId: run._id, ...result, source: "PERSISTED_FAB_MODEL_COMPLETION_EVENTS",
+          costCompleteness: "UNCONFIRMED", reservationReleased: false },
+      });
+    }
+    return result;
+  },
+});

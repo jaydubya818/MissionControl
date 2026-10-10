@@ -1,0 +1,10 @@
+
+ RUN  v4.1.11 /Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server
+
+Preparing worktree (detached HEAD d43d7c3)
+
+ Test Files  66 passed | 4 skipped (70)
+      Tests  797 passed | 12 skipped (809)
+   Start at  09:16:53
+   Duration  24.89s (transform 5.07s, setup 0ms, import 11.83s, tests 111.17s, environment 4ms)
+

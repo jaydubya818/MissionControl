@@ -1,0 +1,16 @@
+import {writeFile,rm} from 'node:fs/promises';
+import {CodexV1ExecutorAdapter} from '/Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server/src/codexExecutorAdapter.ts';
+import {captureHarnessRepositoryBaseline,collectHarnessRepositoryResult} from '/Users/jaywest/.codex/worktrees/f854/MissionControl/apps/orchestration-server/src/harnessRepository.ts';
+const root='/Users/jaywest/.codex/worktrees/f854/MissionControl';
+const repositoryRoot='/Users/jaywest/.codex/worktrees/live-retry-runbook/MissionControl';
+let providerExecutions=0;
+const adapter=new CodexV1ExecutorAdapter(process.env.CODEX_EXECUTABLE,async()=>{providerExecutions++;throw Error('Inference prohibited by preflight');});
+const health=await adapter.health();
+const baseline=await captureHarnessRepositoryBaseline(repositoryRoot);
+const result=await collectHarnessRepositoryResult({repositoryRoot,workingDirectory:repositoryRoot,baselineCommit:baseline,allowedPaths:['docs/operations/verification-retry-runbook.md'],deniedPaths:[]});
+const request={executionId:'executor-selection-no-inference-20261008',repositoryRoot,workingDirectory:repositoryRoot,provider:'openai',model:'gpt-5.6-terra',prompt:'Preflight only. Do not execute.',allowedPaths:['docs/operations/verification-retry-runbook.md'],deniedPaths:[],timeoutMs:600000,isolation:'WORKSPACE_WRITE' as const};
+const issues=adapter.validateConfiguration(request);let prepare:{status:string;reason?:string}={status:'NOT_RUN'};
+if(health.status==='READY'&&!issues.length){try{const prepared=await adapter.prepare(request,{emit:async()=>{}});prepare={status:'PASS'};await rm(prepared.outputDirectory,{recursive:true});}catch(e){prepare={status:'FAIL',reason:String(e)}}}
+const evidence={clientDate:'2026-10-08',adapter:'codex/v1',health,baseline,result,configurationIssues:issues,prepare,providerExecutions,spendAuthorization:'NONE',liveQualification:'NOT_PERFORMED',limitations:['Repository and runtime preflight only; no model execution or provider-cost qualification.','Existing $4.49 reservation remains retained.']};
+await writeFile(root+'/docs/testing/evidence/executor-selection-2026-10-08/codex-repository-preflight.json',JSON.stringify(evidence,null,2)+'\n');console.log(JSON.stringify(evidence,null,2));
+if(!baseline||result.scopeViolations.length||providerExecutions)throw Error('Preflight invariants failed');

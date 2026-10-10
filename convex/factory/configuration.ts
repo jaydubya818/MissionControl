@@ -1,3 +1,4 @@
+import { assertResearchLabDockerTarget } from "../lib/researchLabDockerScope";
 import { dockerSandboxAdmission, DOCKER_ADMISSION_SCHEMA } from "../lib/dockerSandboxAdmission";
 import { qualificationEnvironmentDigest } from "../lib/factoryQualificationScope";
 import {
@@ -601,6 +602,7 @@ export const createSandboxProfile = mutation({
         security: args.certification.security,
       } : {}),
     };
+    assertResearchLabDockerTarget(snapshot, { projectId: args.projectId, tenantId: project.tenantId }, now);
     if (args.certification || docker ) {
       const issues = qualifiedSandboxSnapshotIssues(snapshot);
       if (issues.length) throw new Error(`Certified hardened Sandbox Profile is invalid (${issues.join(", ")}).`);
@@ -722,6 +724,7 @@ export const promoteSandboxProfile = mutation({
         metadata: { profileDigest: profile.profileDigest, admissionDigest } });
       return { sandboxProfileId: profile._id, profileDigest: profile.profileDigest, admissionDigest };
     }
+    assertResearchLabDockerTarget(profile.immutableSnapshot, profile);
     const issues = qualifiedSandboxSnapshotIssues(profile.immutableSnapshot);
     if (issues.length) throw new Error(`Sandbox Profile does not contain qualified hardened evidence (${issues.join(", ")}).`);
     const snapshot = profile.immutableSnapshot as any;
