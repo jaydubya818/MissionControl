@@ -23,7 +23,9 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "main": false
+      "main": false,
+      "codex/checkpoint-h-authenticated-enterprise": false,
+      "codex/enterprise-golden-journey": false
     }
   }
 }
