@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { canonicalHash, canonicalJson } from '@mission-control/shared';
-import { qualifiedLocalDelegationIdentity, LOCAL_DELEGATION_VERSION } from '../lib/localDelegationQualification';
+import { canonicalHash, canonicalJson, sha256Hex } from '@mission-control/shared';
+import { qualifiedLocalDelegationIdentity, localDelegationCanonicalJson, LOCAL_DELEGATION_VERSION } from '../lib/localDelegationQualification';
+import { verifyHostFactoryIdentity } from '../../scripts/enterprise-golden-journey/host-factory-identity.mjs';
+const lock = JSON.parse(readFileSync(new URL('../../scripts/enterprise-golden-journey/source-lock.json', import.meta.url), 'utf8'));
 const hosted = JSON.parse(readFileSync(new URL('./fixtures/hostFactoryQualification.json', import.meta.url), 'utf8'));
 const historical = JSON.parse(readFileSync(new URL('./fixtures/nativeHybridAuthority.json', import.meta.url), 'utf8'));
 let input: any, record: any;
@@ -66,7 +68,23 @@ describe('privileged disposable host qualification admission', () => {
     q.factoryVersion = canonicalHash({ sourceDigest: q.sourceDigest, configurationDigest: q.configurationDigest });
     input.configuration = c; provision(); expect(check).toThrow();
   });
-  it('rejects noncanonical retained wire bytes', () => {
+  it('uses MyFactory lexical wire ordering for mixed-case, underscore and digit keys', () => {
+    expect(localDelegationCanonicalJson({ a: 1, Z: 2, _a: 3, '9': 4, a1: [{ b: 1, B: 2 }] }))
+      .toBe('{"9":4,"Z":2,"_a":3,"a":1,"a1":[{"B":2,"b":1}]}');
+    const q = record.qualification, c = JSON.parse(q.configurationCanonical), r = JSON.parse(q.runtimeCanonical), h = JSON.parse(q.hostQualificationCanonical);
+    r.wireOrderProbe = { a: 1, Z: 2, _a: 3, '9': 4 };
+    q.runtimeCanonical = localDelegationCanonicalJson(r); c.local.runtimeSha256 = h.runtimeSha256 = sha256Hex(q.runtimeCanonical);
+    q.hostQualificationCanonical = localDelegationCanonicalJson(h); c.local.hostQualificationSha256 = sha256Hex(q.hostQualificationCanonical);
+    q.configurationCanonical = localDelegationCanonicalJson(c); q.configurationDigest = sha256Hex(q.configurationCanonical);
+    q.factoryVersion = sha256Hex(localDelegationCanonicalJson({ sourceDigest: q.sourceDigest, configurationDigest: q.configurationDigest }));
+    input.configuration = c; provision();
+    expect(check().factoryVersion).toBe(verifyHostFactoryIdentity(q, lock));
+    // Shared MissionControl digest identities are deliberately unchanged.
+    expect(localDelegationCanonicalJson(r)).not.toBe(canonicalJson(r));
+    expect(lock.factoryVersion).toBe(LOCAL_DELEGATION_VERSION);
+    expect(lock.myFactoryConfigurationTemplateDigest).toBe('c380a977fb40801438f00cd1a83b6e901ce3a3f0a88188934f63a8f00d5ea703');
+  });
+  it('rejects noncanonical retained wire bytes' , () => {
     record.qualification.runtimeCanonical += ' '; provision(); expect(check).toThrow();
   });
 });

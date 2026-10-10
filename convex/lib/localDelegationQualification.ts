@@ -1,4 +1,4 @@
-import { canonicalDigest, canonicalHash, canonicalJson, sha256Hex } from '@mission-control/shared';
+import { canonicalDigest, sha256Hex } from '@mission-control/shared';
 
 export const LOCAL_DELEGATION_SOURCE = 'e498c31db8b749fa91b0544ecd1d1a661b971c2c';
 export const LOCAL_DELEGATION_VERSION = '4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95';
@@ -9,10 +9,19 @@ const controls = ['rootDenied', 'absent', 'noCredentials', 'caps', 'seccomp', 'n
   'resourceLimits', 'crossWorkFilesystem', 'processTreeCleanup', 'separatePidNamespace', 'deadlineInitProtected'];
 const deny = () => { throw Error('LOCAL_DELEGATION_QUALIFICATION_UNAVAILABLE'); };
 const requireValue = (value: unknown) => { if (!value) deny(); };
+// MyFactory's immutable wire identity uses code-unit ordering, independent of
+// host locale/ICU. Keep the shared MissionControl serializer and its identities
+// unchanged; only these externally produced qualification records use this form.
+export function localDelegationCanonicalJson(value: any): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(localDelegationCanonicalJson).join(',') + ']';
+  return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + localDelegationCanonicalJson(value[key])).join(',') + '}';
+}
+const wireHash = (value: unknown) => sha256Hex(localDelegationCanonicalJson(value));
 function canonicalRecord(raw: string) {
   requireValue(typeof raw === 'string' && raw.length < 32768);
   const value = JSON.parse(raw);
-  requireValue(canonicalJson(value) === raw);
+  requireValue(localDelegationCanonicalJson(value) === raw);
   return value;
 }
 
@@ -23,8 +32,8 @@ export function qualifiedLocalDelegationIdentity(input: {
 }) {
   requireValue(process.env.MC_NATIVE_SUCCESSOR_QUALIFICATION === '1'
     && process.env.MC_ENTERPRISE_COMPATIBILITY_FIXTURES === '1');
-  const configurationDigest = canonicalHash(input.configuration);
-  const factoryVersion = canonicalHash({ sourceDigest: input.sourceDigest, configurationDigest });
+  const configurationDigest = wireHash(input.configuration);
+  const factoryVersion = wireHash({ sourceDigest: input.sourceDigest, configurationDigest });
   const raw = process.env.MC_LOCAL_DELEGATION_QUALIFICATION;
   // Preserve only the exact historical immutable composition when no successor
   // record was provisioned. A present invalid record never falls back to it.
@@ -47,11 +56,11 @@ export function qualifiedLocalDelegationIdentity(input: {
       && input.sourceDigest === SOURCE_DIGEST);
     const configuration = canonicalRecord(q.configurationCanonical);
     const runtime = canonicalRecord(q.runtimeCanonical), host = canonicalRecord(q.hostQualificationCanonical);
-    requireValue(canonicalJson(configuration) === canonicalJson(input.configuration)
+    requireValue(localDelegationCanonicalJson(configuration) === localDelegationCanonicalJson(input.configuration)
       && q.configurationDigest === configurationDigest && q.factoryVersion === factoryVersion);
     const template = { ...configuration, local: { ...configuration.local } };
     delete template.architecture; delete template.local.runtimeSha256; delete template.local.hostQualificationSha256;
-    requireValue(canonicalHash(template) === TEMPLATE_DIGEST
+    requireValue(wireHash(template) === TEMPLATE_DIGEST
       && ['amd64', 'arm64'].includes(runtime.architectureImage)
       && configuration.architecture === (runtime.architectureImage === 'amd64' ? 'x64' : 'arm64')
       && runtime.image === IMAGE

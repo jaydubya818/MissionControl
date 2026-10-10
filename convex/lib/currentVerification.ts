@@ -94,6 +94,7 @@ export async function getCurrentVerificationRoutingOutcome(
         || !artifact || artifact.projectId !== workOrder.projectId || artifact.tenantId !== workOrder.tenantId
         || artifact.workflowRunId !== source?._id || artifact.contentHash !== envelope.metadata.resultDigest
         || !artifact.metadata?.authenticatedResponse || !envelope.metadata.authenticatedResponseDigest
+        || !envelope.metadata.custodyObservation
         || canonicalDigest("enterprise-authenticated-readback/v1", artifact.metadata.authenticatedResponse) !== envelope.metadata.authenticatedResponseDigest
         || artifact.metadata?.resultDigest !== envelope.metadata.resultDigest
         || artifact.metadata?.bindingDigest !== trial.bindingDigest || artifact.metadata?.factoryVersion !== binding.factoryVersion
