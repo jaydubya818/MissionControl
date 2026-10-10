@@ -1,3 +1,4 @@
+import { pollQualificationWorker } from './qualification-worker-poll.mjs';
 import { prepareOwnerReviewFixture } from "./sofie-owner-review.mjs";
 import { SofieEnterpriseContractFixture } from '../enterprise-golden-journey/sofie-contract.mjs';
 import { pathToFileURL } from 'node:url';
@@ -150,6 +151,7 @@ try {
   let factoryVersionBindings: any[] = [];
   let lastHostReportAt = 0;
   async function reportHost() {
+    assert.equal(worker?.status().activeRunIds.length ?? 0, 0, 'Host attestation requires an idle qualification worker');
     lastHostReportAt = Date.now();
     const observed = await attestLocalQualificationRepository(localBinding);
     return mutate('workspaceHostBindings:report', { projectId: s.projectId, repositoryId, hostId, repository: `local-qualification/${fixtureId}`,
@@ -383,14 +385,14 @@ try {
         await step('executionRecovery', async () => ({ lostExecutionAck, duplicateDeliveries, restarted,
           executionsBeforeRecovery: executions, verifierStateBeforeRecovery: 'PENDING', freshAdapter: true, freshRegistry: true }));
       }
-      if (Date.now() - lastHostReportAt >= 5000) await reportHost();
+      // This harness never starts autonomous polling; the awaited helper is
+      // the sole admission loop and attests only after all Git tasks finish.
       // Admit the producer once, then drain that controller without polling for
       // newly queued verification work. The fresh controller must admit it after
       // the lost ACK and restart; producer cleanup timing cannot change this cut.
-      if (mode !== 'recovery' || restarted || !recoveryInitialPollCompleted) {
-        await worker.tick();
-        recoveryInitialPollCompleted = true;
-      }
+      const poll = mode !== 'recovery' || restarted || !recoveryInitialPollCompleted;
+      await pollQualificationWorker({ worker, reportHost, refreshHost: Date.now() - lastHostReportAt >= 5000, poll });
+      if (poll) recoveryInitialPollCompleted = true;
       runs = await query('nativeFixture:inspect', { table: 'workflowRuns' });
       const verifier = runs.find(r => r.attemptPurpose === 'VERIFICATION');
       if (verifier && ['COMPLETED', 'FAILED', 'CANCELED'].includes(verifier.status) && worker.status().activeRunIds.length === 0) break;
@@ -519,8 +521,7 @@ try {
       let integrationRuns: any[] = [];
       const integrationDeadline = Date.now() + 90000;
       while (Date.now() < integrationDeadline) {
-        if (Date.now() - lastHostReportAt >= 5000) await reportHost();
-        await worker.tick();
+        await pollQualificationWorker({ worker, reportHost, refreshHost: Date.now() - lastHostReportAt >= 5000 });
         integrationRuns = (await query('nativeFixture:inspect', { table: 'workflowRuns' })).filter((r: any) => r.workOrderId === integrationWO._id);
         const verifier = integrationRuns.find(r => r.attemptPurpose === 'VERIFICATION');
         if (verifier && ['COMPLETED', 'FAILED', 'CANCELED'].includes(verifier.status) && !worker.status().activeRunIds.length) break;

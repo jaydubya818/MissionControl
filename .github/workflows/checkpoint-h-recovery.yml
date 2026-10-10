@@ -25,7 +25,7 @@ jobs:
       - name: Registry and exported runtime integrity regressions
         run: |
           sudo install -d -m 1777 /private/tmp
-          pnpm exec vitest run scripts/qualification/registry-runtime-identity.test.mjs scripts/qualification/native-control-evidence.test.mjs scripts/enterprise-golden-journey/qualified-docker.test.mjs scripts/enterprise-golden-journey/host-factory-identity.test.mjs
+          pnpm exec vitest run scripts/qualification/registry-runtime-identity.test.mjs scripts/qualification/native-control-evidence.test.mjs scripts/qualification/qualification-worker-poll.test.mjs scripts/enterprise-golden-journey/qualified-docker.test.mjs scripts/enterprise-golden-journey/host-factory-identity.test.mjs
           pnpm --filter @mission-control/orchestration-server exec vitest run src/__tests__/localQualificationRepository.test.ts src/__tests__/hardenedGit.test.ts
       - run: pnpm exec tsc --noEmit -p convex/tsconfig.json && pnpm --filter mission-control-ui typecheck
       - run: pnpm --filter mission-control-ui exec vitest run src/eos/views/SofieOwnerReview.test.tsx src/eos/views/MissionPortfolioView.test.tsx
