@@ -25,6 +25,7 @@
     "deploymentEnabled": {
       "main": false,
       "codex/unified-capability-control-plane": false,
+      "codex/factory-turn-budget-test": false,
       "codex/live-retry-runbook-20261003": false
     }
   }
