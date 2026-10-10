@@ -3,10 +3,11 @@ import { execFileSync, spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, writeFile, copyFile, open } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { lock, sourceIdentity, seal } from './evidence.mjs';
+import { lock, sourceIdentity, seal, validateComposedExecution } from './evidence.mjs';
 
 const output=resolve(process.argv[2]);await mkdir(output);
 const root=process.cwd(), source=await sourceIdentity();
+assert.equal(source.dirty,false,'Committed controller source must be clean');
 const required=name=>{assert.ok(process.env[name],`Missing ${name}; no fallback permitted`);return resolve(process.env[name]);};
 const myeve=required('MC_COMPOSED_MYEVE_ROOT'),factory=required('MC_LOCAL_MYFACTORY_ROOT');
 const runtime=required('MC_GOLDEN_RUNTIME_BUILD'),docker=required('MC_GOLDEN_DOCKER');
@@ -17,7 +18,7 @@ for(const [path,sha] of [[myeve,lock.myEve],[factory,lock.myFactory]]) {
 }
 const scratch=await mkdtemp(join(tmpdir(),'mc-composed-sofie-')),fixture=join(scratch,'source');
 const report={schema:'factory-of-factories-composed/v1',source,missionControlDependency:lock.composedDependencies.missionControl,
-  myEve:lock.myEve,myFactory:lock.myFactory,releaseGate:'ADVISORY',releaseEligible:false,paidOperations:0,productionIntegration:'NOT_RUN',externalAlphaChanges:0,publication:'DISABLED',status:'IN_PROGRESS'};
+  myEve:lock.myEve,myFactory:lock.myFactory,compositionScope:'HISTORICAL_LOCKED_MYEVE_BASELINE',currentMyEveCandidateCoverage:'NOT_RUN',releaseGate:'ADVISORY',releaseEligible:false,paidOperations:0,productionIntegration:'NOT_RUN',externalAlphaChanges:0,publication:'DISABLED',status:'IN_PROGRESS'};
 let code;
 try {
   execFileSync(process.execPath,['scripts/enterprise-golden-journey/prepare-sofie-browser.mjs',myeve,fixture],{stdio:'pipe'});
@@ -31,10 +32,12 @@ try {
     });
   } finally {await log.close();}
   const journey=JSON.parse(await readFile(join(output,'hybrid/journey.json'),'utf8'));
+  const records=JSON.parse(await readFile(join(output,'hybrid/durable-records.json'),'utf8'));
+  const execution=validateComposedExecution(journey,records,source);
   const consumer=journey.stages.completedEnterpriseResultConsumer;
   let browserEvidence=consumer?.browser;
   if(!browserEvidence)try{browserEvidence=JSON.parse(await readFile(join(output,'browser/report.json'),'utf8'));}catch{}
-  report.execution={native:journey.nativeExecution??'NOT_RUN',hybrid:journey.hybridMission??'NOT_RUN',accounting:journey.nativeDelegatedAccounting??'NOT_RUN',completedResult:consumer?.status??'NOT_RUN',browser:browserEvidence??{status:'NOT_RUN'}};
+  report.execution={...execution,completedResult:consumer?.status??'NOT_RUN',browser:browserEvidence??{status:'NOT_RUN'}};
   report.status=code!==0 || browserEvidence?.status==='FAIL'?'FAIL':'PARTIAL';
   report.blockers=['No browser control is wired to Sofie proposal authorization in the qualified frontends.','Mission creation and acceptance use synthetic authenticated database clients.','Proposal and Result browser steps do not form one end-to-end owner-created Mission.','Deterministic model, native documents and delegated slug utility do not qualify Recruiting UI or live model behavior.','Hosted private native runtime distribution and independent Claude review remain separate gates.'];
   if(journey.failure)report.failure=journey.failure;

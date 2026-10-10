@@ -2,6 +2,26 @@
 
 This branch composes MissionControl dependency `c0ba5a97087a50feb36bb1a788f9cf065890e328` with exact-owner isolation baseline `6761c0c1c38be24907536f118e214fc962eea231`. The original commits remain ancestors, without rewriting either. MyEve remains `9f1c83b0989abaedc168b740ddcf57582cf15a92`; MyFactory remains `e498c31db8b749fa91b0544ecd1d1a661b971c2c`.
 
+## Source-pair coverage
+
+The MissionControl composed runner intentionally retains the historical MyEve
+`9f1c83b0989abaedc168b740ddcf57582cf15a92` source-lock baseline. Its report identifies
+this as `HISTORICAL_LOCKED_MYEVE_BASELINE` and records current MyEve candidate
+coverage as `NOT_RUN`. It does not qualify the current MyEve PR head.
+
+The current candidate pair is exercised in the MyEve Checkpoint H workflow,
+which points one way to an exact MissionControl commit. Use that run's exact
+MyEve controller SHA and pinned MissionControl SHA as the candidate-pair
+manifest, together with its retained durable proof and Result consumer evidence.
+A historical composed run cannot substitute for that pair's required checks.
+This avoids a circular source-pin update between repositories while preserving
+both the historical baseline and the exact candidate evidence.
+
+The composed runner requires a clean committed MissionControl controller and
+validates its same-source durable hybrid proof before reporting execution PASS.
+The proof includes the exact nine delegation authority controls and one actual
+admission; labels alone cannot establish execution qualification.
+
 ## Canonical authority
 
 The signed Sofie action can invoke only its exact internal command transaction. That transaction revalidates signature, expiry, connection, active owner/member/team, current role scope, proposal digest/authorization and the frozen Mission owner. Mission transfer denies inspection, repeated submission and readback. It cannot approve a Plan, dispatch work, accept results, settle accounting, grant collaborators or schedule follow-up authority.

@@ -1,5 +1,6 @@
 export { validateNativeControls } from '../qualification/native-control-evidence.mjs';
 import assert from 'node:assert/strict';
+import { validateDelegationAuthorityControls } from '../qualification/delegation-authority-controls.mjs';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, lstat, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
@@ -102,6 +103,7 @@ export function validateHybrid(j, records, expectedSourceSha) {
       reservation: producer.executionCostAuthorization.enterprise, settlement: producer.enterpriseSettlement });
   }
   assert.equal(new Set(candidates.map(c => c.workOrderId)).size, 3);
+  validateDelegationAuthorityControls(s.delegatedExecution);
   const b = s.delegatedExecution.binding;
   assert.equal(b.missionId, missionId); assert.equal(b.missionPlanId, planId);
   assert.ok(s.delegatedExecution.verifiedExecutionIdentity, 'Missing verified signed Result execution identity');
@@ -111,8 +113,16 @@ export function validateHybrid(j, records, expectedSourceSha) {
   assert.equal(b.maxSpendMicrousd, 80);
   assert.equal(s.gateBeforeSettlement.current.eligible, false);
   assert.equal(s.productionAcceptanceDenied.accepted, false);
-  return { missionId, planId, candidates, factoryVersion: b.factoryVersion,
+  return { controllerSourceSha: j.controllerSourceSha, missionId, planId, candidates, factoryVersion: b.factoryVersion,
     qualifiedScope: 'DETERMINISTIC_HYBRID_PROOF', fullCrossSystem: 'NOT_RUN', recruitingUi: 'NOT_RUN' };
+}
+export function validateComposedExecution(journey, records, source) {
+  assert.equal(source?.dirty, false, 'Committed controller source must be clean');
+  const proof = validateHybrid(journey, records, source.sha);
+  for (const key of ['nativeExecution', 'hybridMission', 'nativeDelegatedAccounting']) {
+    assert.equal(journey[key], 'PASS', `Composed execution stage failed: ${key}`);
+  }
+  return { native: 'PASS', hybrid: 'PASS', accounting: 'PASS', proof };
 }
 export function aggregate(reports) {
   const bySuite = new Map();

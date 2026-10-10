@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { validateDelegationAuthorityControls } from './delegation-authority-controls.mjs';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -188,6 +189,7 @@ export async function executeHybridDelegation({ provider, db, workOrderId, repos
     assert.equal(accepted.accepted, true, JSON.stringify(accepted));
     const final = await inspect(run._id); assert.ok(final.enterpriseSettlement); assert.equal(final.enterpriseSettlement.chargedMicrousd, 0);
     const artifacts = (await query('nativeFixture:inspect', { table: 'runArtifacts' })).filter((a: any) => a.workflowRunId === run._id);
+    validateDelegationAuthorityControls({ authorityControls: checks, admissionRequests: wire.admissions });
     return { run: final, workOrderId, trialId, binding: b, gateId, candidateCommit: projection.candidateCommit, candidateTree: projection.candidateTree,
       resultDigest: projection.resultDigest, verifiedExecutionIdentity, artifactIds: artifacts.map((a: any) => a._id), factoryEvidence: factory.evidence, admissionRequests: wire.admissions, authorityControls: checks };
   } finally { if (wire) { wire.server.closeAllConnections(); wire.server.close(); } await pg.stop(); }

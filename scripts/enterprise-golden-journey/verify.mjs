@@ -36,6 +36,8 @@ const challenges = {
   'budget-escalation': j => { j.stages.delegatedExecution.binding.maxSpendMicrousd++; },
   'unsettled-exposure': j => { j.stages.hybridDurableAccounting.projectExposureMicrousd = 1; },
   'publication-authority': j => { j.stages.delegatedExecution.binding.allowedEffects.push('publication'); },
+  'missing-delegation-controls': j => { delete j.stages.delegatedExecution.authorityControls; },
+  'repeated-delegation-admission': j => { j.stages.delegatedExecution.admissionRequests = 2; },
   'missing-cleanup': j => { j.repositoryCleanup = 'UNKNOWN'; },
   'wrong-mission': (_, r) => { r.workOrders[0].missionId = 'other'; },
 };
@@ -43,5 +45,5 @@ for (const [name, mutate] of Object.entries(challenges)) {
   const j = structuredClone(journey), r = structuredClone(records); mutate(j, r);
   assert.throws(() => validateHybrid(j, r, expectedSourceSha), undefined, `Missing negative assertion: ${name}`);
 }
-console.log(JSON.stringify({ ...result, offlineChallenges: Object.keys(challenges), nativeCandidateBytes: 'VERIFIED',
+console.log(JSON.stringify({ ...result, expectedSourceSha, offlineChallenges: Object.keys(challenges), nativeCandidateBytes: 'VERIFIED',
   authenticationScope: 'Canonical ingress verified signatures during execution; this offline validator cross-checks retained records and bundle bytes. A digest manifest is integrity evidence, not an independent signature.' }, null, 2));
