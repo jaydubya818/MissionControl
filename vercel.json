@@ -23,7 +23,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "main": false
+      "main": false,
+      "codex/enterprise-golden-journey": false
     }
   }
 }
