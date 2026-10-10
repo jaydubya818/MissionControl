@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
-import { validateHybrid, validateNativeControls, lock, sha256 } from "./evidence.mjs";
+import { validateHybrid, validateNativeControls, lock, sha256, sourceIdentity } from "./evidence.mjs";
+import { validateOwnerReview } from "./owner-review-controls.mjs";
 const output = resolve(process.argv[2]),
   build = join(output, "runtime");
 const report = {
@@ -22,6 +23,9 @@ const run = (args) =>
     env: { ...process.env, MC_OWNER_REVIEW_QUALIFICATION: "1" },
   });
 try {
+  const source = await sourceIdentity();
+  assert.equal(source.dirty, false, 'Qualification requires clean committed source');
+  assert.equal(source.sha, report.sourceSha);
   const recovery = JSON.parse(
     await readFile(join(build, "recovery.json"), "utf8"),
   );
@@ -74,10 +78,9 @@ try {
       JSON.parse(
         await readFile(join(output, "hybrid/durable-records.json"), "utf8"),
       ),
+      report.sourceSha,
     );
-    report.ownerReview = journey.stages.linkedOwnerReview;
-    assert.equal(report.ownerReview.status, "PASS");
-    assert.equal(report.ownerReview.missionId, report.proof.missionId);
+    report.ownerReview = validateOwnerReview(journey.stages.linkedOwnerReview, 'ACCEPT', report.proof.missionId);
     process.env.MC_OWNER_REVIEW_DECISION = "REJECT";
     run([
       "scripts/qualification/native-successor-journey.mts",
@@ -93,7 +96,9 @@ try {
     assert.equal(rejection.repositoryCleanup, "VERIFIED");
     assert.equal(rejection.databaseCleanup, "VERIFIED");
     assert.equal(rejection.stages.sofieDurableReadback.state, "BLOCKED");
-    report.ownerRejection = rejection.stages.linkedOwnerReview;
+    assert.equal(rejection.controllerSourceSha, report.sourceSha);
+    assert.equal(rejection.controllerDirty, false);
+    report.ownerRejection = validateOwnerReview(rejection.stages.linkedOwnerReview, 'REJECT', rejection.stages.mission.mission._id);
     report.status = "PARTIAL";
     report.apiQualification = "PASS";
   } else report.reason = recovery.reason;
@@ -106,4 +111,4 @@ await writeFile(
   JSON.stringify(report, null, 2) + "\n",
 );
 console.log(JSON.stringify(report));
-if (report.status === "FAIL") process.exitCode = 1;
+if (report.apiQualification !== "PASS") process.exitCode = 1;

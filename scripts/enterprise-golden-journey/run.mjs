@@ -83,18 +83,19 @@ async function journey(mode, build) {
   assert.equal(j.repositoryCleanup, 'VERIFIED'); assert.equal(j.databaseCleanup, 'VERIFIED');
   assert.equal('sha256:' + sha256(await readFile(join(dest, 'candidates.bundle'))), j.candidateArchiveDigest);
   if (mode === 'hybrid') {
-    report.proof = validateHybrid(j, await json(join(dest, 'durable-records.json')));
+    report.proof = validateHybrid(j, await json(join(dest, 'durable-records.json')), source.sha);
     if (j.stages.missionReadIsolation.strictOwnerIsolation !== 'PASS') report.blockingFindings = ['CANONICAL_MISSION_READ_ALLOWS_SAME_TENANT_OTHER_OWNER'];
-    await command('independent-evidence-validator', process.execPath, ['scripts/enterprise-golden-journey/verify.mjs', dest]);
+    await command('independent-evidence-validator', process.execPath, ['scripts/enterprise-golden-journey/verify.mjs', dest, source.sha]);
   }
   else if (mode === 'unknown' || mode === 'cancel') { assert.equal(j.additionalExecutions, 0); assert.ok(j.stages.unknownAfterRestart.attemptExposureMicrousd > 0); }
   else { assert.equal(j.nativeExecution, 'PASS'); assert.equal(j.nativeSettlement, 'PASS'); }
   return j;
 }
 try {
+  assert.equal(source.dirty, false, 'Qualification requires clean committed source');
   for (const [path, expected] of Object.entries(lock.dependencyLocks)) assert.equal(sha256(await readFile(path)), expected, `Dependency lock changed: ${path}`);
   if (suite === 'contracts') {
-    await command('report-contracts', process.execPath, ['--test', 'scripts/enterprise-golden-journey/evidence.test.mjs', 'scripts/enterprise-golden-journey/sofie-contract.test.mjs', 'scripts/enterprise-golden-journey/boundary.test.mjs']);
+    await command('report-contracts', process.execPath, ['--test', 'scripts/enterprise-golden-journey/evidence.test.mjs', 'scripts/enterprise-golden-journey/owner-review-controls.test.mjs', 'scripts/enterprise-golden-journey/runtime-recovery-status.test.mjs', 'scripts/enterprise-golden-journey/sofie-contract.test.mjs', 'scripts/enterprise-golden-journey/boundary.test.mjs']);
     await vitest('backend-domain-regressions', ['convex/__tests__']);
     await vitest('enterprise-contracts', ['convex/__tests__/enterpriseDelegationAdmission.test.ts', 'convex/__tests__/enterpriseMissionOwner.test.ts', 'convex/__tests__/missionWorkOrderContract.test.ts', 'convex/__tests__/missionGovernance.test.ts', 'convex/__tests__/qualificationGateScope.test.ts']);
   } else if (suite === 'database-concurrency') {
@@ -127,7 +128,7 @@ try {
   report.status = 'PASS';
 } catch (error) {
   report.status = error.notRun ? 'NOT_RUN' : 'FAIL'; report.failureClassification = error.notRun ? 'DEPENDENCY_UNAVAILABLE' : 'ASSERTION_OR_EXECUTION_FAILURE';
-  report.reason = error.message; process.exitCode = error.notRun ? 0 : 1;
+  report.reason = error.message; process.exitCode = 1;
 } finally {
   try {
     const audit = (await readFile(env.MC_GOLDEN_DATABASE_AUDIT, 'utf8')).trim().split('\n').map(JSON.parse);

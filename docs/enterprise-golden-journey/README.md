@@ -29,10 +29,10 @@ Every run uses a fresh directory. It retains failed commands, raw records, Git c
 To challenge retained hybrid evidence without starting services:
 
 ```sh
-node scripts/enterprise-golden-journey/verify.mjs golden-evidence/RUN/hybrid-mission/hybrid
+node scripts/enterprise-golden-journey/verify.mjs golden-evidence/RUN/hybrid-mission/hybrid EXPECTED_COMMIT_SHA
 ```
 
-This separate process validates lifecycle identities, candidate bytes, gate records, allowance settlement and cleanup. It also rejects eleven deliberate evidence mutations. It is not a Claude review or cryptographic third-party attestation. Signature authentication happens in the canonical MyFactory ingress during execution. The manifest detects changes relative to the saved hashes. It does not protect against an attacker rewriting both evidence and hashes.
+This separate process validates lifecycle identities, candidate bytes, gate records, allowance settlement and cleanup. It also rejects thirteen deliberate evidence mutations. It is not a Claude review or cryptographic third-party attestation. Signature authentication happens in the canonical MyFactory ingress during execution. The manifest detects changes relative to the saved hashes. It does not protect against an attacker rewriting both evidence and hashes.
 
 ## What executes
 

@@ -5,6 +5,7 @@ import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { lock, sha256 } from "./evidence.mjs";
 import { readRegistryManifest } from "../qualification/registry-runtime-identity.mjs";
+import { runtimePullFailure } from "./runtime-recovery-status.mjs";
 const directory = resolve(process.argv[2]);
 const docker = process.env.MC_GOLDEN_DOCKER || "docker";
 const image =
@@ -22,12 +23,10 @@ const run = (cmd, args) =>
 try {
   try {
     run(docker, ["pull", "--platform=linux/amd64", image]);
-  } catch {
-    report.status = "NOT_RUN";
-    report.reason =
-      "Exact private GHCR image could not be pulled. CI requires packages:read and read access to missioncontrol-native-runtime for the invoking repository GITHUB_TOKEN. No package administration or write access is required.";
+  } catch (error) {
+    Object.assign(report, runtimePullFailure(error));
   }
-  if (report.status !== "NOT_RUN") {
+  if (report.status === "IN_PROGRESS") {
     const metadata = fileURLToPath(
       new URL("./runtime-metadata/", import.meta.url),
     );
@@ -80,4 +79,4 @@ await writeFile(
   JSON.stringify(report, null, 2) + "\n",
 );
 console.log(JSON.stringify(report));
-if (report.status === "FAIL") process.exitCode = 1;
+if (report.status !== "PASS") process.exitCode = 1;

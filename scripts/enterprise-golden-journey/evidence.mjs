@@ -19,20 +19,26 @@ export async function sourceIdentity(root = process.cwd()) {
   }
   return { sha: git(['rev-parse', 'HEAD']), dirty: Boolean(git(['status', '--porcelain'])), treeDigest: sha256(JSON.stringify(files)), files };
 }
-export async function seal(directory) {
+async function evidenceFiles(directory) {
   const files = {};
   async function visit(dir) {
+    assert.equal((await lstat(dir)).isSymbolicLink(), false, 'Evidence symlinks are forbidden');
     for (const name of (await readdir(dir)).sort()) {
       const path = join(dir, name), stat = await lstat(path);
       assert.equal(stat.isSymbolicLink(), false, 'Evidence symlinks are forbidden');
       if (stat.isDirectory()) await visit(path);
-      else if (name !== 'manifest.json') files[relative(directory, path)] = sha256(await readFile(path));
+      else if (path !== join(directory, 'manifest.json')) files[relative(directory, path)] = sha256(await readFile(path));
     }
   }
   await visit(directory);
+  return files;
+}
+export async function seal(directory) {
+  const files = await evidenceFiles(directory);
   await writeFile(join(directory, 'manifest.json'), JSON.stringify({ schema: 'golden-evidence-manifest/v1', files }, null, 2) + '\n', { flag: 'wx' });
 }
 export async function verifySeal(directory) {
+  const files = await evidenceFiles(directory);
   const manifest = await json(join(directory, 'manifest.json'));
   assert.equal(manifest.schema, 'golden-evidence-manifest/v1');
   assert.ok(manifest.files['report.json']);
@@ -42,9 +48,13 @@ export async function verifySeal(directory) {
     assert.equal((await lstat(path)).isSymbolicLink(), false);
     assert.equal(sha256(await readFile(path)), hash, `Evidence changed: ${name}`);
   }
+  assert.deepEqual(Object.keys(files).sort(), Object.keys(manifest.files).sort(), 'Evidence inventory changed');
   return manifest;
 }
-export function validateHybrid(j, records) {
+export function validateHybrid(j, records, expectedSourceSha) {
+  assert.match(expectedSourceSha ?? '', /^[a-f0-9]{40}$/, 'Expected source SHA is required');
+  assert.equal(j.controllerDirty, false, 'Committed controller source is required');
+  assert.equal(j.controllerSourceSha, expectedSourceSha, 'Controller source does not match expected SHA');
   assert.equal(j.error, undefined); assert.equal(j.failure, undefined);
   assert.equal(j.paidOperations, 0); assert.equal(j.productionIntegration, 'NOT_RUN');
   assert.equal(j.executableProductionGrants, 0); assert.equal(j.externalAlphaChanges, 0);
@@ -107,9 +117,13 @@ export function validateHybrid(j, records) {
 export function aggregate(reports) {
   const bySuite = new Map();
   for (const r of reports) {
+    assert.match(r.source?.sha ?? '', /^[a-f0-9]{40}$/, 'Committed source SHA is required');
+    assert.equal(r.source.dirty, false, 'Committed source must be clean');
+    assert.ok(r.source.treeDigest, 'Source tree digest is required');
     assert.ok(suites.includes(r.suite)); assert.ok(!bySuite.has(r.suite), 'Duplicate suite evidence');
     assert.ok(['PASS', 'FAIL', 'NOT_RUN', 'IN_PROGRESS'].includes(r.status)); bySuite.set(r.suite, r);
   }
+  assert.equal(new Set(reports.map(r => r.source.sha)).size, 1, 'Reports cover different source commits');
   const identities = new Set(reports.map(r => r.source.treeDigest));
   assert.equal(identities.size, 1, 'Reports cover different source trees');
   const results = suites.map(suite => bySuite.get(suite) ?? { suite, status: 'NOT_RUN', reason: 'Missing suite evidence' });
