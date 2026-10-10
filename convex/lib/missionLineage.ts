@@ -15,7 +15,7 @@ export function missionLineage(db: QueryCtx["db"]) {
   function tableOf(id: string, expectedTable?: string) {
     // Schema/query hints only avoid discovery after the database validates the
     // exact table. A wrong hint cannot create or overwrite a cached identity.
-    if (!tableCache.has(id) && expectedTable && Object.hasOwn(validators, expectedTable)
+    if (!tableCache.has(id) && expectedTable && Object.prototype.hasOwnProperty.call(validators, expectedTable)
       && db.normalizeId(expectedTable as any, id)) tableCache.set(id, expectedTable);
     if (!tableCache.has(id)) tableCache.set(id, Object.keys(validators).find(table => db.normalizeId(table as any, id)) ?? null);
     return tableCache.get(id)!;
