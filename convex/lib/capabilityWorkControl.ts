@@ -1,12 +1,13 @@
+import { requireCapabilityReceiverRecovery } from './capabilityReceiverRecovery';
 import type { Id } from '../_generated/dataModel';
-import type { MutationCtx } from '../_generated/server';
+import type { QueryCtx } from '../_generated/server';
 
 type ControlledWork = { capabilityAuthorities?: CapabilityWorkAuthority[]; workOrderId?: Id<'workOrders'>; missionId?: Id<'missions'>; ownerMemberId?: Id<'orgMembers'>; projectId?: Id<'projects'> };
 
 export type CapabilityWorkAuthority = { scope: string; version: number; policyId: string; capabilityId: string };
 
 /** Native Attempt authority is frozen at admission. Later enables cannot revive it. */
-export async function capabilityWorkRestriction(ctx: Pick<MutationCtx, 'db'>,
+export async function capabilityWorkRestriction(ctx: Pick<QueryCtx, 'db'>,
   run: ControlledWork) {
   // Legacy admitted Work has no exact frozen policy lineage. Explicit controls
   // contain it pending reconciliation; never invent current-version authority.
@@ -25,6 +26,13 @@ export async function capabilityWorkRestriction(ctx: Pick<MutationCtx, 'db'>,
       }
     }
   }
+  for (const authority of run.capabilityAuthorities ?? []) {
+    try {
+      const identity = JSON.parse(authority.scope);
+      if (!Array.isArray(identity) || identity.length !== 6) throw Error('CAPABILITY_SCOPE_INVALID');
+      requireCapabilityReceiverRecovery(identity[5]);
+    } catch { return 'CAPABILITY_RECOVERY_PENDING_BACKEND' as const; }
+  }
   let paused = false;
   for (const authority of run.capabilityAuthorities ?? []) {
     for (const capabilityId of new Set(['work', 'missioncontrol', authority.capabilityId])) {
@@ -41,7 +49,7 @@ export async function capabilityWorkRestriction(ctx: Pick<MutationCtx, 'db'>,
   return paused ? 'CAPABILITY_PAUSE_PENDING_BACKEND' as const : undefined;
 }
 
-export async function assertCapabilityWorkAuthority(ctx: Pick<MutationCtx, 'db'>,
+export async function assertCapabilityWorkAuthority(ctx: Pick<QueryCtx, 'db'>,
   run: ControlledWork) {
   const restriction = await capabilityWorkRestriction(ctx, run);
   if (restriction) throw Error(restriction);

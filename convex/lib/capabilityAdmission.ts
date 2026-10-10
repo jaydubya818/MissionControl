@@ -1,3 +1,4 @@
+import { requireCapabilityReceiverRecovery } from './capabilityReceiverRecovery';
 import { assertCapabilityWorkAuthority } from './capabilityWorkControl';
 import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
@@ -32,7 +33,9 @@ export async function requireCapabilityAdmission(ctx: MutationCtx, record: Admis
   if (!input?.permits) throw new Error('CAPABILITY_POLICY_REVALIDATION_UNAVAILABLE');
   const binding = capabilityBindings().find(item => item.tenantId === record.tenantId
     && item.projectId === record.projectId && item.ownerMemberId === record.ownerMemberId);
-  if (!binding) throw new Error('CAPABILITY_INSTALLATION_UNQUALIFIED');
+  if (!binding || binding.installationId !== process.env.MC_CAPABILITY_INSTALLATION_ID)
+    throw new Error('CAPABILITY_INSTALLATION_UNQUALIFIED');
+  requireCapabilityReceiverRecovery(binding.incarnation);
   if (!enrollment || enrollment.installationId !== binding.installationId || enrollment.incarnation !== binding.incarnation)
     throw Error('CAPABILITY_ENROLLMENT_CHANGED');
   const { capabilityPermits: _permits, ...nativeArgs } = input.args;

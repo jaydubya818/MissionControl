@@ -320,9 +320,11 @@ export const listSandboxReconcileCandidatesInternal = internalQuery({
       const run = await ctx.db.get(allocation.workflowRunId);
       if (!run || run.repositoryId !== args.repositoryId) continue;
       const host = run.hostBindingId ? await ctx.db.get(run.hostBindingId) : null;
+      const restriction = await capabilityWorkRestriction(ctx, run);
       const attemptLeaseCurrent = run.status === "RUNNING"
         && Boolean(run.lease && run.lease.expiresAt > now)
-        && factoryLeaseMatchesCurrentRegistration(run.lease, host ?? undefined);
+        && factoryLeaseMatchesCurrentRegistration(run.lease, host ?? undefined)
+        && restriction !== "CAPABILITY_AUTHORITY_FENCED";
       if (attemptLeaseCurrent) continue;
       const credential = await ctx.db.query("sandboxCredentialGrants")
         .withIndex("by_allocation", (q) => q.eq("sandboxAllocationId", allocation._id))
@@ -362,9 +364,11 @@ export const markSandboxOrphansInternal = internalMutation({
       const run = await ctx.db.get(allocation.workflowRunId);
       if (!run || run.repositoryId !== args.repositoryId) continue;
       const host = run.hostBindingId ? await ctx.db.get(run.hostBindingId) : null;
+      const restriction = await capabilityWorkRestriction(ctx, run);
       const attemptLeaseCurrent = run.status === "RUNNING"
         && Boolean(run.lease && run.lease.expiresAt > now)
-        && factoryLeaseMatchesCurrentRegistration(run.lease, host ?? undefined);
+        && factoryLeaseMatchesCurrentRegistration(run.lease, host ?? undefined)
+        && restriction !== "CAPABILITY_AUTHORITY_FENCED";
       if (attemptLeaseCurrent) continue;
       if (allocation.state !== "ORPHANED") {
         await ctx.db.patch(allocation._id, {
@@ -404,9 +408,11 @@ export const reportSandboxReconcileInternal = internalMutation({
       throw new Error("Remote Factory Attempt is unavailable for reconciliation.");
     }
     const host = run.hostBindingId ? await ctx.db.get(run.hostBindingId) : null;
+    const restriction = await capabilityWorkRestriction(ctx, run);
     const attemptLeaseCurrent = run.status === "RUNNING"
       && Boolean(run.lease && run.lease.expiresAt > Date.now())
-      && factoryLeaseMatchesCurrentRegistration(run.lease, host ?? undefined);
+      && factoryLeaseMatchesCurrentRegistration(run.lease, host ?? undefined)
+      && restriction !== "CAPABILITY_AUTHORITY_FENCED";
     if (attemptLeaseCurrent) throw new Error("A current canonical Attempt lease cannot be reconciled as an orphan.");
     const allocation = await ctx.db.query("sandboxAllocations")
       .withIndex("by_run", (q) => q.eq("workflowRunId", run._id))

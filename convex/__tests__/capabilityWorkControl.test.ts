@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { capabilityWorkRestriction } from '../lib/capabilityWorkControl';
 import { updateContext, advance } from '../workflowRuns';
-const scope = 'exact-owner-installation-incarnation';
+beforeEach(() => { vi.stubEnv('MC_CAPABILITY_RECEIVER_RECOVERY_STATE', 'ACTIVE'); vi.stubEnv('MC_CAPABILITY_RECEIVER_EPOCH', 'epoch'); });
+afterEach(() => vi.unstubAllEnvs());
+const scope = JSON.stringify(['myeve', 'owner', 'org', 'installation', 'missioncontrol', 'epoch']);
 const authority = { scope, version: 3, policyId: 'admitted-3', capabilityId: 'enterprise.fleet' };
 function context(controls: Array<Record<string, unknown>>, run: Record<string, unknown> = {}) {
   const writes = vi.fn();
@@ -19,6 +21,10 @@ function context(controls: Array<Record<string, unknown>>, run: Record<string, u
   } };
 }
 describe('admitted Work policy lineage', () => {
+  it('quarantines restored writers even when their old database has lost revoke controls', async () => {
+    vi.stubEnv('MC_CAPABILITY_RECEIVER_EPOCH', 'after-restore');
+    expect(await capabilityWorkRestriction(context([]) as never, { capabilityAuthorities: [authority] })).toBe('CAPABILITY_RECOVERY_PENDING_BACKEND');
+  });
   it('does not fence another owner or unrelated capability', async () => {
     const ctx = context([{ scope: 'foreign-owner', capabilityId: 'work', operation: 'revoke', version: 9 },
       { scope, capabilityId: 'files', operation: 'revoke', version: 9 }]);

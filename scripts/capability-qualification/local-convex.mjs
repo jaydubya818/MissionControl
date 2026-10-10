@@ -1,3 +1,4 @@
+import { delegatedFixture } from './delegated-fixture.mjs';
 import { mkdtemp, cp, symlink, writeFile, readFile, rm, mkdir } from 'node:fs/promises';
 import { spawn, execFile as callback } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -7,12 +8,13 @@ import { randomBytes } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { ConvexHttpClient } from 'convex/browser';
 import { makeFunctionReference } from 'convex/server';
+import { verifyLifecycleReceipt, signLifecycleReceipt } from '../../convex/lib/capabilityLifecycleWire.ts';
 import { signPolicyMessage, policyMessageHash, admissionActionDigest, verifyPolicyMessage } from '../../convex/lib/capabilityOrderingWire.ts';
 const execFile = promisify(callback), root = resolve('.');
 const binary = process.env.CAPABILITY_TEST_CONVEX_BIN;
 if (!binary) throw Error('CAPABILITY_TEST_CONVEX_BIN must identify a local Convex binary');
 const directory = await mkdtemp(join(tmpdir(), 'capability-convex-'));
-const port = 55561, sitePort = 55562, url = `http://127.0.0.1:${port}`;
+const port = Number(process.env.CAPABILITY_TEST_CONVEX_PORT ?? 55561), sitePort = Number(process.env.CAPABILITY_TEST_CONVEX_SITE_PORT ?? 55562), url = `http://127.0.0.1:${port}`;
 const env = { PATH: process.env.PATH, HOME: directory, TMPDIR: directory, CONVEX_DISABLE_TELEMETRY: '1' };
 const secret = randomBytes(32).toString('hex'), instance = 'capability-qualification';
 const cli = join(root, 'node_modules/convex/dist/cli.bundle.cjs');
@@ -72,6 +74,8 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   await invoke(['env', 'set', 'MC_CAPABILITY_ENVIRONMENT', 'qualification']);
   await invoke(['env', 'set', 'MC_CAPABILITY_INSTALLATION_ID', 'isolated']);
   await invoke(['env', 'set', 'MC_CAPABILITY_BINDINGS_JSON', JSON.stringify([binding])]);
+  await invoke(['env', 'set', 'MC_CAPABILITY_RECEIVER_RECOVERY_STATE', 'ACTIVE']);
+  await invoke(['env', 'set', 'MC_CAPABILITY_RECEIVER_EPOCH', binding.incarnation]);
   const identity = { ownerId: binding.ownerId, organizationId: binding.organizationId, installationId: binding.installationId, backendId: binding.backendId, incarnation: binding.incarnation, enrollmentVersion: 1 };
   const fences = {};
   async function fence(authority, version, operation, controls, capabilityId = 'missioncontrol') {
@@ -93,9 +97,9 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
     const workOrderId = await insert('workOrders', { tenantId, projectId, missionId, ownerMemberId, owningTeamId: teamId, title: 'Qualification', desiredOutcome: 'No paid execution', priority: 3, riskLevel: 'LOW', acceptanceCriteria: [], state: 'READY', verificationStatus: 'PENDING', approvalStatus: 'APPROVED', releasedAt: now, createdAt: now, updatedAt: now });
     return { missionId, workOrderId };
   }
-  async function permits(missionId, args, workId = missionId, capabilityId = 'enterprise.missions', nativeSnapshot) {
+  async function permits(missionId, args, workId = missionId, capabilityId = 'enterprise.missions', nativeSnapshot, budgetMicros = capabilityId === 'enterprise.fleet' ? 10000 : 0) {
     const issuedAt = Date.now();
-    const base = { ...identity, kind: 'PERMIT', authority: 'myeve', version: fences.myeve.version, policyId: fences.myeve.policyId, referenceId: randomBytes(16).toString('hex'), capabilityId, requiredCapabilities: ['work', 'missioncontrol', capabilityId], registryVersion: binding.registryVersion, agentId: binding.agentId, agentRevision: 1, workId, missionId, workGeneration: now, actionDigest: await admissionActionDigest({ workId, missionId, generation: now, nativeSnapshot: nativeSnapshot ?? await query('qualificationFixture:read', { id: missionId }), args }), budgetMicros: 0, issuedAt, expiresAt: issuedAt + 30000, sourcePermitHash: 'SELF' };
+    const base = { ...identity, kind: 'PERMIT', authority: 'myeve', version: fences.myeve.version, policyId: fences.myeve.policyId, referenceId: randomBytes(16).toString('hex'), capabilityId, requiredCapabilities: ['work', 'missioncontrol', capabilityId], registryVersion: binding.registryVersion, agentId: binding.agentId, agentRevision: 1, workId, missionId, workGeneration: now, actionDigest: await admissionActionDigest({ workId, missionId, generation: now, nativeSnapshot: nativeSnapshot ?? await query('qualificationFixture:read', { id: missionId }), args }), budgetMicros, issuedAt, expiresAt: issuedAt + 30000, sourcePermitHash: 'SELF' };
     const myeve = await signPolicyMessage(base, sourceKey);
     const relay = await signPolicyMessage({ ...base, authority: 'relay', referenceId: randomBytes(16).toString('hex'), version: fences.relay.version, policyId: fences.relay.policyId, sourcePermitHash: await policyMessageHash(base) }, relayKey);
     return { myeve, relay };
@@ -121,7 +125,15 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   checks.push('fleet admission cannot implicitly start an unadmitted Mission');
   await assert.rejects(mutate('missions:start', args), /POLICY_REVALIDATION/);
   await assert.rejects(mutate('missions:start', { ...args, capabilityPermits: wrongCapability }), /CAPABILITY_ADMISSION_SCOPE/);
-  const admitted = await mutate('missions:start', { ...args, capabilityPermits: valid });
+  await invoke(['env', 'set', 'MC_CAPABILITY_RECEIVER_RECOVERY_STATE', 'QUARANTINED']);
+  await assert.rejects(mutate('missions:start', { ...args, capabilityPermits: valid }), /RECOVERY_QUARANTINED/);
+  await invoke(['env', 'set', 'MC_CAPABILITY_RECEIVER_RECOVERY_STATE', 'ACTIVE']);
+  await invoke(['env', 'set', 'MC_CAPABILITY_RECEIVER_EPOCH', 'restored-other-epoch']);
+  await assert.rejects(mutate('missions:start', { ...args, capabilityPermits: valid }), /RECOVERY_QUARANTINED/);
+  await invoke(['env', 'set', 'MC_CAPABILITY_RECEIVER_EPOCH', binding.incarnation]);
+  const renewedValid = await permits(first.missionId, args);
+  const admitted = await mutate('missions:start', { ...args, capabilityPermits: renewedValid });
+  checks.push('host quarantine and independently configured incarnation deny restored admission before reference consumption');
   assert.equal(admitted.created, true); assert.equal(admitted.mission.state, 'IN_PROGRESS');
   assert.equal((await mutate('missions:start', { ...args, capabilityPermits: valid })).created, false);
   checks.push('authenticated exact-owner positive native Mission admission and idempotent retry');
@@ -147,6 +159,37 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   await assert.rejects(client.action(makeFunctionReference('capabilityChallenges:create'), {
     missionId: first.missionId, workOrderId: first.workOrderId, idempotencyKey: 'different-command', budgetMicros: 10000, dispatch: delegatedArgs }), /CHALLENGE_INVALID/);
   checks.push('delegated challenge signs canonical dispatch fields and bounded budget without granting execution');
+  const nativeFactory = await delegatedFixture({ insert, mutate, query, invoke, tenantId, projectId, ownerMemberId,
+    operatorId, missionId: first.missionId, workOrderId: first.workOrderId, teamId });
+  const positiveArgs = { workOrderId: first.workOrderId, actorType: 'HUMAN', idempotencyKey: 'qualified-delegated-admission',
+    factoryDefinitionVersionId: nativeFactory.versionId, taskId: nativeFactory.taskId, workflowId: 'capability-delegated-offline', executionEnvironment: 'LOCAL', executorHostId: nativeFactory.hostId };
+  const positiveSnapshot = { mission: await query('qualificationFixture:read', { id: first.missionId }),
+    workOrder: await query('qualificationFixture:read', { id: first.workOrderId }) };
+  const positivePermits = await permits(first.missionId, positiveArgs, first.workOrderId, 'enterprise.fleet', positiveSnapshot);
+  await mutate('qualificationFixture:patch', { id: nativeFactory.profileId, value: { enabled: false } });
+  await assert.rejects(mutate('workOrders:dispatch', { ...positiveArgs, capabilityPermits: positivePermits }), /execution-profile|agent-manifest|recovery|Factory dispatch blocked/);
+  await mutate('qualificationFixture:patch', { id: nativeFactory.profileId, value: { enabled: true } });
+  const insufficientPermits = await permits(first.missionId, positiveArgs, first.workOrderId, 'enterprise.fleet', positiveSnapshot, 9999);
+  await assert.rejects(mutate('workOrders:dispatch', { ...positiveArgs, capabilityPermits: insufficientPermits }), /CAPABILITY_NATIVE_AUTHORITY_OR_BUDGET_REQUIRED/);
+  assert.equal((await query('qualificationFixture:rows', { table: 'capabilityAdmissionReferences' })).length, 2);
+  assert.equal((await query('qualificationFixture:rows', { table: 'workflowRuns' })).length, 0);
+  const concurrentClient = new ConvexHttpClient(url, { logger: false });
+  concurrentClient.setAdminAuth(admin, { subject: 'synthetic-owner', issuer: 'https://synthetic.invalid', tokenIdentifier: 'synthetic|owner' });
+  const concurrentAdmissions = await Promise.all([
+    mutate('workOrders:dispatch', { ...positiveArgs, capabilityPermits: positivePermits }),
+    concurrentClient.mutation(makeFunctionReference('workOrders:dispatch'), { ...positiveArgs, capabilityPermits: positivePermits }),
+  ]);
+  assert.equal(concurrentAdmissions.filter(result => result.created).length, 1);
+  const positiveWork = concurrentAdmissions.find(result => result.created);
+  checks.push('profile revocation and insufficient budget roll back all permit consumption; concurrent duplicate WorkOrder admission creates one Attempt');
+  assert.equal(positiveWork.created, true);
+  assert.equal(positiveWork.run.factoryDefinitionVersionId, nativeFactory.versionId);
+  assert.equal(positiveWork.run.executionCostAuthorization.maxProviderCalls, 0);
+  assert.equal(positiveWork.run.executionCostAuthorization.actualCost.status, 'UNAVAILABLE');
+  assert.equal(positiveWork.run.reservedCostUsd, 0.01);
+  assert.equal((await mutate('workOrders:dispatch', { ...positiveArgs, capabilityPermits: positivePermits })).created, false);
+  checks.push('real positive delegated WorkOrder admission binds qualified offline Factory, exact Mission/Attempt, frozen policy and budget without provider authority');
+
 
 
   const secondArgs = { missionId: second.missionId, idempotencyKey: 'stale-start' };
@@ -164,7 +207,7 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   await assert.rejects(client.action(makeFunctionReference('capabilityChallenges:create'), { ...args, budgetMicros: 0 }));
   checks.push('cross-owner Mission replay denied');
   client.setAdminAuth(admin);
-  assert.equal((await query('qualificationFixture:rows', { table: 'capabilityAdmissionReferences' })).length, 2);
+  assert.equal((await query('qualificationFixture:rows', { table: 'capabilityAdmissionReferences' })).length, 4);
   const third = await mission();
   await fence('myeve', 3, 'enable');
   const raceArgs = { missionId: third.missionId, idempotencyKey: 'race-start' };
@@ -183,10 +226,10 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
     currentStepIndex: 0, totalSteps: 1, steps: [{ stepId: 'bounded', status: 'RUNNING', retryCount: 0 }],
     context: {}, initialInput: '', startedAt: now, reservedCostUsd: 12, capabilityAuthorities: [authority] });
   await mutate('workflowRuns:updateContext', { runId, context: { beforeControl: true } });
-  await fence('myeve', 5, 'pause');
+  const pauseEnvelope = await fence('myeve', 5, 'pause');
   await assert.rejects(mutate('workflowRuns:claimExecution', { runId, leaseId: 'stale', ownerId: 'stale', dispatchMode: 'MANUAL' }), /CAPABILITY_PAUSE/);
   await assert.rejects(mutate('workflowRuns:updateContext', { runId, context: { bypass: true } }), /CAPABILITY_PAUSE/);
-  await fence('myeve', 6, 'revoke');
+  const revokeEnvelope = await fence('myeve', 6, 'revoke');
   await fence('myeve', 6, 'revoke');
   for (const [name, args] of [
     ['workflowRuns:updateContext', { runId, context: { bypass: true } }],
@@ -203,6 +246,56 @@ export const rows = internalQuery({ args: { table: v.string() }, handler: (ctx, 
   assert.equal(preservedRun.status, 'RUNNING');
   assert.deepEqual(preservedRun.context, { beforeControl: true });
   checks.push('pause prevents reclaim; revoke fences native stale writers across later enable without clearing reservation or claiming resource stop');
+  async function lifecycle(envelope) {
+    const response = await fetch(`http://127.0.0.1:${sitePort}/capability-control/lifecycle`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ envelope }) });
+    assert.equal(response.status, 200, await response.clone().text());
+    return response.json();
+  }
+  const preparedLifecycle = await query('capabilityLifecycle:prepare', { envelope: revokeEnvelope });
+  const staleLifecycle = await signLifecycleReceipt(preparedLifecycle.receipt, backendKey);
+  await mutate('qualificationFixture:patch', { id: runDocId, value: { factoryConfigurationDigest: 'synthetic-new-inventory' } });
+  await assert.rejects(mutate('capabilityLifecycle:acknowledge', { envelope: revokeEnvelope, acknowledgment: staleLifecycle }), /OBSERVATION_CHANGED/);
+  checks.push('lifecycle acknowledgment rejects a stale inventory between signed preparation and transaction commit');
+  const pauseAck = await verifyLifecycleReceipt(await lifecycle(pauseEnvelope), backendKey);
+  assert.equal(pauseAck.state, 'PENDING_BACKEND');
+  const revokeAck = await lifecycle(revokeEnvelope);
+  const revokeMessage = await verifyLifecycleReceipt(revokeAck, backendKey);
+  assert.equal(revokeMessage.state, 'PENDING_BACKEND');
+  assert.equal(revokeMessage.inventoryComplete, false);
+  assert.equal(revokeMessage.version, 6);
+  assert.deepEqual(await lifecycle(revokeEnvelope), revokeAck);
+  const stoppedForRestart = new Promise(resolve => backend.once('exit', resolve));
+  backend.kill('SIGTERM'); await stoppedForRestart;
+  backend = spawn(binary, ['--interface', '127.0.0.1', '--port', String(port), '--site-proxy-port', String(sitePort),
+    '--instance-name', instance, '--instance-secret', secret, '--local-storage', join(directory, 'storage'),
+    '--disable-beacon', join(directory, 'db.sqlite')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  backend.stderr.on('data', chunk => log.push(chunk.toString()));
+  backend.stdout.on('data', chunk => log.push(chunk.toString()));
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try { if ((await fetch(url + '/version', { signal: AbortSignal.timeout(500) })).ok) break; } catch {}
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.deepEqual(await lifecycle(revokeEnvelope), revokeAck);
+  await assert.rejects(mutate('workflowRuns:updateContext', { runId, context: { afterRestart: true } }), /AUTHORITY_FENCED/);
+  checks.push('real receiver restart preserves signed acknowledgment and revoked writer fence');
+  const controlSnapshot = await query('qualificationFixture:rows', { table: 'capabilityWorkControls' });
+  for (const control of controlSnapshot) if (control.scope === authority.scope)
+    await mutate('qualificationFixture:patch', { id: control._id, value: { version: 1 } });
+  await invoke(['env', 'set', 'MC_CAPABILITY_RECEIVER_EPOCH', 'independently-retained-post-restore-epoch']);
+  await assert.rejects(mutate('workflowRuns:updateContext', { runId, context: { restoredAuthority: true } }), /RECOVERY_PENDING_BACKEND/);
+  await assert.rejects(query('capabilityLifecycle:prepare', { envelope: revokeEnvelope }), /CONTROL_IDENTITY_MISMATCH/);
+  for (const control of controlSnapshot) await mutate('qualificationFixture:patch', { id: control._id, value: { version: control.version } });
+  await invoke(['env', 'set', 'MC_CAPABILITY_RECEIVER_EPOCH', binding.incarnation]);
+  checks.push('restored older policy rows cannot revive writers while independently retained host incarnation fences the database');
+
+
+  assert.equal((await query('qualificationFixture:read', { id: runDocId })).reservedCostUsd, 12);
+  const tampered = { ...revokeEnvelope, message: revokeEnvelope.message.replace('synthetic-owner', 'foreign-owner') };
+  assert.equal((await fetch(`http://127.0.0.1:${sitePort}/capability-control/lifecycle`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ envelope: tampered }) })).status, 503);
+  checks.push('signed lifecycle acknowledgment is durable, exact-owner, retry-idempotent, and pending without native absence evidence');
+
   const { _id: _runId, _creationTime: _created, ...legacy } = preservedRun;
   delete legacy.capabilityAuthorities;
   const legacyId = await insert('workflowRuns', { ...legacy, runId: 'legacy-capability-writer' });

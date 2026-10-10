@@ -14,6 +14,8 @@ export const capabilityPolicyTables = {
   capabilityWorkControls: defineTable({
     scope: v.string(), capabilityId: v.string(), operation: v.union(v.literal('pause'), v.literal('revoke')),
     version: v.number(), policyId: v.string(), fenceHash: v.string(),
+    lifecycleSequence: v.optional(v.number()), lifecycleEvidenceDigest: v.optional(v.string()),
+    lifecycleAcknowledgment: v.optional(v.object({ message: v.string(), keyId: v.string(), signature: v.string() })),
   }).index('by_control', ['scope', 'capabilityId', 'operation']),
   capabilityAdmissionReferences: defineTable({
     scope: v.string(), referenceId: v.string(), workId: v.string(), missionId: v.string(),

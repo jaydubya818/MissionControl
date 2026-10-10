@@ -1,3 +1,4 @@
+import { requireCapabilityReceiverRecovery } from './lib/capabilityReceiverRecovery';
 import { dispatchArgs } from './lib/workOrderDispatchArgs';
 import { action, internalQuery } from './_generated/server';
 import { makeFunctionReference } from 'convex/server';
@@ -28,6 +29,7 @@ export const describe = internalQuery({
     const binding = capabilityBindings().find(value => value.ownerMemberId === mission.ownerMemberId
       && value.projectId === mission.projectId && value.tenantId === mission.tenantId);
     if (!binding || binding.installationId !== process.env.MC_CAPABILITY_INSTALLATION_ID) throw Error('CAPABILITY_INSTALLATION_UNQUALIFIED');
+    requireCapabilityReceiverRecovery(binding.incarnation);
     const enrollment = await ctx.db.query('capabilityEnrolledOwners').withIndex('by_owner', q =>
       q.eq('memberId', binding.ownerMemberId).eq('projectId', binding.projectId)).unique();
     if (!enrollment || enrollment.incarnation !== binding.incarnation || enrollment.installationId !== binding.installationId)
