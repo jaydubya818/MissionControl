@@ -7,10 +7,11 @@ import {
   type HarnessExecutorAdapter,
 } from "@mission-control/workflow-engine";
 import { HarnessAdapterRegistry } from "../harnessAdapterRegistry.js";
-import { ISOLATED_INVOCATION_MANIFEST, ISOLATED_INVOCATION_ADAPTER_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
+import { findKnownIsolatedHarness } from "@mission-control/workflow-engine/harness-contract";
 
 describe("HarnessAdapterRegistry", () => {
-  it("requires the exact offline backend artifact and denies expanded capabilities", () => {
+  it.each(["2", "3"])("requires the exact offline backend v%s and denies expanded capabilities", version => {
+    const { manifest: ISOLATED_INVOCATION_MANIFEST, adapter: ISOLATED_INVOCATION_ADAPTER_ARTIFACT } = findKnownIsolatedHarness(version)!;
     const adapter = fixtureAdapter("isolated-invocation", ISOLATED_INVOCATION_MANIFEST.identity.adapterVersion);
     const caps: any = { ...adapter.capabilities(), provider: undefined, supportsRepositoryMutation: false,
       isolationModes: [...ISOLATED_INVOCATION_MANIFEST.sandbox.isolationModes], executionBackends: ["isolated-container"],
@@ -26,6 +27,7 @@ describe("HarnessAdapterRegistry", () => {
       v => { v.supportsResume = true; }, v => { v.executionBackends.push("persistent-worker"); },
       v => { v.runtimeArtifact.executableSha256 = "0".repeat(64); },
       v => { v.capabilityManifest.effectiveConfigSha256 = "0".repeat(64); },
+      v => { v.version = version === "3" ? "2" : "3"; },
     ];
     for (const substitute of substitutions) {
       const changed = structuredClone(pristine); substitute(changed); adapter.capabilities = () => changed;

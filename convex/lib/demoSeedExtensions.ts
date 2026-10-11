@@ -39,6 +39,7 @@ import {
 export type DemoSeedContext = {
   tenantId: Id<"tenants">;
   projectId: Id<"projects">;
+  ownerOperatorId?: Id<"operators">;
   now: number;
   seedTag: string;
   seedVersion: string;
@@ -231,6 +232,7 @@ async function seedSpecIntakeGoldenPath(ctx: MutationCtx, input: DemoSeedContext
     constraints: ["No Spec path may authorize execution or acceptance", "Existing Plan approval remains the release boundary"],
     sourceOfTruthRefs: [{ kind: "DOC", label: "Approved Spec Intake architecture", location: "docs/architecture/2026-08-16-spec-driven-mission-intake-audit.md" }],
     owner: "Mission Control Operator",
+    ownerOperatorId: input.ownerOperatorId,
     repositoryId: repository._id,
     codeScopeIds: [codeScope._id],
     executionEnvironment: "LOCAL",

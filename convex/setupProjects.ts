@@ -4,7 +4,7 @@
  * Run with: npx convex run setupProjects:createInitialProjects
  */
 
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/missionScopedFunctions";
 
 export const createInitialProjects = internalMutation({
   args: {},

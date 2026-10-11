@@ -123,7 +123,6 @@ export function AgentDetailFlyout({
   const daily = agent.budgetDaily ?? 0;
   const perRun = agent.budgetPerRun ?? 0;
   const spent = agent.spendToday ?? 0;
-  const remaining = Math.max(0, daily - spent);
   const ratio = daily > 0 ? spent / daily : 0;
   const ratioClass =
     ratio > 0.9 ? "text-err" : ratio > 0.7 ? "text-warn" : "text-ok";
@@ -220,10 +219,10 @@ export function AgentDetailFlyout({
         <DetailSection title="Budget">
           <DetailRow label="Daily Budget" value={`$${daily.toFixed(2)}`} mono />
           <DetailRow label="Per-Run Budget" value={`$${perRun.toFixed(2)}`} mono />
-          <DetailRow label="Spent Today" value={`$${spent.toFixed(2)}`} mono />
+          <DetailRow label="Authorized run cost" value={`$${spent.toFixed(2)}`} mono />
           <DetailRow
-            label="Remaining"
-            value={`$${remaining.toFixed(2)}`}
+            label="Budget enforcement"
+            value="Checked at admission"
             mono
             valueClassName={ratioClass}
           />

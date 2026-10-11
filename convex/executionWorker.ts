@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import { reconcileTerminalWorkflowSteps } from "./lib/workflowRunState";
 import { evaluateGithubAppCapabilities, githubInstallationIsStale } from "./lib/githubAppReadiness";

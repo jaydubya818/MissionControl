@@ -1,7 +1,7 @@
 /** Independent observer for the repository-dispatch Incident Command control. */
 
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { mutation } from "../lib/missionScopedFunctions";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";
 import {
   REPOSITORY_DISPATCH_OBSERVER_ID,

@@ -7,7 +7,7 @@ import {
 } from "../lib/localQualificationSandbox";
 import { OFFLINE_EXECUTION_PROFILE_SCHEMA, type OfflineExecutionPolicy } from "../lib/offlineExecutionPolicy";
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query } from "../lib/missionScopedFunctions";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";
 import {
   executionProfileDigest,

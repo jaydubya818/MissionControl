@@ -1,4 +1,4 @@
-import { query, mutation } from "../_generated/server";
+import { query, mutation } from "../lib/missionScopedFunctions";
 import { v } from "convex/values";
 import { resolveAgentRef } from "../lib/agentResolver";
 import { appendChangeRecord } from "../lib/armAudit";

@@ -1,3 +1,4 @@
+import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Runs — Convex Functions
  * 
@@ -5,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
@@ -248,7 +249,7 @@ export const start = mutation({
     }
     
     // Get agent and task
-    const agent = await ctx.db.get(args.agentId);
+    const agent = await missionAuthorityDatabase(ctx).get(args.agentId);
     if (!agent) {
       throw new Error("Agent not found");
     }
@@ -305,7 +306,7 @@ export const start = mutation({
         severity: "WARNING",
         type: "BUDGET_EXCEEDED",
         title: "Agent daily budget exceeded",
-        description: `Agent ${agent.name} exceeded daily budget: $${agent.spendToday.toFixed(2)} / $${agent.budgetDaily.toFixed(2)}`,
+        description: `Agent ${agent.name} reached its daily budget limit`,
         agentId: args.agentId,
         taskId: args.taskId,
         status: "OPEN",
@@ -827,7 +828,7 @@ export const complete = mutation({
     
     // Update agent's spend
     if (args.costUsd > 0) {
-      const agent = await ctx.db.get(run.agentId);
+      const agent = await missionAuthorityDatabase(ctx).get(run.agentId);
       if (agent) {
         const newSpend = agent.spendToday + args.costUsd;
         await ctx.db.patch(run.agentId, {
@@ -843,7 +844,7 @@ export const complete = mutation({
             severity: "WARNING",
             type: "BUDGET_EXCEEDED",
             title: "Agent daily budget exceeded",
-            description: `Agent ${agent.name} exceeded daily budget: $${newSpend.toFixed(2)} / $${agent.budgetDaily.toFixed(2)}`,
+            description: `Agent ${agent.name} reached its daily budget limit`,
             agentId: run.agentId,
             status: "OPEN",
           });

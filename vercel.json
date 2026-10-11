@@ -26,7 +26,10 @@
       "main": false,
       "codex/unified-capability-control-plane": false,
       "codex/factory-turn-budget-test": false,
-      "codex/live-retry-runbook-20261003": false
+      "codex/live-retry-runbook-20261003": false,
+      "codex/checkpoint-h-authenticated-enterprise": false,
+      "codex/enterprise-golden-journey": false,
+      "codex/unified-beta-missioncontrol-20261011": false
     }
   }
 }

@@ -1,5 +1,7 @@
+import { makeFunctionReference } from "convex/server";
+import { requireMissionAccess } from "./lib/missionAccess";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   COMPANY_PERMISSIONS,
@@ -621,6 +623,7 @@ export const assignMissionMember = mutation({
     teamId: v.id("scrumTeams"),
     role: assignmentRole,
     capacityAllocationPct: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const access = await requireWorkspaceAccess(ctx, args.tenantId, args.projectId, { permission: COMPANY_PERMISSIONS.ASSIGN_DELIVERY });
@@ -628,39 +631,50 @@ export const assignMissionMember = mutation({
     const [mission, member, team] = await Promise.all([ctx.db.get(args.missionId), ctx.db.get(args.memberId), ctx.db.get(args.teamId)]);
     if (!mission || mission.projectId !== args.projectId || mission.tenantId !== args.tenantId) throw new Error("Mission does not belong to the active workspace.");
     if (!member || member.projectId !== args.projectId || member.tenantId !== args.tenantId || !member.active) throw new Error("Mission assignee must be an active workspace member.");
+    const memberOperator = member.operatorId && await ctx.db.get(member.operatorId);
+    if (!memberOperator?.active || memberOperator.tenantId !== args.tenantId) throw Error("MISSION_MEMBER_OPERATOR_REQUIRED");
     if (!team || team.projectId !== args.projectId || team.tenantId !== args.tenantId || team.status !== "ACTIVE") throw new Error("Mission team must be active in the same workspace.");
     assertAuthorizedDeliveryRecord(access, { owningTeamId: team._id });
-    if (mission.owningTeamId || mission.ownerMemberId) assertAuthorizedDeliveryRecord(access, mission);
+    await requireMissionAccess(ctx, mission._id, "OWNER");
     const teamMembership = await ctx.db.query("teamMemberships").withIndex("by_team_member", (q) => q.eq("teamId", team._id).eq("memberId", member._id)).first();
     if (!teamMembership?.active) throw new Error("Mission assignee must be an active member of the selected team.");
     const now = Date.now();
+    if (args.expiresAt !== undefined && (args.role === "OWNER" || args.expiresAt <= now)) throw Error("INVALID_MISSION_GRANT_EXPIRY");
+    await ctx.db.insert("activities", { tenantId: args.tenantId, projectId: args.projectId,
+      actorId: String(membership.operatorId), actorType: "HUMAN", targetType: "MISSION", targetId: mission._id,
+      action: "MISSION_MEMBER_ASSIGNED", description: `Assigned ${args.role} to ${member._id}` });
     const existingAssignments = await ctx.db.query("missionAssignments").withIndex("by_mission", (q) => q.eq("missionId", mission._id)).collect();
     if (args.role === "OWNER") {
       for (const existing of existingAssignments.filter((item) => item.active && item.role === "OWNER" && item.memberId !== member._id)) {
         await ctx.db.patch(existing._id, { active: false, activeUntil: now, updatedAt: now, updatedBy: membership.operatorId });
       }
-      await ctx.db.patch(mission._id, { owner: member.name, ownerMemberId: member._id, owningTeamId: team._id, updatedAt: now });
     }
     const existing = existingAssignments.find((item) => item.memberId === member._id && item.teamId === team._id && item.role === args.role);
     if (existing) {
-      await ctx.db.patch(existing._id, { active: true, activeUntil: undefined, capacityAllocationPct: args.capacityAllocationPct, updatedAt: now, updatedBy: membership.operatorId });
+      await ctx.db.patch(existing._id, { operatorId: member.operatorId, active: true, activeUntil: args.expiresAt, capacityAllocationPct: args.capacityAllocationPct, updatedAt: now, updatedBy: membership.operatorId });
+      if (args.role === "OWNER") await ctx.db.patch(mission._id, { owner: member.name, ownerMemberId: member._id, ownerOperatorId: member.operatorId, owningTeamId: team._id, updatedAt: now });
+      if (args.expiresAt) await ctx.scheduler.runAt(args.expiresAt, makeFunctionReference<"mutation">("missionAuthorization:expireAssignment"), { assignmentId: existing._id });
       return { success: true, assignmentId: existing._id };
     }
     const assignmentId = await ctx.db.insert("missionAssignments", {
       tenantId: args.tenantId,
       projectId: args.projectId,
       missionId: mission._id,
+      operatorId: member.operatorId,
       memberId: member._id,
       teamId: team._id,
       role: args.role,
       capacityAllocationPct: args.capacityAllocationPct,
       activeFrom: now,
+      activeUntil: args.expiresAt,
       active: true,
       createdAt: now,
       updatedAt: now,
       createdBy: membership.operatorId,
       updatedBy: membership.operatorId,
     });
+    if (args.role === "OWNER") await ctx.db.patch(mission._id, { owner: member.name, ownerMemberId: member._id, ownerOperatorId: member.operatorId, owningTeamId: team._id, updatedAt: now });
+    if (args.expiresAt) await ctx.scheduler.runAt(args.expiresAt, makeFunctionReference<"mutation">("missionAuthorization:expireAssignment"), { assignmentId });
     return { success: true, assignmentId };
   },
 });
@@ -1075,6 +1089,8 @@ export const seedScaleFixture = mutation({
               objective: `Deliver governed feature ${epicIndex} with current proof and bounded agent execution.`,
               owner: `Developer ${workspaceIndex}.${teamIndex + 1}.${memberIndex}`,
               ownerMemberId: memberId,
+              ownerOperatorId: membership.operatorId,
+              requestedByOperatorId: membership.operatorId,
               owningTeamId: teamId,
               repositoryId,
               codeScopeIds: codeScopeIdsByTeam.has(teamId) ? [codeScopeIdsByTeam.get(teamId)!] : [],
@@ -1397,5 +1413,22 @@ export const validateCodeScopeOverlap = query({
     const scopes = await ctx.db.query("repositoryCodeScopes").withIndex("by_repository", (q) => q.eq("repositoryId", repository._id)).collect();
     const overlaps = findOverlappingScopes(args.includePaths, scopes.filter((scope) => scope.active));
     return { valid: overlaps.length === 0, overlaps };
+  },
+});
+
+export const revokeMissionMember = mutation({
+  args: { assignmentId: v.id("missionAssignments") },
+  handler: async (ctx, { assignmentId }) => {
+    const assignment = await ctx.db.get(assignmentId);
+    if (!assignment) throw Error("MISSION_UNAVAILABLE");
+    const access = await requireWorkspaceAccess(ctx, assignment.tenantId, assignment.projectId, { permission: COMPANY_PERMISSIONS.ASSIGN_DELIVERY });
+    const mission = await requireMissionAccess(ctx, assignment.missionId, "OWNER");
+    if (assignment.role === "OWNER" && assignment.memberId === mission.ownerMemberId) throw Error("TRANSFER_MISSION_OWNERSHIP_FIRST");
+    const now = Date.now();
+    await ctx.db.patch(assignmentId, { active: false, activeUntil: now, updatedAt: now, updatedBy: access.membership.operatorId });
+    await ctx.db.insert("activities", { tenantId: assignment.tenantId, projectId: assignment.projectId,
+      actorId: String(access.membership.operatorId), actorType: "HUMAN", targetType: "MISSION", targetId: mission._id,
+      action: "MISSION_MEMBER_REVOKED", description: `Revoked assignment ${assignmentId}` });
+    return { success: true };
   },
 });

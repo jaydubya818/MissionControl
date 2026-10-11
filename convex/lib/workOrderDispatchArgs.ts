@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { capabilityPermitsValidator } from './capabilityAdmission';
 
 export const dispatchArgs = {
+    isolatedLocalDelegation: v.optional(v.boolean()),
     capabilityPermits: v.optional(capabilityPermitsValidator),
     workOrderId: v.id("workOrders"),
     taskId: v.optional(v.id("tasks")),

@@ -18,7 +18,7 @@ export async function mapOfflineVerification(input: {
     && Object.keys(value).sort().join(",") === [...keys].sort().join(",");
   if (!exact(packet, ["responseDigest", "candidate", "candidateObservation"])
     || packet.responseDigest !== retained.packetDigest || retained.result.status !== "SUCCESS"
-    || !retained.runtimeResult || retained.evidence.schema !== "factory-isolated-execution-evidence/v2"
+    || !retained.runtimeResult || !["factory-isolated-execution-evidence/v2", "factory-isolated-execution-evidence/v3"].includes(retained.evidence.schema)
     || !retained.evidence.container?.id || !retained.evidence.cleanupVerified
     || workload.reference !== "verify-document-bytes/v1"
     || workload.input.producerAttemptId !== String(sourceAttempt._id)

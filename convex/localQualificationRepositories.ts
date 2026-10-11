@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation } from "./lib/missionScopedFunctions";
 import type { Id } from "./_generated/dataModel";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
 import { assertLocalRepositoryScope, parseLocalRepositoryAdmission, LOCAL_QUALIFICATION_MODE } from "./lib/localRepositoryAdmission";

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { action } from "../_generated/server";
+import { action } from "../lib/missionScopedFunctions";
 import { discoverSkillPaths } from "../lib/githubRepoSkills";
 import { buildFileTreeFromPaths, skillDirectoryPrefix } from "../lib/fileTree";
 

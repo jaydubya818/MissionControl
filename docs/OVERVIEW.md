@@ -198,7 +198,7 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v63**. The governed
+The proposed unified-beta client/backend runtime contract is **v64**. It combines exact-owner enterprise boundaries with capability admission and receiver recovery. The governed
 inference work adds the disabled-by-default price-book, reservation, receipt,
 reconciliation, and accepted-outcome economics contracts. Fab adds exact candidate
 verification and publication bindings plus read-only candidate recovery. Todo 062

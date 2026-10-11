@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { describe, expect, it, vi } from "vitest";
 import { buildLocalCandidateRecoveryRows } from "../lib/localCandidateRecovery";
 import { recoverLocalCandidate } from "../factory/attempts";

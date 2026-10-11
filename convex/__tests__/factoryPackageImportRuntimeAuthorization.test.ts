@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { describe, expect, it, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import { importDrafts, preview, resolveTarget } from "../factoryPackageImports";

@@ -8,7 +8,7 @@
  * - Back-and-forth transitions (state oscillation)
  */
 
-import { internalMutation } from "./_generated/server";
+import { internalMutation } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 
@@ -229,7 +229,7 @@ async function blockTaskForLoop(
         (loopData.detail ? `**Detail:** ${loopData.detail}\n` : "") +
         `\n**Action:** Task blocked. Review and resolve the loop before unblocking.`,
       updatedAt: Date.now(),
-      metadata: { loopDetection: loopData },
+      metadata: { taskId: task._id, loopDetection: loopData },
     });
   }
   

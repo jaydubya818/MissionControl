@@ -17,7 +17,7 @@ function fixture(operation?: 'pause' | 'revoke') {
   const records: any = { run, allocation, mission: { ownerMemberId: 'owner', tenantId: 'tenant', projectId: 'project' }, order: { missionId: 'mission', projectId: 'project' } };
   const tables: any = { workflowRuns: [run], sandboxAllocations: [allocation], sandboxCredentialGrants: [], runEvents: [],
     capabilityWorkControls: operation ? [{ scope, capabilityId: 'missioncontrol', operation, version: 2 }] : [] };
-  const ctx: any = { db: { get: async (id: string) => records[id] ?? null,
+  const ctx: any = { auth: { getUserIdentity: async () => null }, db: { get: async (id: string) => records[id] ?? null,
     patch: vi.fn(async (id, value) => Object.assign(records[id], value)), insert: vi.fn(async () => 'event'),
     query: (table: string) => {
       let rows = [...(tables[table] ?? [])];

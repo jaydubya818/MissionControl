@@ -1,3 +1,4 @@
+import { denyEnterprisePaidAuthority } from "./enterpriseAttemptAccounting";
 import {
   canonicalDigest,
   inferencePriceBook,
@@ -45,6 +46,7 @@ export async function admitBedrockAccounting(
   price: ProviderPrice,
   request: { requestId: string; requestDigest: string; outputTokens: number; preSendInputBound?: { maximumInputTokens: number } },
 ) {
+  await denyEnterprisePaidAuthority(ctx, aggregate.projectId);
   if (process.env.MC_GOVERNED_INFERENCE_GATEWAY_ENABLED !== "1")
     throw new Error("GOVERNED_INFERENCE_GATEWAY_DISABLED");
   const now = Date.now();

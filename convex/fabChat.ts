@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
@@ -327,7 +327,7 @@ export const buildRedactedContext = internalQuery({
             verificationPolicy: redactFabContextText(row.verificationPolicy, 100),
           };
         }),
-        agents: agents.map((row, index) => ({ identity: `agent-${index + 1}`, role: row.role, status: row.status, errorStreak: row.errorStreak, lastError: redactFabContextText(row.lastError, 180), spendToday: row.spendToday, budgetDaily: row.budgetDaily })),
+        agents: agents.map((row, index) => ({ identity: `agent-${index + 1}`, role: row.role, status: row.status, errorStreak: row.errorStreak, lastError: redactFabContextText(row.lastError, 180), authorizedRunSpendToday: row.spendToday, budgetDaily: row.budgetDaily })),
       },
       delivery: {
         activeWorkOrders: activeWorkOrders.slice(0, 20).map((row) => ({ id: String(row._id), title: redactFabContextText(row.title, 180), state: row.state, risk: row.riskLevel, approval: row.approvalStatus })),

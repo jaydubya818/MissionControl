@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const access = vi.hoisted(() => vi.fn());
 vi.mock("../lib/deliveryAuthorization", () => ({

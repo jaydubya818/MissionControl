@@ -498,6 +498,10 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
+Current local candidate runtime contract: **v64**. This combines exact-owner enterprise isolation and service delegation with capability ordering, lifecycle and recovery quarantine. Client and backend must advance together. This source is not installed or released.
+
+Historical current-main evidence follows.
+
 Current public client/backend runtime contract: **v63**. Version 63 adds receiver recovery quarantine and signed capability lifecycle acknowledgments. Version 61 on main adds
 observed-cost reconciliation for terminal Fab Attempts. Version 62 combines that
 contract with authenticated capability challenges and ordered policy proofs for

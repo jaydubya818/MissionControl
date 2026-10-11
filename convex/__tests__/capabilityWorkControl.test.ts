@@ -7,7 +7,8 @@ const scope = JSON.stringify(['myeve', 'owner', 'org', 'installation', 'missionc
 const authority = { scope, version: 3, policyId: 'admitted-3', capabilityId: 'enterprise.fleet' };
 function context(controls: Array<Record<string, unknown>>, run: Record<string, unknown> = {}) {
   const writes = vi.fn();
-  return { writes, db: {
+  return { writes, auth: { getUserIdentity: async () => null }, db: {
+    normalizeId: () => null,
     patch: writes,
     get: async () => null,
     query: (table: string) => ({ withIndex: (_name: string, filter: (q: unknown) => unknown) => {
@@ -16,7 +17,8 @@ function context(controls: Array<Record<string, unknown>>, run: Record<string, u
       filter(q);
       const rows = controls.filter(row => Object.entries(conditions).every(([key, value]) => row[key] === value));
       return { unique: async () => rows[0] ?? null, take: async () => rows,
-        first: async () => table === 'workflowRuns' ? run : null };
+        first: async () => table === 'workflowRuns' ? run : null,
+        async *[Symbol.asyncIterator]() { if(table === 'workflowRuns') yield run; else yield* rows; } };
     } }),
   } };
 }

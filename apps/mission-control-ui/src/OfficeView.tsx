@@ -472,7 +472,7 @@ function AgentCard({ agent, currentTask, isSelected, onSelect }: AgentCardProps)
         {/* Budget bar */}
         <div>
           <div className="flex justify-between mb-0.5">
-            <span className="text-ink-muted text-[11.5px]">Budget</span>
+            <span className="text-ink-muted text-[11.5px]">Visible cost / limit</span>
             <span className="text-ink-muted text-[11.5px] font-medium">
               ${agent.spendToday.toFixed(2)} / ${agent.budgetDaily.toFixed(2)}
             </span>
@@ -622,7 +622,7 @@ function AgentDetailPanel({
                 value={heartbeat.text}
                 valueClass={heartbeat.healthy ? "text-ok" : "text-err"}
               />
-              <DetailRow label="Error Streak" value={String(agent.errorStreak)} />
+              <DetailRow label="Error Streak" value={agent.errorStreak === undefined ? "Unavailable" : String(agent.errorStreak)} />
               {agent.lastError && (
                 <DetailRow label="Last Error" value={agent.lastError} valueClass="text-err" />
               )}
@@ -641,7 +641,7 @@ function AgentDetailPanel({
 
           {/* Budget */}
           <div>
-            <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-muted mb-2">Budget</div>
+            <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-muted mb-2">Visible cost / limit</div>
             <div className="p-2.5 px-3 rounded-lg bg-surface-2 border border-line">
               <div className="flex justify-between mb-1.5">
                 <span className="text-[13.5px] text-ink-muted">

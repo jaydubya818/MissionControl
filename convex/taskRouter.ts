@@ -9,7 +9,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation } from "./lib/missionScopedFunctions";
 import type { Id } from "./_generated/dataModel";
 
 /** Performance data for an agent on a task type */

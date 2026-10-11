@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { action, internalMutation, mutation, query } from "../_generated/server";
+import { action, internalMutation, mutation, query } from "../lib/missionScopedFunctions";
 import { api } from "../_generated/api";
 import { resolveAgentRef } from "../lib/agentResolver";
 import { preferInstanceRefs } from "../lib/armCompat";

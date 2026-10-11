@@ -1,7 +1,7 @@
 /** Executor-facing activation of a repository's immutable context lock. */
 
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query } from "../lib/missionScopedFunctions";
 import { requireContextRegistryEnabled } from "../lib/contextRegistryGate";
 import { parseResolvedContextLock } from "../lib/contextActivation";
 

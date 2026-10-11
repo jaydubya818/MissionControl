@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createGitVerificationSubject, createPrepublicationGitVerificationSubject } from "@mission-control/workflow-engine/verification-subject";
 import { retryVerification, retryVerificationHandler, reportVerificationInternal, claimInternal, authorizePublicationInternal } from "../factory/attempts";

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./lib/missionScopedFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import {

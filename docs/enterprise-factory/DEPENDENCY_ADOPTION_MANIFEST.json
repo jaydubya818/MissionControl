@@ -1,0 +1,251 @@
+{
+  "schema": "enterprise-dependency-adoption/v1",
+  "observedAt": "2026-10-10T02:08:46.465511+00:00",
+  "sourceReadOnly": true,
+  "automaticAdoption": false,
+  "repositories": [
+    {
+      "repository": "MissionControl",
+      "mainSha": "5308727463ec737589bf8072ee9f5de0af1bba7a",
+      "compatibilitySourceSha": "08daed6f5745dce00d18da4218a26fdc5b827666",
+      "sourceIsInMain": false,
+      "pullRequests": [],
+      "contracts": [
+        {
+          "path": "convex/factory/enterpriseCompatibility.ts",
+          "sha256": "12af6107bd43b2fff78ee320b2078c29e1c024096b85a7459e4c413345f0783a",
+          "url": "https://github.com/jaydubya818/MissionControl/blob/08daed6f5745dce00d18da4218a26fdc5b827666/convex/factory/enterpriseCompatibility.ts",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        },
+        {
+          "path": "convex/factory/nativeAccounting.ts",
+          "sha256": "9b73e666853922fb3cd1864bd7307c2149f6abf75e62168294228f9a7ddf786f",
+          "url": "https://github.com/jaydubya818/MissionControl/blob/08daed6f5745dce00d18da4218a26fdc5b827666/convex/factory/nativeAccounting.ts",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        },
+        {
+          "path": "convex/factory/enterpriseQualification.ts",
+          "sha256": "87fd972f0592fdfd5b6487e44890ade1e74aceb35a954cc6d34dfbca4f354f88",
+          "url": "https://github.com/jaydubya818/MissionControl/blob/08daed6f5745dce00d18da4218a26fdc5b827666/convex/factory/enterpriseQualification.ts",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        }
+      ]
+    },
+    {
+      "repository": "MyFactory",
+      "mainSha": "030b1a51017f3159436b93817ed2d5bf6ae18288",
+      "compatibilitySourceSha": "fa48a820ba185eb9b891130c78166463b61cba74",
+      "sourceIsInMain": false,
+      "pullRequests": [
+        {
+          "baseRefName": "codex/external-alpha-private-source-clean",
+          "headRefName": "codex/external-alpha-gate-one-20261007",
+          "headRefOid": "fa48a820ba185eb9b891130c78166463b61cba74",
+          "mergedAt": null,
+          "number": 12,
+          "state": "OPEN",
+          "title": "External alpha: private source, independent verification, and fenced Work execution",
+          "url": "https://github.com/jaydubya818/MyFactory/pull/12"
+        }
+      ],
+      "contracts": [
+        {
+          "path": "apps/cloud-control/src/external-alpha-authority.mjs",
+          "sha256": "4c0fc4150d4c09c437f68553456b7492cadbfc52ae674e9e1db4c3540f4e0cf7",
+          "url": "https://github.com/jaydubya818/MyFactory/blob/fa48a820ba185eb9b891130c78166463b61cba74/apps/cloud-control/src/external-alpha-authority.mjs",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        },
+        {
+          "path": "apps/cloud-control/migrations/011-external-alpha-work-authority.sql",
+          "sha256": "dfa77cec5ebfec595737c63c720e37f40ffaa0551f73fb9c7bbe07475be63385",
+          "url": "https://github.com/jaydubya818/MyFactory/blob/fa48a820ba185eb9b891130c78166463b61cba74/apps/cloud-control/migrations/011-external-alpha-work-authority.sql",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        }
+      ]
+    },
+    {
+      "repository": "MyEveBot",
+      "mainSha": "2ef364024bc1cdd3e10ec28f3d340119c6f87d41",
+      "compatibilitySourceSha": "8338309582d6806829dec1ae1beef301d6b52425",
+      "sourceIsInMain": false,
+      "pullRequests": [
+        {
+          "baseRefName": "codex/external-alpha-work-authority",
+          "headRefName": "codex/external-alpha-gate-one-20261007",
+          "headRefOid": "8338309582d6806829dec1ae1beef301d6b52425",
+          "mergedAt": null,
+          "number": 67,
+          "state": "OPEN",
+          "title": "External alpha: exact Work authority, private verification, and shared accounting",
+          "url": "https://github.com/jaydubya818/MyEveBot/pull/67"
+        },
+        {
+          "baseRefName": "main",
+          "headRefName": "codex/external-alpha-owner-policy",
+          "headRefOid": "e1a0876e44d464b1b503928af94d549b4202588f",
+          "mergedAt": null,
+          "number": 65,
+          "state": "OPEN",
+          "title": "Add inactive external-alpha owner allowance foundation",
+          "url": "https://github.com/jaydubya818/MyEveBot/pull/65"
+        }
+      ],
+      "contracts": [
+        {
+          "path": "apps/eve/lib/digital-worker/routing.ts",
+          "sha256": "f548914ccab0b6b0d2ba657f011b686d78bd23114c0fb89b7bae866485e0c6ae",
+          "url": "https://github.com/jaydubya818/MyEveBot/blob/8338309582d6806829dec1ae1beef301d6b52425/apps/eve/lib/digital-worker/routing.ts",
+          "mainStatus": "IDENTICAL",
+          "mainSha256": "f548914ccab0b6b0d2ba657f011b686d78bd23114c0fb89b7bae866485e0c6ae"
+        },
+        {
+          "path": "apps/eve/lib/engineering/route-admission.ts",
+          "sha256": "5151368e3aeb4f4117e88f4f94ec073364b4cec62e6d05320273cefc8004a0c9",
+          "url": "https://github.com/jaydubya818/MyEveBot/blob/8338309582d6806829dec1ae1beef301d6b52425/apps/eve/lib/engineering/route-admission.ts",
+          "mainStatus": "IDENTICAL",
+          "mainSha256": "5151368e3aeb4f4117e88f4f94ec073364b4cec62e6d05320273cefc8004a0c9"
+        },
+        {
+          "path": "apps/eve/lib/engineering/factory-result-consumer.ts",
+          "sha256": "a71a41799af92b7d1a2c97d8651eda15ce127cd123f4e0ada1b1a8f555bcbae3",
+          "url": "https://github.com/jaydubya818/MyEveBot/blob/8338309582d6806829dec1ae1beef301d6b52425/apps/eve/lib/engineering/factory-result-consumer.ts",
+          "mainStatus": "IDENTICAL",
+          "mainSha256": "a71a41799af92b7d1a2c97d8651eda15ce127cd123f4e0ada1b1a8f555bcbae3"
+        },
+        {
+          "path": "apps/eve/lib/external-alpha/shared-accounting.ts",
+          "sha256": "df56de2e0204a105c5511b48b6a847850b4c7354e6ffeb7aebb232a21fa4c74d",
+          "url": "https://github.com/jaydubya818/MyEveBot/blob/8338309582d6806829dec1ae1beef301d6b52425/apps/eve/lib/external-alpha/shared-accounting.ts",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        }
+      ]
+    },
+    {
+      "repository": "skillz",
+      "mainSha": "4942dde4b2a442df3ee45879bb22734c658426df",
+      "compatibilitySourceSha": "3c975f3df6cfd973d5d42b45c64565c1171dcdc8",
+      "sourceIsInMain": false,
+      "pullRequests": [
+        {
+          "baseRefName": "codex/myskills-platform",
+          "headRefName": "codex/myskills-initial-qualification",
+          "headRefOid": "3c975f3df6cfd973d5d42b45c64565c1171dcdc8",
+          "mergedAt": null,
+          "number": 7,
+          "state": "OPEN",
+          "title": "MySkills checkpoint 6: source-bound claim verification",
+          "url": "https://github.com/jaydubya818/skillz/pull/7"
+        },
+        {
+          "baseRefName": "main",
+          "headRefName": "codex/myskills-platform",
+          "headRefOid": "d57ff77b8522f897fc6ae392cf59b3141295ba82",
+          "mergedAt": null,
+          "number": 6,
+          "state": "OPEN",
+          "title": "Add MySkills governed registry and local reference platform",
+          "url": "https://github.com/jaydubya818/skillz/pull/6"
+        }
+      ],
+      "contracts": [
+        {
+          "path": "myskills/resolver.py",
+          "sha256": "cc06d50e109bc61c50968ef6df6204294df6fd089ee4803b00314ea27fa43fcf",
+          "url": "https://github.com/jaydubya818/skillz/blob/3c975f3df6cfd973d5d42b45c64565c1171dcdc8/myskills/resolver.py",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        },
+        {
+          "path": "myskills/registry.py",
+          "sha256": "6da288aef4ea364666188c46b7518999e7ece6e478cd61c45754e0a4a97d4737",
+          "url": "https://github.com/jaydubya818/skillz/blob/3c975f3df6cfd973d5d42b45c64565c1171dcdc8/myskills/registry.py",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        },
+        {
+          "path": "qualification/checkpoint5/consumer-compatibility.json",
+          "sha256": "3320fa469b4524918a5a0a8fdc6fcb9c16291434b387f32cca893dacc364be2a",
+          "url": "https://github.com/jaydubya818/skillz/blob/3c975f3df6cfd973d5d42b45c64565c1171dcdc8/qualification/checkpoint5/consumer-compatibility.json",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        },
+        {
+          "path": "qualification/checkpoint6/independent-review.json",
+          "sha256": "3e991937e580e6aa4115a353859614d0e6c7306a011aa3d3e01d40e27a639214",
+          "url": "https://github.com/jaydubya818/skillz/blob/3c975f3df6cfd973d5d42b45c64565c1171dcdc8/qualification/checkpoint6/independent-review.json",
+          "mainStatus": "ABSENT",
+          "mainSha256": null
+        }
+      ]
+    },
+    {
+      "repository": "relay",
+      "mainSha": "a90625776193031ca2303ba2e2162249d1245479",
+      "compatibilitySourceSha": "a90625776193031ca2303ba2e2162249d1245479",
+      "sourceIsInMain": true,
+      "pullRequests": [
+        {
+          "baseRefName": "main",
+          "headRefName": "codex/relay-owner-experience",
+          "headRefOid": "25def56c72128201002dff0f0f179ad5e3074e6d",
+          "mergedAt": null,
+          "number": 34,
+          "state": "OPEN",
+          "title": "Owner-focused Relay UI with explicit Advanced tools \u2014 no release change",
+          "url": "https://github.com/jaydubya818/relay/pull/34"
+        }
+      ],
+      "contracts": [
+        {
+          "path": "lib/v2/federation/contracts.ts",
+          "sha256": "655fdc15365687325d0beeba1a7540ed8591742d2ed0ddafedf51892d1840fea",
+          "url": "https://github.com/jaydubya818/relay/blob/a90625776193031ca2303ba2e2162249d1245479/lib/v2/federation/contracts.ts",
+          "mainStatus": "IDENTICAL",
+          "mainSha256": "655fdc15365687325d0beeba1a7540ed8591742d2ed0ddafedf51892d1840fea"
+        },
+        {
+          "path": "lib/v2/federation/service.ts",
+          "sha256": "760a330409b9e4cb182bdf71bec83ba925e200b7930562ae09919d454bcfa565",
+          "url": "https://github.com/jaydubya818/relay/blob/a90625776193031ca2303ba2e2162249d1245479/lib/v2/federation/service.ts",
+          "mainStatus": "IDENTICAL",
+          "mainSha256": "760a330409b9e4cb182bdf71bec83ba925e200b7930562ae09919d454bcfa565"
+        },
+        {
+          "path": "lib/v2/federation/signing-envelope.ts",
+          "sha256": "25c1fc5a72ccd77ea6ccdb75d407a9909c8b3c132f6c028c50e32aa2a42b640a",
+          "url": "https://github.com/jaydubya818/relay/blob/a90625776193031ca2303ba2e2162249d1245479/lib/v2/federation/signing-envelope.ts",
+          "mainStatus": "IDENTICAL",
+          "mainSha256": "25c1fc5a72ccd77ea6ccdb75d407a9909c8b3c132f6c028c50e32aa2a42b640a"
+        }
+      ]
+    }
+  ],
+  "qualifiedLocalMyFactory": {
+    "sha": "e498c31db8b749fa91b0544ecd1d1a661b971c2c",
+    "factoryVersion": "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95",
+    "scope": "Accepted isolated deterministic local-provider checkpoint; no canonical production adoption"
+  },
+  "decisions": {
+    "MissionControl": "Qualified native/hybrid branch is not main; retain pins. Requalify canonical merged source before production adoption.",
+    "MyFactory": "PR12 remains stacked on the private-source branch. Existing adapter qualified only at exact compatibility/local-provider sources. Main is not a substitute for those contracts.",
+    "MyEve": "PR65 and PR67 remain open. Main route schema lacks MissionControl; shared owner/cohort accounting and enterprise owner session-to-connection projection need composed qualification. Do not modify external alpha.",
+    "MySkills": "PR6 platform and PR7 checkpoint6 remain open. PR7 advanced from 21ae05a7be2f73be1378deb896f138700c473e84. Source-bound claim review PASS is retained evidence, not consumer execution qualification. Existing deterministic bridge cannot execute the qualified Python TDD task profile; consumer compatibility NOT_ESTABLISHED, activation DISABLED.",
+    "Relay": "Federation signing-envelope v2 exists in main. Transport delivery does not grant receiver execution or spending. MissionControl transport binding remains NOT_QUALIFIED and is unnecessary for the direct readiness fixture."
+  },
+  "nextAdoptionChecks": [
+    "Record exact merged main SHAs without merging automatically",
+    "Revalidate identity, scope, revision, Result signatures and revocation against those SHAs",
+    "Compose MyEve owner/cohort allowance with enterprise reservations without a second ledger",
+    "Qualify actual MyEve owner session/proposal/decision and canonical Result consumer",
+    "Qualify exact MySkills task/model/harness profile if adopted",
+    "Qualify Relay transport only if selected, keeping receiver authority separate"
+  ],
+  "productionIntegration": "NOT_RUN",
+  "externalAlphaChanges": 0
+}

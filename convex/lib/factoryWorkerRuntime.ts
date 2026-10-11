@@ -10,8 +10,7 @@ import {
   harnessRuntimeArtifactDigest,
   harnessRuntimeArtifactIssues,
   harnessSupportsModel,
-  ISOLATED_INVOCATION_MANIFEST,
-  ISOLATED_INVOCATION_ADAPTER_ARTIFACT,
+  findKnownIsolatedHarness,
 } from "@mission-control/workflow-engine/harness-contract";
 import { isNoInferenceConstraint, type NO_INFERENCE_CONSTRAINT } from "./offlineExecutionPolicy";
 
@@ -213,10 +212,12 @@ export function factoryWorkerEligibility(input: {
     return { eligible: false as const, reason: "worker-runtime-artifact-mismatch" };
   }
   const offline = requirements.executionBackend === "isolated-container";
+  const isolated = executor.adapter === "isolated-invocation" && ["2", "3"].includes(executor.version)
+    ? findKnownIsolatedHarness(executor.version) : undefined;
   if (offline ? (!isNoInferenceConstraint(requirements.inferenceConstraint)
       || requirements.provider !== null || requirements.model !== null || requirements.modelRouteDigest !== undefined
-      || harnessCapabilityManifestDigest(executor.capabilityManifest) !== harnessCapabilityManifestDigest(ISOLATED_INVOCATION_MANIFEST)
-      || executor.runtimeArtifactSha256 !== harnessRuntimeArtifactDigest(ISOLATED_INVOCATION_ADAPTER_ARTIFACT))
+      || !isolated || harnessCapabilityManifestDigest(executor.capabilityManifest) !== harnessCapabilityManifestDigest(isolated.manifest)
+      || executor.runtimeArtifactSha256 !== harnessRuntimeArtifactDigest(isolated.adapter))
     : (requirements.inferenceConstraint !== undefined || !harnessSupportsModel(executor.capabilityManifest, requirements.provider, requirements.model))) {
     return { eligible: false as const, reason: "worker-harness-model-unsupported" };
   }

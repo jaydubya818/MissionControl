@@ -4,7 +4,7 @@
  * Run with: npx convex run setupSellerFiAgents:createSellerFiAgents
  */
 
-import { mutation } from "./_generated/server";
+import { mutation } from "./lib/missionScopedFunctions";
 
 export const createSellerFiAgents = mutation({
   args: {},

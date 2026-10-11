@@ -1,12 +1,18 @@
 import { dispatchArgs } from './lib/workOrderDispatchArgs';
 import { requireWorkOrderCapabilityAdmission, type CapabilityPermits } from "./lib/capabilityAdmission";
+import { serviceInternalMutation } from "./lib/missionScopedFunctions";
+import { canonicalDigest } from "@mission-control/shared";
+import { prepareCanonicalDelegation, DELEGATION_PREPARATION, LOCAL_DELEGATION_REPOSITORY } from "./lib/enterpriseDelegationAdmission";
+import { denyEnterprisePaidAuthority } from "./lib/enterpriseAttemptAccounting";
+import { requireEnterpriseQualificationOwner } from "./lib/enterpriseQualificationAccess";
 import { assertQualificationActivation } from "./lib/factoryQualificationScope";
 import { reserveOfflineAttemptBudget } from "./lib/offlineAttemptBudget";
+import { freezeNativeEngineeringTariff } from "./lib/nativeEngineeringTariff";
 import { NO_INFERENCE_CONSTRAINT } from "./lib/offlineExecutionPolicy";
 import { deterministicFactoryVersionIssues } from "./lib/factoryWorkflowContract";
 import { factoryVersionExecutionProfileProjection } from "./lib/executionProfileAdmission";
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, reviewerMutation } from "./lib/missionScopedFunctions";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -2123,6 +2129,7 @@ export const create = mutation({
 
 type DispatchArgs = {
   capabilityPermits?: CapabilityPermits;
+  isolatedLocalDelegation?: boolean;
   workOrderId: Id<"workOrders">;
   taskId?: Id<"tasks">;
   workflowId?: string;
@@ -2310,6 +2317,9 @@ async function reconcilePreExecutionReservation(
   },
 ) {
   const authorization = input.sourceRun.executionCostAuthorization;
+  if (authorization?.schema === "work-order-offline-cost-authorization/v1" && authorization.enterprise) {
+    throw new Error("Enterprise exposure requires canonical settlement evidence.");
+  }
   if (!authorization) {
     if ((input.proof.code === "EXECUTION_PROFILE_REJECTED_BEFORE_EXECUTOR"
       || input.proof.code === "FAB_CONFIGURATION_REJECTED_BEFORE_PROVIDER"
@@ -2989,6 +2999,8 @@ async function dispatchWorkOrder(
       throw new Error(`Workflow not available for dispatch: ${resolvedWorkflowId}`);
     }
 
+    const delegatedPreparation = args.isolatedLocalDelegation === true
+      ? await prepareCanonicalDelegation(ctx, refreshedWorkOrder, args.factoryDefinitionVersionId) : null;
     const runId = generateRunId();
     const retryExecutionBinding = resolveRetryExecutionBinding({
       branch: args.branch,
@@ -3018,7 +3030,7 @@ async function dispatchWorkOrder(
     // Factory tuple control plane unless an exact baseline (or explicit pin)
     // already exists, preserving the default-off rollout contract.
     const explicitlySelectedFactory = retryFactoryDefinitionVersionId ? await ctx.db.get(retryFactoryDefinitionVersionId) : null;
-    const offlineSelected = explicitlySelectedFactory?.executionBackend === "isolated-container";
+    const offlineSelected = !!delegatedPreparation || explicitlySelectedFactory?.executionBackend === "isolated-container";
     const executionRoutingPreview = !offlineSelected && !remoteRetryState && executionRoutingRequested({
       factoryDefinitionVersionId: retryFactoryDefinitionVersionId,
       executionRoutingPin: refreshedWorkOrder.executionRoutingPin,
@@ -3031,7 +3043,7 @@ async function dispatchWorkOrder(
       : null;
     const routedFactoryDefinitionVersionId = executionRoutingPreview?.selectedFactoryDefinitionVersionId
       ?? retryFactoryDefinitionVersionId;
-    const factoryBinding = executionRoutingPreview?.result.status === "EXHAUSTED"
+    const factoryBinding = delegatedPreparation || executionRoutingPreview?.result.status === "EXHAUSTED"
       ? null
       : await resolveFactoryDispatchBinding(ctx, {
           args: {
@@ -3133,7 +3145,7 @@ async function dispatchWorkOrder(
       throw new Error(`WorkOrder is not dispatchable (${("reason" in dispatchable ? dispatchable.reason : "unknown")})`);
     }
 
-    const routing = factoryBinding?.executionBackend === "isolated-container" ? null : executionRoutingPreview
+    const routing = delegatedPreparation || factoryBinding?.executionBackend === "isolated-container" ? null : executionRoutingPreview
       ? await persistExecutionRoutingDecision(ctx, {
           preview: executionRoutingPreview,
           workOrder: refreshedWorkOrder,
@@ -3359,7 +3371,25 @@ async function dispatchWorkOrder(
           },
         })
       : null;
-    const executionManifest = executionManifestInput ? (() => {
+    const delegatedManifest = delegatedPreparation ? {
+      schema: DELEGATION_PREPARATION, runId, taskId: selectedTask?._id,
+      tenantId: refreshedWorkOrder.tenantId, projectId: refreshedWorkOrder.projectId,
+      missionId: refreshedWorkOrder.missionId, missionPlanId: refreshedWorkOrder.missionPlanId,
+      planDigest: `sha256:${computeCanonicalHash(missionPlanForDispatch)}`, ownerId: delegatedPreparation.ownerId,
+      workOrderId: refreshedWorkOrder._id, workOrderRevisionId: refreshedWorkOrder.currentRevisionId,
+      workOrderRevisionNumber: refreshedWorkOrder.currentRevisionNumber,
+      qualityContractDigest: refreshedWorkOrder.qualityContractDigest,
+      verificationContractDigest: refreshedWorkOrder.verificationContractDigest,
+      repositoryId: delegatedPreparation.repository._id, repository: delegatedPreparation.repository.repository,
+      delegatedSourceRepository: LOCAL_DELEGATION_REPOSITORY,
+      baseCommit: delegatedPreparation.admission.baselineCommit, baseTree: delegatedPreparation.admission.baselineTree,
+      factoryId: delegatedPreparation.registration.config.factoryId, factoryVersion: delegatedPreparation.registration.config.factoryVersion,
+      definitionVersionId: delegatedPreparation.version._id, configurationDigest: delegatedPreparation.version.configurationDigest,
+      workflowDigest: `sha256:${computeCanonicalHash(workflowSnapshot)}`,
+      executionProfileDigest: delegatedPreparation.version.executionProfileDigest,
+      authority: "PENDING_EXACT_OWNER_APPROVAL", productionAuthority: "NONE", publicationAuthority: "NONE",
+    } : null;
+    const executionManifest = delegatedManifest ? { manifest: delegatedManifest, digest: canonicalDigest(DELEGATION_PREPARATION, delegatedManifest) } : executionManifestInput ? (() => {
       if (factoryBinding.executionBackend === "isolated-container") {
         const { modelRoute: _modelRoute, routedModel: _routedModel, sandbox: _sandbox, ...offlineInput } = executionManifestInput;
         return buildFactoryExecutionManifest({ ...offlineInput, executionProfile: offlineInput.executionProfile!,
@@ -3379,7 +3409,8 @@ async function dispatchWorkOrder(
             : factoryBinding.version.budget.maxCostUsd,
         )
       : undefined;
-    const executionCostAuthorization = factoryBinding?.executionBackend === "isolated-container"
+    if (!delegatedPreparation && factoryBinding?.executionBackend !== "isolated-container") await denyEnterprisePaidAuthority(ctx, refreshedWorkOrder.projectId!);
+    let executionCostAuthorization = factoryBinding?.executionBackend === "isolated-container"
       ? await reserveOfflineAttemptBudget(ctx, { runId, version: factoryBinding.version, workOrder: refreshedWorkOrder,
           mission: missionForDispatch, policy: factoryBinding.policy, now })
       : factoryBinding
@@ -3420,6 +3451,9 @@ async function dispatchWorkOrder(
           authorizedAt: now,
         }
       : undefined;
+    if (executionCostAuthorization && executionManifest && factoryBinding?.executionBackend === "isolated-container") {
+      executionCostAuthorization = await freezeNativeEngineeringTariff(ctx, executionCostAuthorization as any, executionManifest.manifest, missionForDispatch);
+    }
     if (capabilityAdmission && (!factoryBinding || !executionCostAuthorization
       || !Number.isFinite(executionCostAuthorization.hardLimitUsd)
       || Math.ceil(executionCostAuthorization.hardLimitUsd * 1_000_000) > capabilityAdmission.budgetMicros))
@@ -3498,6 +3532,11 @@ async function dispatchWorkOrder(
       spentUsd: executionCostAuthorization ? 0 : undefined,
       reservedCostUsd: executionCostAuthorization?.reservedCostUsd,
       executionCostAuthorization,
+      ...(delegatedPreparation ? { factoryDefinitionVersionId: delegatedPreparation.version._id,
+        factoryConfigurationDigest: delegatedPreparation.version.configurationDigest, executionProfileDigest: delegatedPreparation.version.executionProfileDigest,
+        repositoryId: delegatedPreparation.repository._id, policyEnvelopeId: delegatedPreparation.version.policyEnvelopeId,
+        environmentId: delegatedPreparation.version.environmentId, executorAdapter: "myfactory-local-delegation", executorVersion: "1",
+        executionBaseSha: delegatedPreparation.admission.baselineCommit, spentUsd: 0, reservedCostUsd: 0 } : {}),
       routingDecisionId: routing?.decisionId,
       routingDecisionDigest: routing?.decisionDigest,
       executionRoutingSnapshot: routing?.executionRoutingSnapshot,
@@ -4533,7 +4572,7 @@ export const setAuthorizedModelOverride = mutation({
   },
 });
 
-export const syncExecutionOutcome = internalMutation({
+export const syncExecutionOutcome = serviceInternalMutation(["attempts.report", "verification:report"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     eventType: v.union(
@@ -4770,6 +4809,7 @@ export const requestApprovalDecision = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    if (args.approvalType === "SERVICE_ATTEMPT_ACCESS") throw Error("USE_SCOPED_SERVICE_GRANT_API");
     const workOrder = await ctx.db.get(args.workOrderId);
     if (!workOrder) throw new Error("WorkOrder not found");
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, workOrder.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
@@ -4865,6 +4905,7 @@ export const decideApprovalDecision = mutation({
   handler: async (ctx, args) => {
     const approvalDecision = await ctx.db.get(args.approvalDecisionId);
     if (!approvalDecision) throw new Error("ApprovalDecision not found");
+    if (approvalDecision.approvalType === "SERVICE_ATTEMPT_ACCESS") throw Error("USE_SCOPED_SERVICE_GRANT_API");
     if (args.projectId && approvalDecision.projectId !== args.projectId) {
       throw new Error("ApprovalDecision does not belong to the selected workspace");
     }
@@ -5040,6 +5081,7 @@ export const expireApprovalDecision = mutation({
   handler: async (ctx, args) => {
     const approvalDecision = await ctx.db.get(args.approvalDecisionId);
     if (!approvalDecision) throw new Error("ApprovalDecision not found");
+    if (approvalDecision.approvalType === "SERVICE_ATTEMPT_ACCESS") throw Error("USE_SCOPED_SERVICE_GRANT_API");
     const scopedWorkOrder = await ctx.db.get(approvalDecision.workOrderId);
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, scopedWorkOrder?.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
     if (scopedWorkOrder) assertAuthorizedDeliveryRecord(deliveryAccess, scopedWorkOrder);
@@ -5120,7 +5162,7 @@ export const expireFactoryHumanReviewCheckpointInternal = internalMutation({
   },
 });
 
-export const recordVerificationReceipt = mutation({
+export const recordVerificationReceipt = reviewerMutation({
   args: {
     workOrderId: v.id("workOrders"),
     workflowRunId: v.id("workflowRuns"),
@@ -5303,10 +5345,12 @@ export const accept = mutation({
     actorType: v.union(v.literal("HUMAN"), v.literal("SYSTEM"), v.literal("AGENT")),
     actorId: v.optional(v.string()),
     idempotencyKey: v.string(),
+    isolatedEnterpriseQualification: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const workOrder = await ctx.db.get(args.workOrderId);
     if (!workOrder) throw new Error("WorkOrder not found");
+    if (args.isolatedEnterpriseQualification) await requireEnterpriseQualificationOwner(ctx, workOrder);
     if (args.actorType !== "HUMAN") {
       throw new Error("WorkOrder acceptance is reserved for an authenticated human operator.");
     }
@@ -5380,7 +5424,7 @@ export const accept = mutation({
     const policyV2Enforced = workOrder.verificationContract?.schemaVersion === 2
       && workOrder.verificationContract.enforcementMode === "ENFORCED";
     const currentVerification = policyV2Enforced
-      ? await getCurrentVerificationResult(ctx, workOrder, now)
+      ? await getCurrentVerificationResult(ctx, workOrder, now, args.isolatedEnterpriseQualification === true)
       : null;
     const currentVerificationAudit = currentVerification
       ? await appendCurrentVerificationQualityGateDecision(
@@ -5389,6 +5433,7 @@ export const accept = mutation({
           currentVerification,
           args.idempotencyKey,
           now,
+          args.isolatedEnterpriseQualification ? "ISOLATED_ENTERPRISE_QUALIFICATION" : undefined,
         )
       : null;
     const currentVerificationMetadata = currentVerification
@@ -5478,6 +5523,9 @@ export const accept = mutation({
     await ctx.db.patch(workOrder._id, {
       state: "DONE",
       acceptedRevisionNumber: workOrder.currentRevisionNumber ?? 1,
+      ...(args.isolatedEnterpriseQualification ? { metadata: { ...workOrder.metadata,
+        isolatedEnterpriseAcceptance: { acceptedAt: now, ownerActorId: acceptActorId,
+          qualityGateDecisionId: currentVerificationAudit?._id, productionAuthority: "NONE", publicationAuthority: "NONE" } } } : {}),
       currentExecutionRunId: undefined,
       blockingIssue: undefined,
       requiredHumanAction: undefined,

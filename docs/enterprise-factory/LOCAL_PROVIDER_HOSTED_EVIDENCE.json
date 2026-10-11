@@ -1,0 +1,176 @@
+{
+  "checks": [
+    "failed or foreign host qualification is rejected even with a matching report hash",
+    "provider, runtime, implementation and source mismatch denied before allocation",
+    "eight concurrent admissions reserve one canonical Work and allowance",
+    "paid reservation is denied transactionally before any model operation",
+    "wrong FactoryVersion and stale writer cannot claim",
+    "eight concurrent deliveries execute one producer and one separate verifier",
+    "verifier cannot chmod, overwrite, unlink or replace the root-owned candidate",
+    "authenticated V3 Result binds candidate, separate verifier and cleanup",
+    "explicit negotiation, impersonation, candidate and verifier substitutions denied",
+    "cross-owner read, custody and stop denied",
+    "PostgreSQL restart preserves Result and prevents duplicate execution",
+    "cleanup ambiguity stays UNKNOWN and recovery never executes work",
+    "cancel before allocation yields authenticated terminal cleanup without execution",
+    "revoked authority refuses admission and paid operations remain unsupported"
+  ],
+  "factoryVersion": "7eb60da0fb0789ecc1cc0302894555cead6286a6d3c374d01befbcd009bdde1f",
+  "sourceDigest": "93944614be94c6d824f8640d0bda26a7822528dd0d960c02e7db474d15e7f929",
+  "hostQualification": {
+    "runtimeSha256": "4385bb37fd279097b123eeec646f37bb6bb05b6262915bd7fe3ccfc878f35c9c",
+    "policySha256": "6b5419dd57095b9f639ad09d88c1183da18c7353bb45e0a8c97f3593290383b0",
+    "checks": {
+      "uid": 1000,
+      "rootDenied": true,
+      "absent": true,
+      "noCredentials": true,
+      "caps": true,
+      "seccomp": true,
+      "noNewPrivileges": true,
+      "networkBlocked": true,
+      "resourceLimits": true,
+      "crossWorkFilesystem": true,
+      "processTreeCleanup": true,
+      "separatePidNamespace": true,
+      "deadlineInitProtected": true
+    }
+  },
+  "execution": {
+    "producerAllocations": 1,
+    "verifierAllocations": 1,
+    "productiveExecutions": 1,
+    "containers": [
+      {
+        "id": "8145969a7d0e557ad143d8c6915fd5ab83a200e7b68a2885972410e62dd6bbed",
+        "runId": "9dea0741-297b-48f8-964e-2af73dfe9029",
+        "kind": "producer"
+      },
+      {
+        "id": "d9a05fd238c9ff7773870c487787581a826b63537242d8788ac9651e194157e5",
+        "runId": "9dea0741-297b-48f8-964e-2af73dfe9029",
+        "kind": "verifier"
+      }
+    ],
+    "runtime": {
+      "engine": "28.0.4",
+      "kernel": "6.17.0-1022-azure",
+      "architecture": "x86_64",
+      "os": "Ubuntu 24.04.5 LTS",
+      "securityOptions": [
+        "name=apparmor",
+        "name=seccomp,profile=builtin",
+        "name=cgroupns"
+      ],
+      "imageId": "sha256:5738ddb39d7f2420a5d43b86be907de09eed5c0751a034f233b3a0aa2d5cbebe",
+      "image": "public.ecr.aws/docker/library/node@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0",
+      "architectureImage": "amd64"
+    },
+    "policy": {
+      "version": 1,
+      "network": "none",
+      "user": "1000:1000",
+      "initUser": "0:0",
+      "rootFilesystem": "read-only",
+      "capabilities": [],
+      "noNewPrivileges": true,
+      "seccomp": "docker-default",
+      "pidNamespace": "private",
+      "ipc": "private",
+      "hostMounts": false,
+      "ports": false,
+      "memoryMb": 256,
+      "pids": 64,
+      "vcpus": 1,
+      "swapMb": 256,
+      "timeoutMs": 180000,
+      "tmpfsMb": 96
+    }
+  },
+  "resultDigest": "76b85183cf4fd734c65b9da37fbf92cc84bf86be02d9f4997fdb707102bdbf89",
+  "candidate": {
+    "base": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+    "commit": "c376cc84ecbf5ac93aa5df82503511e4f0d66942",
+    "commitArtifactId": "candidate.commit",
+    "patchArtifactId": "candidate.patch",
+    "patchDigest": "ce31378796ca29105726d3685095059c01723a07dfbce792bcdc953f2f1a9dc8",
+    "tree": "54b52827d3c96b97be575e603cca465380962d13",
+    "treeArtifactId": "candidate.tree"
+  },
+  "verification": {
+    "candidateCommit": "c376cc84ecbf5ac93aa5df82503511e4f0d66942",
+    "candidateTree": "54b52827d3c96b97be575e603cca465380962d13",
+    "checks": [
+      {
+        "id": "trim-and-case",
+        "result": "PASS"
+      },
+      {
+        "id": "repeated-space",
+        "result": "PASS"
+      },
+      {
+        "id": "digits-and-hyphens",
+        "result": "PASS"
+      },
+      {
+        "id": "tab-newline",
+        "result": "PASS"
+      },
+      {
+        "id": "blank",
+        "result": "PASS"
+      },
+      {
+        "id": "empty",
+        "result": "PASS"
+      },
+      {
+        "id": "punctuation",
+        "result": "PASS"
+      },
+      {
+        "id": "unicode",
+        "result": "PASS"
+      },
+      {
+        "id": "number",
+        "result": "PASS"
+      },
+      {
+        "id": "null",
+        "result": "PASS"
+      }
+    ],
+    "cleanupConfirmed": true,
+    "custodySha256": "44e41c8cc59cba1e39e972a377cf0b09de47f87a4bd07389187c88cacefddc87",
+    "finishedAt": "2026-10-09T21:48:29.875Z",
+    "image": "public.ecr.aws/docker/library/node@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0",
+    "kind": "INDEPENDENT_LOCAL_VERIFICATION",
+    "outcome": "PASS",
+    "policySha256": "8e4df86832ee72ebfc49983382359097f7ceae2a191de4511288277cf8505e4c",
+    "producerSessionId": "sbx_8145969a7d0e557ad143d8c6915fd5ab83a200e7b68a2885972410e62dd6bbed",
+    "providerSessionId": "sbx_d9a05fd238c9ff7773870c487787581a826b63537242d8788ac9651e194157e5",
+    "runId": "9dea0741-297b-48f8-964e-2af73dfe9029",
+    "startedAt": "2026-10-09T21:48:28.500Z",
+    "version": 1,
+    "workGeneration": 1,
+    "workId": "b00a0c54-351e-45c4-8ec3-4b7f735872b8"
+  },
+  "localExecution": {
+    "candidateCommit": "c376cc84ecbf5ac93aa5df82503511e4f0d66942",
+    "candidateTree": "54b52827d3c96b97be575e603cca465380962d13",
+    "custodySha256": "44e41c8cc59cba1e39e972a377cf0b09de47f87a4bd07389187c88cacefddc87",
+    "delegationDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "hostQualificationSha256": "7b78ffa9a4c60b64cd111a8184064d0545e1864b0851ed9b49039fc323baaf89",
+    "ownerScope": "fixture-owner",
+    "policySha256": "6b5419dd57095b9f639ad09d88c1183da18c7353bb45e0a8c97f3593290383b0",
+    "producerAllocation": "sbx_8145969a7d0e557ad143d8c6915fd5ab83a200e7b68a2885972410e62dd6bbed",
+    "producerDestroyed": true,
+    "provider": "local-docker",
+    "runtimeSha256": "4385bb37fd279097b123eeec646f37bb6bb05b6262915bd7fe3ccfc878f35c9c",
+    "verifierAllocation": "sbx_d9a05fd238c9ff7773870c487787581a826b63537242d8788ac9651e194157e5",
+    "verifierDestroyed": true
+  },
+  "paidOperations": 0
+}

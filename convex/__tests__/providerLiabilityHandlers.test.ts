@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   registerPriceVersion,

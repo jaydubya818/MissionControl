@@ -232,6 +232,15 @@ describe("exact-current verification acceptance eligibility", () => {
     };
   }
 
+  it("checks local freshness before reporting pending human acceptance", () => {
+    const data = observedLocalFixture();
+    Object.assign(data.verificationResults[0], { verdict: "REQUIRES_HUMAN_REVIEW" });
+    Object.assign(data.verificationReceipts[0], { status: "PENDING", verdict: "REQUIRES_HUMAN_REVIEW" });
+    expect(evaluateCurrentVerificationEligibility(data)).toMatchObject({ current: true, eligible: false });
+    data.localCandidateObservations[0].expiresAt = now;
+    expect(evaluateCurrentVerificationEligibility(data)).toMatchObject({ current: false, eligible: false });
+  });
+
   it("requires complete independent lineage plus a current exact local observation", () => {
     const data = observedLocalFixture();
     expect(evaluateCurrentVerificationEligibility(data).eligible).toBe(true);

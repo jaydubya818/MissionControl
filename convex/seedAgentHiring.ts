@@ -5,7 +5,7 @@
  * Requires at least one project to exist (e.g. run seedMissionControlDemo first or create a project).
  */
 
-import { mutation } from "./_generated/server";
+import { mutation } from "./lib/missionScopedFunctions";
 import type { Id } from "./_generated/dataModel";
 
 export const run = mutation({
