@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import ts from "typescript";
 import {
   compareContractSnapshots,
   extractPublicConvexContracts,
@@ -46,6 +47,43 @@ describe("runtime contract extraction", () => {
 
     expect([...contracts.keys()]).toEqual(["alerts:list"]);
     expect(contracts.get("alerts:list")).toMatchObject({ kind: "query", returns: null });
+  });
+
+  it("covers every typed public Mission wrapper and excludes internal wrappers", () => {
+    const source = readFileSync(new URL("../../convex/lib/missionScopedFunctions.ts", import.meta.url), "utf8");
+    const file = ts.createSourceFile("missionScopedFunctions.ts", source, ts.ScriptTarget.Latest, true);
+    const expectedKinds = new Map([["rawQuery", "query"], ["rawMutation", "mutation"], ["rawAction", "action"]]);
+    const wrappers = file.statements.filter(ts.isVariableStatement)
+      .filter((statement) => statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword))
+      .flatMap((statement) => [...statement.declarationList.declarations])
+      .filter((declaration) => ts.isIdentifier(declaration.name) && declaration.type && ts.isTypeQueryNode(declaration.type));
+    expect(wrappers.length).toBeGreaterThan(0);
+    for (const wrapper of wrappers) {
+      const name = wrapper.name.text;
+      const expected = expectedKinds.get(wrapper.type.exprName.getText(file));
+      const contracts = extractPublicConvexContracts(`export const endpoint = ${name}({args: {id: v.string()}, handler: async () => null});`, "convex/example.ts");
+      expect(contracts.get("example:endpoint")?.kind, name).toBe(expected);
+    }
+  });
+
+  it("tracks aliased public wrappers without exposing aliased internal mutations", () => {
+    const source = (validator) => `
+      import { reviewerMutation as review, internalMutation as hidden } from "./lib/missionScopedFunctions";
+      export const record = review({ args: { id: ${validator} }, handler: async () => null });
+      export const privateRecord = hidden({ args: {}, handler: async () => null });
+    `;
+    const before = extractPublicConvexContracts(source("v.string()"), "convex/reviews.ts");
+    const after = extractPublicConvexContracts(source("v.number()"), "convex/reviews.ts");
+    expect([...before.keys()]).toEqual(["reviews:record"]);
+    expect(compareContractSnapshots(before, after)).toEqual([{ name: "reviews:record", reason: "args changed" }]);
+  });
+
+  it("includes the canonical Mission plan and verification endpoints", () => {
+    for (const [file, names] of [["missions", ["savePlanDraft", "submitPlan", "recordValidationResult"]], ["workOrders", ["recordVerificationReceipt"]]]) {
+      const source = readFileSync(new URL(`../../convex/${file}.ts`, import.meta.url), "utf8");
+      const contracts = extractPublicConvexContracts(source, `convex/${file}.ts`);
+      for (const name of names) expect(contracts.get(`${file}:${name}`)?.kind, name).toBe("mutation");
+    }
   });
 
   it("normalizes formatting while retaining validator structure", () => {
@@ -183,6 +221,18 @@ describe("Git-base runtime contract guard", () => {
     expect(result.ok).toBe(false);
     expect(result.message).toContain("without incrementing RUNTIME_CONTRACT_VERSION");
     expect(result.changes).toEqual([{ name: "alerts:list", reason: "args changed" }]);
+  });
+
+  it("fails a wrapped Mission argument change without a runtime version increment", () => {
+    const cwd = createRepository();
+    const endpoint = (validator) => `export const savePlanDraft = contributorMutation({ args: { missionId: ${validator} }, handler: async () => null });`;
+    writeFileSync(path.join(cwd, "convex", "missions.ts"), endpoint("v.string()"));
+    git(cwd, ["add", "convex/missions.ts"]);
+    git(cwd, ["commit", "-qm", "wrapped public endpoint"]);
+    writeFileSync(path.join(cwd, "convex", "missions.ts"), endpoint("v.optional(v.string())"));
+    const result = runRuntimeContractGuard({ cwd, baseRef: "HEAD" });
+    expect(result.ok).toBe(false);
+    expect(result.changes).toEqual([{ name: "missions:savePlanDraft", reason: "args changed" }]);
   });
 
   it("accepts a public validator change with a version increment", () => {

@@ -3,7 +3,15 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 
-const PUBLIC_BUILDERS = new Set(["query", "mutation", "action"]);
+const PUBLIC_BUILDERS = new Map([
+  ["query", "query"],
+  ["mutation", "mutation"],
+  ["action", "action"],
+  ["contributorMutation", "mutation"],
+  ["reviewerMutation", "mutation"],
+  ["serviceAttemptAction", "action"],
+  ["sofieApplicationAction", "action"],
+]);
 const VERSION_FILE = "convex/lib/runtimeContract.ts";
 const VERSION_EXPORT = "RUNTIME_CONTRACT_VERSION";
 
@@ -96,6 +104,17 @@ export function extractPublicConvexContracts(source, filePath) {
   );
   const contracts = new Map();
   const initializers = localInitializers(sourceFile);
+  const builders = new Map(PUBLIC_BUILDERS);
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const binding of bindings.elements) {
+      const kind = PUBLIC_BUILDERS.get((binding.propertyName ?? binding.name).text);
+      if (kind) builders.set(binding.name.text, kind);
+      else builders.delete(binding.name.text);
+    }
+  }
 
   for (const statement of sourceFile.statements) {
     if (!ts.isVariableStatement(statement)) continue;
@@ -109,8 +128,8 @@ export function extractPublicConvexContracts(source, filePath) {
       if (!ts.isCallExpression(declaration.initializer)) continue;
       if (!ts.isIdentifier(declaration.initializer.expression)) continue;
 
-      const kind = declaration.initializer.expression.text;
-      if (!PUBLIC_BUILDERS.has(kind)) continue;
+      const kind = builders.get(declaration.initializer.expression.text);
+      if (!kind) continue;
       const config = declaration.initializer.arguments[0];
       if (!config || !ts.isObjectLiteralExpression(config)) continue;
 
