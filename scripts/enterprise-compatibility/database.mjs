@@ -20,7 +20,7 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
   const url = `http://127.0.0.1:${port}`;
   let backend;
   let backendLog;
-  const env = { PATH: process.env.PATH, HOME: process.env.HOME, CONVEX_TELEMETRY_DISABLED: "1",
+  const env = { PATH: process.env.PATH, HOME: process.env.HOME, CI: "1", CONVEX_TELEMETRY_DISABLED: "1",
     CONVEX_SELF_HOSTED_URL: url };
   async function start() {
     backendLog = await openFixtureBackendLog(root);

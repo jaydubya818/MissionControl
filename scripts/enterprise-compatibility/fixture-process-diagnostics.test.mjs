@@ -1,7 +1,10 @@
 import { afterEach, expect, it } from 'vitest';
 import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
-import { fstatSync } from 'node:fs';
+import { fstatSync, readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
+import { stripVTControlCharacters } from 'node:util';
+import ts from 'typescript';
 import { throws } from 'node:assert/strict';
 import { mkdtemp, rm, stat, appendFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -16,6 +19,55 @@ afterEach(async () => {
 });
 const directory = async () => { const root = await mkdtemp(join(tmpdir(), 'mc-fixture-process-test-')); roots.push(root); return root; };
 const producer = `process.stderr.write(Buffer.alloc(8*1024*1024,120),()=>require('node:fs').writeFileSync(process.argv[1],'ready'));setInterval(()=>{},1000)`;
+it('bounds output inspection and emits only fixed markers, byte counts and process facts', () => {
+  const stderr = Buffer.from('Preparing Convex functions...' + 'x'.repeat(7000)
+    + '\nPRIVATE_SECRET Retrying request (attempt 4/6)...\nConvex functions ready!\n');
+  const failure = fixtureProcessFailure('PREPARE_FUNCTIONS', { status: 7,
+    message: 'PRIVATE_ARG', stdout: 'PRIVATE_BODY 😀', stderr }, 100);
+  const detail = JSON.parse(failure.message.slice(failure.message.indexOf('{')));
+  expect(detail.status).toBe(7); // Spoofing ready output does not establish success.
+  expect(detail.stdout).toEqual({ bytes: Buffer.byteLength('PRIVATE_BODY 😀'), inspectedTailBytes: Buffer.byteLength('PRIVATE_BODY 😀'), markers: [] });
+  expect(detail.stderr).toEqual({ bytes: stderr.length, inspectedTailBytes: 6000, markers: ['FUNCTIONS_READY', 'RETRYING_REQUEST'] });
+  expect(failure.message).not.toMatch(/PRIVATE_SECRET|PRIVATE_BODY|PRIVATE_ARG|xxx|Convex functions ready|Retrying request/);
+  expect(failure.cause).toBeUndefined();
+});
+it('handles absent and nontext output without invoking arbitrary serializers', () => {
+  const hostile = { toString() { throw Error('PRIVATE_SECRET'); }, toJSON() { throw Error('PRIVATE_SECRET'); } };
+  const failure = fixtureProcessFailure('PREPARE_FUNCTIONS', { stdout: hostile }, 10);
+  const detail = JSON.parse(failure.message.slice(failure.message.indexOf('{')));
+  expect(detail.stdout).toEqual({ bytes: 0, inspectedTailBytes: 0, markers: [] });
+  expect(detail.stderr).toEqual(detail.stdout);
+});
+it('retains safe preparation markers from a real failed command without exposing its output', () => {
+  let failure;
+  try { runFixtureCommand('PREPARE_FUNCTIONS', process.execPath, ['-e',
+    "process.stderr.write('PRIVATE_SECRET Preparing Convex functions...');process.exit(7)"], { timeout: 2000, stdio: 'pipe' }); }
+  catch (error) { failure = error; }
+  const detail = JSON.parse(failure.message.slice(failure.message.indexOf('{')));
+  expect(detail.status).toBe(7); expect(detail.stderr.markers).toEqual(['PREPARING']);
+  expect(detail.stderr.bytes).toBeGreaterThan(0); expect(failure.message).not.toContain('PRIVATE_SECRET');
+});
+it('disables installed Convex Sentry initialization with the filtered CI environment', () => {
+  // Execute the installed SDK implementation with inert imports, so no network
+  // or telemetry client is created in either the enabled or disabled case.
+  const source = readFileSync(new URL('../../node_modules/convex/src/cli/lib/utils/sentry.ts', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021 } }).outputText;
+  const initialize = env => {
+    const calls = [], exports = {};
+    runInNewContext(code, { exports, process: { env }, require: name => {
+      if (name === '@sentry/node') return { init: options => calls.push(options) };
+      if (name === '@sentry/tracing') return {};
+      if (name === '../config.js') return { productionProvisionHost: 'https://api.convex.dev', provisionHost: 'https://api.convex.dev' };
+      if (name === '../../../index.js') return { version: 'installed-fixture-test' };
+      if (name === 'util') return { stripVTControlCharacters };
+      throw Error('Unexpected SDK dependency');
+    } });
+    exports.initSentry(); return calls;
+  };
+  expect(initialize({ CONVEX_TELEMETRY_DISABLED: '1' })).toHaveLength(1);
+  expect(initialize({ CI: '1', CONVEX_TELEMETRY_DISABLED: '1' })).toHaveLength(0);
+  expect(initialize({ CI: '1', VERCEL: '1' })).toHaveLength(1);
+});
 const waiter = `const end=Date.now()+Number(process.argv[2]);(async()=>{while(Date.now()<end){if(require('node:fs').existsSync(process.argv[1]))return;await new Promise(r=>setTimeout(r,20));}process.exit(4)})()`;
 it('reproduces pipe backpressure while the owning process waits synchronously', async () => {
   const root = await directory(), marker = join(root, 'ready');
