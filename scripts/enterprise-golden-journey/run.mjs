@@ -96,7 +96,7 @@ try {
   for (const [path, expected] of Object.entries(lock.dependencyLocks)) assert.equal(sha256(await readFile(path)), expected, `Dependency lock changed: ${path}`);
   if (suite === 'contracts') {
     await command('report-contracts', process.execPath, ['--test', 'scripts/enterprise-golden-journey/evidence.test.mjs', 'scripts/enterprise-golden-journey/owner-review-controls.test.mjs', 'scripts/enterprise-golden-journey/runtime-recovery-status.test.mjs', 'scripts/enterprise-golden-journey/sofie-contract.test.mjs', 'scripts/enterprise-golden-journey/boundary.test.mjs']);
-    await vitest('fixture-process-regressions', ['scripts/enterprise-compatibility/fixture-process-diagnostics.test.mjs', 'scripts/enterprise-compatibility/database-lifecycle.test.mjs']);
+    await vitest('fixture-process-regressions', ['scripts/enterprise-compatibility/fixture-process-diagnostics.test.mjs', 'scripts/enterprise-compatibility/database-lifecycle.test.mjs', 'scripts/enterprise-compatibility/fixture-function-timing.test.mjs']);
     await vitest('backend-domain-regressions', ['convex/__tests__']);
     await vitest('enterprise-contracts', ['convex/__tests__/enterpriseDelegationAdmission.test.ts', 'convex/__tests__/enterpriseMissionOwner.test.ts', 'convex/__tests__/missionWorkOrderContract.test.ts', 'convex/__tests__/missionGovernance.test.ts', 'convex/__tests__/qualificationGateScope.test.ts']);
   } else if (suite === 'database-concurrency') {

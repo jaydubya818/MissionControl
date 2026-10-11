@@ -41,7 +41,7 @@ if (['delegated-execution', 'hybrid-mission'].includes(suite)) {
 if (['native-execution', 'hybrid-mission', 'security-recovery'].includes(suite)) {
   if (process.env.MC_GOLDEN_RUNTIME_FROM_REGISTRY === '1') process.exit(0);
   const url = process.env.MC_GOLDEN_RUNTIME_PACKAGE_URL;
-  if (!url) { console.log('Exact native runtime distribution unavailable. Runner will report NOT_RUN.'); process.exit(0); }
+  if (!url) { console.log('No optional runtime archive configured. Runtime qualification requires the workflow’s separate registry recovery or another verified exact distribution.'); process.exit(0); }
   assert.equal(new URL(url).protocol, 'https:');
   const packagePath = join(temp, 'runtime.tar'), build = join(temp, 'golden-runtime');
   run('curl', ['--fail', '--location', '--proto', '=https', '--proto-redir', '=https', '--output', packagePath, url]);

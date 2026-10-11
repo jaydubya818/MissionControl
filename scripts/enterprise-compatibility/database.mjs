@@ -1,4 +1,5 @@
 import { fixtureProcessFailure, openFixtureBackendLog, runFixtureCommand } from './fixture-process-diagnostics.mjs';
+import { captureCompletedResultFunctionTiming, readFixtureFunctionLogPage } from './fixture-function-timing.mjs';
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, writeFile, copyFile, symlink, cp, rm, appendFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -105,7 +106,9 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
     const owner = client(nativeExecution ? "user_SyntheticHandoffQualification" : "fixture-owner"), other = client("fixture-other");
     const seed = await owner.mutation(nativeExecution ? "nativeFixture:seed" : "fixtureSeed:seed", {});
     return { root, seed, owner, other, peer: client("fixture-peer"), anonymous: new ConvexHttpClient(url), stop,
-      ...(nativeExecution ? { client, subscription(subject) {
+      ...(nativeExecution ? { client, captureCompletedResultTiming(operation, retain) {
+        return captureCompletedResultFunctionTiming(cursor => readFixtureFunctionLogPage(url, key, cursor), operation, retain);
+      }, subscription(subject) {
         const c = new ConvexClient(url);
         c.setAdminAuth(key, { subject, issuer: "https://fixture.example.test", email: `${subject}@example.test` });
         return c;

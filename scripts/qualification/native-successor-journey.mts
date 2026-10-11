@@ -545,7 +545,11 @@ try {
         isolatedEnterpriseQualification: true, idempotencyKey: 'hybrid-integration-accept' }));
       assert.equal(accepted.accepted, true);
       await handoff(integrationWO._id, integrationDispatch.run._id, 'integration-proof', integrationArtifacts.filter((a: any) => a.workflowRunId === integrationDispatch.run._id).map((a: any) => a._id));
-      if (resultConsumer) await step('completedEnterpriseResultConsumer', () => resultConsumer.qualify(missionId));
+      if (resultConsumer) await step('completedEnterpriseResultConsumer', () => process.env.MYEVE_CHECKPOINT_H_BROWSER === '1'
+        ? db.captureCompletedResultTiming(() => resultConsumer.qualify(missionId), async (evidence: any) => {
+          state.completedResultFunctionTiming = evidence;
+          await writeFile(join(output, 'completed-result-function-timing.json'), JSON.stringify(evidence, null, 2) + '\n');
+        }) : resultConsumer.qualify(missionId));
       const ownerReadback = await step('sofieNeedsYou', () => sofie.readback(missionId));
       assert.equal(ownerReadback.state, 'AWAITING_ACCEPTANCE');
       assert.equal(ownerReadback.acceptanceEligible, true);
@@ -623,4 +627,8 @@ try {
 }
 // All worker, image and database cleanup has completed. Convex CLI child
 // transport handles must not keep a finished qualification command resident.
+if (resultConsumer && process.env.MYEVE_CHECKPOINT_H_BROWSER === '1') {
+  assert.equal(state.completedResultFunctionTiming?.status, 'COMPLETE', 'Backend Result function timing is unqualified');
+  assert.ok(state.completedResultFunctionTiming.observedUserExecutionMarginMs > 0, 'No observed mutation user-execution margin');
+}
 process.exit(0);
