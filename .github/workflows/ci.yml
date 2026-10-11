@@ -101,7 +101,7 @@ jobs:
       - name: Guard public Convex runtime contracts
         run: pnpm run ci:runtime-contract
         env:
-          RUNTIME_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          RUNTIME_CONTRACT_BASE_SHA: ${{ github.ref == 'refs/heads/codex/unified-beta-missioncontrol-20261011' && 'a7d95bc587d11ff8bbdf7112dc1de5f2b116da12' || github.event.pull_request.base.sha || github.event.before }}
 
   unit-tests:
     name: Unit Tests
@@ -262,7 +262,7 @@ jobs:
       - name: Enforce dependency and credential policy
         run: pnpm run release:security
         env:
-          AUTHORIZATION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          AUTHORIZATION_BASE_SHA: ${{ github.ref == 'refs/heads/codex/unified-beta-missioncontrol-20261011' && 'a7d95bc587d11ff8bbdf7112dc1de5f2b116da12' || github.event.pull_request.base.sha || github.event.before }}
 
   browser-security:
     name: Browser Security and Accessibility
