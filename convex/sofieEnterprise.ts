@@ -136,7 +136,7 @@ export const apply = internalMutation({
   },
 });
 
-async function projectMission(ctx: MutationCtx, mission: Doc<'missions'>, expectedPlanDigest: string | null) {
+export async function projectMission(ctx: MutationCtx, mission: Doc<'missions'>, expectedPlanDigest: string | null) {
   const plans = await ctx.db.query('missionPlans').withIndex('by_mission_revision', q => q.eq('missionId', mission._id)).order('desc').take(21);
   if (plans.some(p => p.projectId !== mission.projectId || p.tenantId !== mission.tenantId)) return denied();
   const plan = mission.currentPlanId ? await ctx.db.get(mission.currentPlanId) : plans[0] ?? null;

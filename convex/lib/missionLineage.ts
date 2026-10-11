@@ -12,7 +12,11 @@ export const missionLineageTables = [...scopedTables];
 
 export function missionLineage(db: QueryCtx["db"]) {
   const tableCache = new Map<string, string | null>();
-  function tableOf(id: string) {
+  function tableOf(id: string, expectedTable?: string) {
+    // Schema/query hints only avoid discovery after the database validates the
+    // exact table. A wrong hint cannot create or overwrite a cached identity.
+    if (!tableCache.has(id) && expectedTable && Object.prototype.hasOwnProperty.call(validators, expectedTable)
+      && db.normalizeId(expectedTable as any, id)) tableCache.set(id, expectedTable);
     if (!tableCache.has(id)) tableCache.set(id, Object.keys(validators).find(table => db.normalizeId(table as any, id)) ?? null);
     return tableCache.get(id)!;
   }
@@ -24,7 +28,10 @@ export function missionLineage(db: QueryCtx["db"]) {
   }
   function references(validator: Validator, value: any): string[] {
     if (value === undefined || value === null) return [];
-    if (validator.type === "id") return scopedTables.has(validator.tableName!) && typeof value === "string" ? [value] : [];
+    if (validator.type === "id") {
+      if (typeof value === "string" && validator.tableName && Object.prototype.hasOwnProperty.call(validators, validator.tableName)) tableOf(value, validator.tableName);
+      return scopedTables.has(validator.tableName!) && typeof value === "string" ? [value] : [];
+    }
     if (validator.type === "object") return Object.entries(validator.value).flatMap(([key, field]: [string, any]) => references(field.fieldType, value[key]));
     if (validator.type === "array") return Array.isArray(value) ? value.flatMap(item => references(validator.value, item)) : [];
     if (validator.type === "union") return validator.value.flatMap((variant: Validator) => references(variant, value));
@@ -35,7 +42,10 @@ export function missionLineage(db: QueryCtx["db"]) {
   }
   return {
     tableOf,
-    references: (row: Record<string, any>, table?: string) => sharedIdentities.has(table ?? "") ? [] : [...new Set(table && validators[table]
-      ? references(validators[table], row) : dynamic(Object.fromEntries(Object.entries(row).filter(([key]) => key !== "_id"))))],
+    references: (row: Record<string, any>, table?: string) => {
+      if (table && typeof row._id === "string") tableOf(row._id, table);
+      return sharedIdentities.has(table ?? "") ? [] : [...new Set(table && validators[table]
+        ? references(validators[table], row) : dynamic(Object.fromEntries(Object.entries(row).filter(([key]) => key !== "_id"))))];
+    },
   };
 }

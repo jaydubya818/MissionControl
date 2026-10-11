@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { json, sha256, validateHybrid } from './evidence.mjs';
 const directory = resolve(process.argv[2]);
+const expectedSourceSha = process.argv[3];
+assert.match(expectedSourceSha ?? '', /^[a-f0-9]{40}$/, 'Expected source SHA is required as the second argument');
 const journey = await json(join(directory, 'journey.json')), records = await json(join(directory, 'durable-records.json'));
-const result = validateHybrid(journey, records);
+const result = validateHybrid(journey, records, expectedSourceSha);
 const bundle = join(directory, 'candidates.bundle');
 assert.equal('sha256:' + sha256(await readFile(bundle)), journey.candidateArchiveDigest);
 const root = await mkdtemp(join(tmpdir(), 'golden-proof-'));
@@ -23,6 +25,8 @@ try {
     journey.stages['exact-documentHandoff'].handoff._id, journey.stages['delegated-slugHandoff'].handoff._id]) assert.ok(proof.includes(identity));
 } finally { await rm(root, { recursive: true }); }
 const challenges = {
+  'dirty-controller': j => { j.controllerDirty = true; },
+  'wrong-controller': j => { j.controllerSourceSha = expectedSourceSha === 'f'.repeat(40) ? 'e'.repeat(40) : 'f'.repeat(40); },
   'candidate-substitution': j => { j.stages.integrationGate.current.candidateRevision = 'f'.repeat(40); },
   'evidence-spoof': j => { j.stages.integrationGate.current.evidenceSetDigest = 'sha256:' + 'f'.repeat(64); },
   'partial-verification': (_, r) => { r.validationAssertions[0].status = 'UNKNOWN'; },
@@ -32,12 +36,14 @@ const challenges = {
   'budget-escalation': j => { j.stages.delegatedExecution.binding.maxSpendMicrousd++; },
   'unsettled-exposure': j => { j.stages.hybridDurableAccounting.projectExposureMicrousd = 1; },
   'publication-authority': j => { j.stages.delegatedExecution.binding.allowedEffects.push('publication'); },
+  'missing-delegation-controls': j => { delete j.stages.delegatedExecution.authorityControls; },
+  'repeated-delegation-admission': j => { j.stages.delegatedExecution.admissionRequests = 2; },
   'missing-cleanup': j => { j.repositoryCleanup = 'UNKNOWN'; },
   'wrong-mission': (_, r) => { r.workOrders[0].missionId = 'other'; },
 };
 for (const [name, mutate] of Object.entries(challenges)) {
   const j = structuredClone(journey), r = structuredClone(records); mutate(j, r);
-  assert.throws(() => validateHybrid(j, r), undefined, `Missing negative assertion: ${name}`);
+  assert.throws(() => validateHybrid(j, r, expectedSourceSha), undefined, `Missing negative assertion: ${name}`);
 }
-console.log(JSON.stringify({ ...result, offlineChallenges: Object.keys(challenges), nativeCandidateBytes: 'VERIFIED',
+console.log(JSON.stringify({ ...result, expectedSourceSha, offlineChallenges: Object.keys(challenges), nativeCandidateBytes: 'VERIFIED',
   authenticationScope: 'Canonical ingress verified signatures during execution; this offline validator cross-checks retained records and bundle bytes. A digest manifest is integrity evidence, not an independent signature.' }, null, 2));

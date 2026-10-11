@@ -6,8 +6,8 @@ import { enterpriseMissionOwner } from "./enterpriseMissionOwner";
 import { requireEnterpriseQualificationOwner } from "./enterpriseQualificationAccess";
 import { loadLocalRepositoryAdmission } from "./localRepositoryAdmission";
 
-export const LOCAL_DELEGATION_SOURCE = "e498c31db8b749fa91b0544ecd1d1a661b971c2c";
-export const LOCAL_DELEGATION_VERSION = "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95";
+import { qualifiedLocalDelegationIdentity, LOCAL_DELEGATION_SOURCE } from "./localDelegationQualification";
+export { LOCAL_DELEGATION_SOURCE, LOCAL_DELEGATION_VERSION } from "./localDelegationQualification";
 export const LOCAL_DELEGATION_REPOSITORY = "jaydubya818/MyFactory";
 export const LOCAL_DELEGATION_COMMIT = "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9";
 export const LOCAL_DELEGATION_TREE = "1084844b1454165358e51248afe8676f96daf17c";
@@ -36,7 +36,15 @@ async function inspectCanonicalDelegation(ctx: any, workOrder: any, versionId: a
   const policy = version?.policyEnvelopeId && await ctx.db.get(version.policyEnvelopeId);
   const mission = await ctx.db.get(workOrder.missionId), plan = await ctx.db.get(workOrder.missionPlanId);
   const ownerId = await enterpriseMissionOwner(ctx, mission);
-  if (admission.baselineCommit !== LOCAL_DELEGATION_COMMIT || admission.baselineTree !== LOCAL_DELEGATION_TREE
+  const identity = qualifiedLocalDelegationIdentity({ sourceDigest: version?.executionProfileSnapshot?.sourceDigest,
+    configuration: version?.executionProfileSnapshot?.configuration, repositoryId: repository._id,
+    admission, admissionDigest: digest, now: Date.now() });
+  if (ownerId !== admission.operatorId
+    || version?.executionProfileSnapshot?.sourceSha !== LOCAL_DELEGATION_SOURCE
+    || version?.executionProfileSnapshot?.factoryVersion !== identity.factoryVersion
+    || version?.executionProfileSnapshot?.qualificationDigest !== identity.qualificationDigest
+    || version?.executionProfileDigest !== `sha256:${identity.configurationDigest}`
+    || admission.baselineCommit !== LOCAL_DELEGATION_COMMIT || admission.baselineTree !== LOCAL_DELEGATION_TREE
     || !policy?.active || policy.projectId !== workOrder.projectId || policy.tenantId !== workOrder.tenantId
     || !version || version.projectId !== workOrder.projectId || version.tenantId !== workOrder.tenantId
     || version.repositoryId !== repository._id || definition.repositoryId !== repository._id
@@ -45,7 +53,7 @@ async function inspectCanonicalDelegation(ctx: any, workOrder: any, versionId: a
     || registration?.config.kind !== "MYFACTORY" || registration.config.definitionVersionId !== version._id
     || registration.config.executionProvider !== "LOCAL_DOCKER_QUALIFICATION"
     || registration.config.localProviderSourceSha !== LOCAL_DELEGATION_SOURCE
-    || registration.config.factoryVersion !== LOCAL_DELEGATION_VERSION
+    || registration.config.factoryVersion !== identity.factoryVersion
     || registration.health !== "HEALTHY" || registration.qualification !== "FIXTURE_QUALIFIED"
     || registration.revokedAt !== undefined || registration.validUntil <= Date.now()
     || mission.currentPlanId !== plan?._id || plan.revisionNumber !== workOrder.missionPlanRevision

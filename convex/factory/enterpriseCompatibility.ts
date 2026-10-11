@@ -1,6 +1,7 @@
 import { factoryVersionConfigurationDigest } from "../lib/factoryConfiguration";
 import { enterpriseMissionOwner } from "../lib/enterpriseMissionOwner";
-import { enterprisePlanApprovedByOwner, enterpriseDelegationApproval, DELEGATION_PREPARATION, LOCAL_DELEGATION_VERSION, LOCAL_DELEGATION_SOURCE } from "../lib/enterpriseDelegationAdmission";
+import { enterprisePlanApprovedByOwner, enterpriseDelegationApproval, DELEGATION_PREPARATION, LOCAL_DELEGATION_SOURCE } from "../lib/enterpriseDelegationAdmission";
+import { qualifiedLocalDelegationIdentity } from "../lib/localDelegationQualification";
 import { loadLocalRepositoryAdmission } from "../lib/localRepositoryAdmission";
 import { internal } from "../_generated/api";
 import { ingestEnterpriseQualityGate } from "../lib/enterpriseQualityGate";
@@ -68,17 +69,20 @@ export const registerLocalVersion = mutation({
     const repository = await ctx.db.get(factory.repositoryId);
     const local = await loadLocalRepositoryAdmission(ctx, repository, Date.now());
     const workflow = await ctx.db.get(args.workflowId), policy = await ctx.db.get(args.policyEnvelopeId);
-    const c = args.configuration, profileDigest = canonicalHash(c);
+    const c = args.configuration;
+    const identity = qualifiedLocalDelegationIdentity({ sourceDigest: args.sourceDigest, configuration: c,
+      repositoryId: repository!._id, admission: local.admission, admissionDigest: local.digest, now: Date.now() });
+    const profileDigest = identity.configurationDigest;
     if (auth.actorId !== local.admission.operatorId || !workflow?.active || workflow.projectId !== args.projectId
       || !policy?.active || policy.projectId !== args.projectId || policy.tenantId !== factory.tenantId
       || c?.local?.modelProvider !== "none" || c.local.evidenceClass !== "DETERMINISTIC"
-      || c.local.provider !== "local-docker" || c.executor !== "deterministic-qualification"
-      || canonicalHash({ sourceDigest: args.sourceDigest, configurationDigest: profileDigest }) !== LOCAL_DELEGATION_VERSION) throw denied();
+      || c.local.provider !== "local-docker" || c.executor !== "deterministic-qualification") throw denied();
     const body = { tenantId: factory.tenantId, projectId: args.projectId, factoryDefinitionId: factory._id, version: 1,
       repositoryId: factory.repositoryId, repositoryMode: "LOCAL_SYNTHETIC_QUALIFICATION" as const,
       repositoryAdmissionDigest: local.digest, purpose: "SOFTWARE" as const, workflowId: workflow._id,
       executor: { adapter: "myfactory-local-delegation", version: "1" }, executionProfileDigest: `sha256:${profileDigest}`,
-      executionProfileSnapshot: { sourceSha: LOCAL_DELEGATION_SOURCE, sourceDigest: args.sourceDigest, factoryVersion: LOCAL_DELEGATION_VERSION, configuration: c },
+      executionProfileSnapshot: { sourceSha: LOCAL_DELEGATION_SOURCE, sourceDigest: args.sourceDigest, factoryVersion: identity.factoryVersion, configuration: c,
+        ...(identity.qualificationDigest ? { qualificationDigest: identity.qualificationDigest } : {}) },
       policyEnvelopeId: policy._id, environmentId: local.environment!._id,
       codeScopeIds: [], agentBindings: [], budget: { maxCostUsd: 0.00008, maxRuntimeMinutes: 3, maxAttempts: 1 }, verifierIds: [], riskBoundary: "GREEN" as const,
       recovery: { pause: false, cancel: true, retry: false, resume: false } };
