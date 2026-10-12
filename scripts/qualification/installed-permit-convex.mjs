@@ -83,8 +83,14 @@ try{
  assert.equal(resultRead.document.work.id,work.id);
  await assert.rejects(()=>db.other.mutation('sofieFactoryResultState:read',{permitId:document.permitId}));
  const observation={permitId:document.permitId,missionId:s.missionId,workOrderId:s.workOrderId,work,observedAt:Date.now(),expiresAt:Date.now()+30000,status:'PENDING',result:null,enterpriseQualityGate:'NOT_ESTABLISHED',executionAuthority:'NONE',accountingAuthority:'MYEVE_FACTORY'};
- const retainedArgs={permitId:document.permitId,permitSha256:permitDigest(document),pinsDigest:resultRead.pinsDigest,serviceKeyDigest:resultRead.serviceKeyDigest,observation};
+ const retainedArgs={permitId:document.permitId,permitSha256:permitDigest(document),enrollmentDigest:resultRead.enrollmentDigest,pinsDigest:resultRead.pinsDigest,serviceKeyDigest:resultRead.serviceKeyDigest,observation};
  await db.owner.mutation('sofieFactoryResultState:retain',retainedArgs);
+ // An enrollment change after the network read fences both retention and cached evidence.
+ await db.owner.mutation('installedPermitFixture:patch',{id:s.connectionId,patch:{installedEnrollment:{...s.enrollment,revision:s.enrollment.revision+1}}});
+ await assert.rejects(()=>db.owner.mutation('sofieFactoryResultState:retain',retainedArgs));
+ assert.equal((await db.owner.query('sofieExecutionPermitState:inspect',{projectId:s.projectId,connectionId:s.connectionId})).permits[0].factoryResult.status,'STALE');
+ await db.owner.mutation('installedPermitFixture:patch',{id:s.connectionId,patch:{installedEnrollment:s.enrollment}});
+ report.checks.push('enrollment revision change fences in-flight Result and cached currentness');
  // A real revision change, not an expired service response, must reject an in-flight observation.
  const previousPlan=(await db.owner.query('installedPermitFixture:rows',{table:'missionPlans'})).find(p=>p._id===s.missionPlanId);
  await db.owner.mutation('installedPermitFixture:patch',{id:s.missionPlanId,patch:{summary:'changed after read'}});
