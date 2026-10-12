@@ -59,7 +59,7 @@ export function InstalledPermitPanel({state,busy,error,notice,onRefresh,onApprov
    <p>Work {p.work.id}: {p.status==='REVOKED'?(p.authority==='FENCED'?'Receiving authority fenced':'Revocation requested'):p.status==='NEW_ADMISSIONS_DENIED'?'New admissions denied; existing Work preserved':p.status==='EXPIRED'?'Approval expired':'Owner approved'}</p>
    {p.status==='REVOKED'&&<p>Backend cleanup: {p.cleanup === 'CONFIRMED' ? 'confirmed' : 'pending confirmation'}.</p>}
    {p.factoryResult&&<div aria-label="Factory Result and MyEve reports">
-    <p>{p.factoryResult.expiresAt<=now?'Factory evidence expired. Refresh before review.':`Factory evidence: ${p.factoryResult.status}`}</p>
+    <p>{p.factoryResult.expiresAt<=now?'Factory evidence expired. Refresh before review.':p.factoryResult.status==='RESULT_VERIFIED_SETTLEMENT_REPORTED'?'Factory Result signature verified. Settlement reported by MyEve.':p.factoryResult.status==='RESULT_VERIFIED_PENDING_REPORTED'?'Factory Result signature verified. Settlement pending according to MyEve.':`Factory evidence: ${p.factoryResult.status}`}</p>
     {p.factoryResult.expiresAt>now&&p.factoryResult.result&&<>
      <p>Candidate: {p.factoryResult.result.candidate}</p>
      <p>Independent verdict: {p.factoryResult.result.independentVerdict}. Proof outcome: {p.factoryResult.result.proofOutcome}.</p>

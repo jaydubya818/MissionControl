@@ -1,6 +1,7 @@
 'use node';
 import {createPublicKey} from 'node:crypto';
-import {canonicalPermitJson,permitDigest,type ExecutionPermit} from '../../packages/shared/src/executionPermit';
+import {verifyPermitSignature} from './executionPermitCrypto';
+import {canonicalPermitJson,permitDigest,type ExecutionPermit,type AdmissionReceipt,type OwnerEnrollment} from '../../packages/shared/src/executionPermit';
 import {digest,verifyResult,type ResultKey,MAX_RESULT_BYTES} from '../../packages/shared/src/factoryResult/factory-producer-protocol';
 import {workSpendV2Schema,validateSpendBinding} from '../../packages/shared/src/factoryResult/factory-spend';
 
@@ -8,6 +9,8 @@ export interface OwnerFactoryResultPins {
  schema:'mc-owner-factory-result-pins/v1';factoryId:string;sourceDigest:string;configurationDigest:string;
  profileHash:string;verifierPolicySha256:string;resultKeys:ResultKey[];checkCommands:string[];allowedFiles:string[];
 }
+export interface OwnerAdmissionEvidence {document:AdmissionReceipt;enrollment:OwnerEnrollment}
+
 const deny=():never=>{throw Error('INSTALLED_OWNER_FACTORY_RESULT_UNVERIFIED');};
 const object=(v:any):Record<string,any>=>v&&typeof v==='object'&&!Array.isArray(v)?v:deny();
 const exact=(v:any,fields:string[])=>{if(Object.keys(object(v)).sort().join(',')!==fields.sort().join(','))deny();};
@@ -32,14 +35,14 @@ export function parseOwnerFactoryResultPins(value:unknown):OwnerFactoryResultPin
 
 /** Authenticated MyEve custody plus the original producer signature. No execution,
  * enterprise quality gate, owner acceptance or accounting settlement is granted here. */
-export function verifyOwnerFactoryResult(document:Record<string,any>,permit:ExecutionPermit,pins:OwnerFactoryResultPins,now=Date.now()) {
+export function verifyOwnerFactoryResult(document:Record<string,any>,permit:ExecutionPermit,pins:OwnerFactoryResultPins,now=Date.now(),admissionEvidence?:OwnerAdmissionEvidence) {
  if(Buffer.byteLength(JSON.stringify(document))>MAX_RESULT_BYTES+512000
   ||digest({sourceDigest:pins.sourceDigest,configurationDigest:pins.configurationDigest})!==permit.admission.factoryVersion)deny();
  const base={permitId:permit.permitId,missionId:permit.missionId,workOrderId:permit.workOrderId,work:permit.work,
   observedAt:document.observedAt,expiresAt:document.expiresAt,enterpriseQualityGate:'NOT_ESTABLISHED',executionAuthority:'NONE',accountingAuthority:'MYEVE_FACTORY'} as const;
  if(document.result===null){if(document.status==='SETTLED')deny();return {...base,status:document.status,result:null};}
  const a=object(document.admission),r=object(document.result);
- exact(a,['schema','binding','originalFactoryReadback','dispatchState','quiescence','fencedAt']);
+ exact(a,['schema','binding','admissionReceipt','originalFactoryReadback','dispatchState','quiescence','fencedAt']);
  exact(r,['signedResult','resultId','manifestDigest','nativeResultId','proof','proofHash','cleanupConfirmed','settlementState','exposureUnknown','accounting','acceptance']);
  const b=object(a.binding),origin=object(b.origin),material=object(origin.tupleMaterial),q=object(b.factoryBinding);
  if(a.schema!=='mc-owner-factory-admission/v1'||b.schema!==a.schema||b.permitId!==permit.permitId||b.permitSha256!==permitDigest(permit)
@@ -52,6 +55,14 @@ export function verifyOwnerFactoryResult(document:Record<string,any>,permit:Exec
   ||origin.expectedWorkOrderRevisionId!==permit.workOrderRevisionId||origin.expectedPlanDigest!==permit.planDigest
   ||material.pins.factoryId!==pins.factoryId||material.pins.sourceDigest!==pins.sourceDigest||material.pins.configurationDigest!==pins.configurationDigest
   ||material.pins.profileHash!==pins.profileHash||digest(origin.pins)!==digest(material.pins))deny();
+ const admitted=admissionEvidence??deny();
+ if(canonicalPermitJson(a.admissionReceipt?.document)!==canonicalPermitJson(admitted.document)
+  ||admitted.document.commandId!==b.commandId||admitted.document.permitSha256!==permitDigest(permit)
+  ||admitted.document.permitId!==permit.permitId||admitted.document.connectionId!==permit.connectionId
+  ||admitted.document.issuedAt>now||admitted.document.expiresAt<=admitted.document.issuedAt
+  ||admitted.document.expiresAt-admitted.document.issuedAt>10000
+  ||digest(a.admissionReceipt)!==b.receiptSha256)deny();
+ verifyPermitSignature(a.admissionReceipt,admitted.enrollment);
  for(const key of ['commandId','factoryRequestId','routeDecisionId','routeRunId','dispatchIdentity'])text(b[key]);hash(b.receiptSha256);
  if(!Number.isSafeInteger(b.writerGeneration)||b.writerGeneration<1||q.workId!==permit.work.id||q.workVersion!==permit.work.version
   ||q.workGeneration!==permit.work.generation||q.factoryId!==pins.factoryId||q.factoryVersion!==permit.admission.factoryVersion
@@ -92,7 +103,8 @@ export function verifyOwnerFactoryResult(document:Record<string,any>,permit:Exec
   &&spend.status==='KNOWN'&&spend.accountingComplete&&spend.retainedMicrousd===0;
  if(document.status==='SETTLED'&&!settled)deny();
  const key=pins.resultKeys.find(k=>k.factoryId===pins.factoryId&&k.keyId===manifest.keyId)!;
- return {...base,expiresAt:Math.min(document.expiresAt,observed+30000,Date.parse(key.notAfter)),status:settled?'VERIFIED_SETTLED':'VERIFIED_PENDING',
+ return {...base,expiresAt:Math.min(document.expiresAt,observed+30000,Date.parse(key.notAfter)),admissionBinding:{commandId:b.commandId,documentSha256:digest(admitted.document)},
+  status:settled?'RESULT_VERIFIED_SETTLEMENT_REPORTED':'RESULT_VERIFIED_PENDING_REPORTED',
   result:{resultId:r.resultId,nativeResultId:r.nativeResultId,manifestDigest:r.manifestDigest,proofHash:r.proofHash,candidate:c.commit,
    independentVerdict:manifest.status==='COMPLETED'&&v?.outcome==='PASS'&&proof.evidence.every((item:any)=>item.state==='PASS')?'PASS':'NOT_ESTABLISHED',
    proofOutcome:proof.outcome,accounting,exposureUnknown,cleanupConfirmed,ownerAcceptance:'SEPARATE_DECISION_REQUIRED'}};

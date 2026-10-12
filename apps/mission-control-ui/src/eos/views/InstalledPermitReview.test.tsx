@@ -5,8 +5,10 @@ const props=()=>({state:null as PermitReviewState|null,busy:false,error:'',notic
 const request:any={requestId:'request',missionId:'mission',workOrderId:'wo',work:{id:'work',version:1,generation:2},admission:{maxCostMicrousd:1300000,maxDurationSeconds:180}};
 describe('installed permit owner review',()=>{
  it.each([true,false])('attributes current terminal observations to MyEve (UNKNOWN=%s)',unknown=>{
-  render(<InstalledPermitPanel {...props()} state={{requests:[],permits:[{permitId:'permit' as any,missionId:'mission',workOrderId:'wo',work:request.work,status:'OWNER_APPROVED',cleanup:'PENDING_BACKEND',factoryResult:{status:unknown?'VERIFIED_PENDING':'VERIFIED_SETTLED',expiresAt:Date.now()+30000,result:{candidate:'candidate',independentVerdict:'NOT_ESTABLISHED',proofOutcome:'PARTIAL',exposureUnknown:unknown,cleanupConfirmed:!unknown,accounting:{unknownMicrousd:unknown?100:0}}}}],truncated:false}}/>);
+  render(<InstalledPermitPanel {...props()} state={{requests:[],permits:[{permitId:'permit' as any,missionId:'mission',workOrderId:'wo',work:request.work,status:'OWNER_APPROVED',cleanup:'PENDING_BACKEND',factoryResult:{status:unknown?'RESULT_VERIFIED_PENDING_REPORTED':'RESULT_VERIFIED_SETTLEMENT_REPORTED',expiresAt:Date.now()+30000,result:{candidate:'candidate',independentVerdict:'NOT_ESTABLISHED',proofOutcome:'PARTIAL',exposureUnknown:unknown,cleanupConfirmed:!unknown,accounting:{unknownMicrousd:unknown?100:0}}}}],truncated:false}}/>);
   expect(screen.getByLabelText('Factory Result and MyEve reports')).toBeTruthy();
+  expect(screen.getByText(unknown?'Factory Result signature verified. Settlement pending according to MyEve.':'Factory Result signature verified. Settlement reported by MyEve.')).toBeTruthy();
+  expect(screen.queryByText(/VERIFIED_SETTLED/)).toBeNull();
   expect(screen.getByText(`Accounting exposure reported by MyEve: ${unknown?'UNKNOWN — reservation retained':'known'}. Cleanup reported by MyEve: ${unknown?'pending backend':'confirmed'}.`)).toBeTruthy();
   expect(screen.getByText(/Enterprise acceptance is not established/)).toBeTruthy();
  });

@@ -21,7 +21,15 @@ export const refresh=action({args:{permitId:v.id('enterpriseExecutionPermits')},
  try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>MAX_RESULT_BYTES+512000)return permitDenied();chunks.push(value);}}finally{await reader.cancel();}
  const packet=JSON.parse(Buffer.concat(chunks).toString('utf8'));
  const document=verifyResultReadbackPacket(packet,request,permit,secret);
- const observation=verifyInstalledFactoryResult(document,permit,pins);
+ let admissionEvidence;
+ if('schema' in pins&&document.result!==null){
+  const commandId=document.admission?.binding?.commandId;
+  if(typeof commandId!=='string'||!commandId.length||commandId.length>200)return permitDenied();
+  const admitted=await ctx.runMutation(makeFunctionReference<'mutation'>('sofieFactoryResultState:read'),{permitId:args.permitId,admissionCommandId:commandId});
+  if(admitted.enrollmentDigest!==state.enrollmentDigest||admitted.pinsDigest!==state.pinsDigest||admitted.serviceKeyDigest!==state.serviceKeyDigest||permitDigest(admitted.document)!==permitDigest(permit))return permitDenied();
+  admissionEvidence={document:admitted.admissionDocument,enrollment:admitted.enrollment};
+ }
+ const observation=verifyInstalledFactoryResult(document,permit,pins,Date.now(),admissionEvidence);
  // Reauthenticate the owner and exact current Plan/revision/pins after network I/O.
- return ctx.runMutation(makeFunctionReference<'mutation'>('sofieFactoryResultState:retain'),{permitId:args.permitId,permitSha256:permitDigest(permit),pinsDigest:state.pinsDigest,serviceKeyDigest:state.serviceKeyDigest,observation});
+ return ctx.runMutation(makeFunctionReference<'mutation'>('sofieFactoryResultState:retain'),{permitId:args.permitId,enrollmentDigest:state.enrollmentDigest,permitSha256:permitDigest(permit),pinsDigest:state.pinsDigest,serviceKeyDigest:state.serviceKeyDigest,observation});
 }});
