@@ -11,7 +11,7 @@ Base af521c92c05a1c79d1aff11510efea8dcf23e350. Exclusive checkout codex/unified-
 - [x] Implement boundary validators and crypto parity tests.
 - [x] Implement authenticated current owner permit approval, stale/revoked denial and duplicate-safe admission receipt.
 - [x] Integrate explicit installed readiness while retaining isolated deterministic mode.
-- [ ] Bind existing independently verified Result/Proof to permit Work; no asserted PASS projection.
+- [x] Bind existing independently verified Result/Proof to permit Work; no asserted PASS projection.
 - [x] Verify on matching surface. Unit, local Convex, browser. Installed endpoints remain NOT_RUN without actual records.
 - [ ] Commit meaningful validated units, verify nondeploying publication controls before push.
 - [ ] Independent review; handoff exact source and limitations.
@@ -25,3 +25,13 @@ Full Convex unit suite: 185 files / 1719 tests passed. Owner UI regressions: 2 f
 Independent review found and corrected four permit-slice issues: lifecycle access after connection expiry/revocation (including parent owner view), explicit revoke after plan disable-new, stale ACK returned on control upgrade, and new admission for DONE native records. Final committed-source review remains required.
 
 The original coordinator 89e60d2 findings belong to the qualification owner; this source does not claim to correct or qualify that package. Actual installation identities, custody FactoryVersions, installed authentication and composed cross-system execution remain NOT_RUN. No real enrollment, secret, runtime grant or spending limit is created.
+
+## Independent Factory Result readback
+
+The owner action `sofieFactoryResults:refresh` reads the exact enrolled MyEve origin through the dedicated 30-second HMAC request contract. It independently verifies the original Factory receipt and current readback signatures, exact authority and admitted request/run, original Result signature, artifact bytes, source/configuration/FactoryVersion, verifier policy and immutable per-criterion Proof. The canonical Work ledger V2 parser and invariants are reused without changes. `packages/shared/src/factoryResult/PROVENANCE.json` records verified upstream commit and original/local file digests plus the import/ES2021 compatibility transformations. Zod4.3.6 is explicitly declared using the existing lockfile version.
+
+`MC_SOFIE_FACTORY_RESULT_PINS` is an operator-installed object keyed by exact connectionId, containing factoryId,sourceDigest,configurationDigest,verifierPolicySha256,resultKeys,receiptKeys,checkCommands,allowedFiles. No fallback pins exist. Actual installed pins remain unavailable and no values were installed.
+
+The post-network transaction rechecks authenticated owner, current Mission Plan/WorkOrder revision, retained positive admission, permit digest, Result pins and service-key identity. The existing permit record stores an observation cache only. Every read revalidates cache currentness; stale keys/Plan/revision suppress current verdict and cleanup claims. No execution, accounting settlement, native Quality Gate or owner-acceptance records are created. Contradictory cleanup/exposure evidence is conservatively pending. UNKNOWN exposure and original PARTIAL Proof remain intact.
+
+Qualification:27 signed Result/Proof/ledger tamper tests;2 owner action/transport tests;full backend suite passed before the2 added action tests (1719+27), and the2 new tests passed separately.18 affected UI tests passed.14 disposable Convex checks passed, including service-key rotation, Plan and pin changes across network I/O and stale cache suppression. Actual Chromium/axe checks cover evidence expiry and UNKNOWN states; authenticated installed Golden Journey remains NOT_RUN. Final exact-source review and hosted CI are required.

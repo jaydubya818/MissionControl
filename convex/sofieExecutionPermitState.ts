@@ -1,3 +1,4 @@
+import {currentFactoryObservation} from './sofieFactoryResultState';
 import { revokePermit, permitControlDocument, permitControlDigest } from './lib/permitLifecycle';
 import { capabilityBindings, capabilityPolicyScope } from './capabilityPolicy';
 import { admissionActionDigest, type AdmissionChallenge as PolicyAdmissionChallenge } from './lib/capabilityOrderingWire';
@@ -72,9 +73,10 @@ export const inspect = query({args:{projectId:v.id('projects'),connectionId:v.id
   // No writes; the common helper reads only for an authenticated owner.
   const live=await permitLifecycleOwner(ctx as any,args.connectionId); if(live.project._id!==args.projectId) return permitDenied();
   const rows=await ctx.db.query('enterpriseExecutionPermits').withIndex('by_connection_intent',q=>q.eq('connectionId',args.connectionId)).take(101);
-  return {mode:'INSTALLED_NONPRODUCTION',installationId:live.enrollment.installationId,truncated:rows.length>100,permits:rows.slice(0,100).map(row=>({
+  return {mode:'INSTALLED_NONPRODUCTION',installationId:live.enrollment.installationId,truncated:rows.length>100,permits:await Promise.all(rows.slice(0,100).map(async row=>({
     permitId:row._id,missionId:row.missionId,workOrderId:row.workOrderId,work:parseExecutionPermit(row.document).work,
-    operation:row.control?.operation??null,status:row.revokedAt!==undefined?(row.control?.operation==='disable_new'?'NEW_ADMISSIONS_DENIED':'REVOKED'):parseExecutionPermit(row.document).expiresAt<=Date.now()?'EXPIRED':'OWNER_APPROVED',authority:row.control?.acknowledgment?.authority??'PENDING_BACKEND',cleanup:row.control?.acknowledgment?.cleanup??'PENDING_BACKEND'}))};
+    factoryResult:await currentFactoryObservation(ctx as any,row),
+    operation:row.control?.operation??null,status:row.revokedAt!==undefined?(row.control?.operation==='disable_new'?'NEW_ADMISSIONS_DENIED':'REVOKED'):parseExecutionPermit(row.document).expiresAt<=Date.now()?'EXPIRED':'OWNER_APPROVED',authority:row.control?.acknowledgment?.authority??'PENDING_BACKEND',cleanup:row.control?.acknowledgment?.cleanup??'PENDING_BACKEND'})))};
 }});
 // Internal-only service transaction authenticates its entire input before reading or writing permit state.
 export const authorizeAdmission = internalMutation({args:{envelope:commandEnvelope,payloadJson:v.string()},handler:async(ctx,args)=>{

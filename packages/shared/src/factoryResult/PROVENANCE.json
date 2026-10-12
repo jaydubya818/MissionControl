@@ -1,0 +1,25 @@
+{
+  "upstreamRepository": "jaydubya818/MyEveBot",
+  "sourceCommit": "f0019920e3a7a97a8c715807338275ede470b9a8",
+  "transformation": "Only remove .ts import suffix for MissionControl TypeScript build. No protocol behavior changes. Spend contract digest import points to identical canonical digest implementation. Object.hasOwn uses equivalent Object.prototype.hasOwnProperty.call for ES2021 type library.",
+  "files": [
+    {
+      "path": "apps/eve/lib/engineering/factory-producer-protocol.ts",
+      "sourceSha256": "d090d45fed214b949a0a4e8a4ffc369b97b70c3cb0b68febe18af96f9c9e634d",
+      "localPath": "packages/shared/src/factoryResult/factory-producer-protocol.ts",
+      "localSha256": "d835b8200409850768c685c177b1b460709a9f4ea7ff4b8c4d696f48a5fb67ec"
+    },
+    {
+      "path": "apps/eve/lib/engineering/factory-producer-signature.ts",
+      "sourceSha256": "6a2e40d3e5b3ee04e675e15a6f89d0c11412569f9a8fc5f27615583e8d9b90cb",
+      "localPath": "packages/shared/src/factoryResult/factory-producer-signature.ts",
+      "localSha256": "6a2e40d3e5b3ee04e675e15a6f89d0c11412569f9a8fc5f27615583e8d9b90cb"
+    },
+    {
+      "path": "apps/eve/lib/engineering/factory-spend.ts",
+      "sourceSha256": "20e734460e29a950108639120e80e98ada568c8200919dd81c7eb7b411e10538",
+      "localPath": "packages/shared/src/factoryResult/factory-spend.ts",
+      "localSha256": "19e4a2fe595e00b610d1ae597ecde8d564ffce9710f160bed930f3a104f40d56"
+    }
+  ]
+}

@@ -2056,13 +2056,14 @@ export const schemaTablesPartOne = {
     tenantId:v.id("tenants"), projectId:v.id("projects"), ownerId:v.id("operators"), missionId:v.id("missions"),
     workOrderId:v.id("workOrders"), approvalId:v.id("approvalDecisions"), intentKey:v.string(), requestDigest:v.string(),
     control:v.optional(v.object({sequence:v.number(),operation:v.union(v.literal("revoke"),v.literal("disable_new")),reason:v.string(),requestedAt:v.number(),acknowledgment:v.optional(v.object({controlDigest:v.string(),authority:v.union(v.literal("FENCED"),v.literal("NEW_ADMISSIONS_DENIED")),cleanup:v.union(v.literal("PENDING_BACKEND"),v.literal("CONFIRMED")),acknowledgedAt:v.number()}))})),
+    factoryResultObservation:v.optional(v.any()),
     binding:v.string(), workKey:v.string(), document:v.any(), permitSha256:v.string(), createdAt:v.number(), revokedAt:v.optional(v.number()),
   }).index("by_connection_intent",["connectionId","intentKey"]).index("by_binding",["binding"]).index("by_connection_work",["connectionId","workKey"]).index("by_mission",["missionId"]),
   enterprisePermitAdmissionReceipts: defineTable({
     kind:v.union(v.literal("CHALLENGE"),v.literal("ADMISSION")),
     connectionId:v.id("enterpriseAppConnections"), permitId:v.id("enterpriseExecutionPermits"), commandId:v.string(),
     payloadDigest:v.string(), document:v.any(), createdAt:v.number(),
-  }).index("by_connection_command",["connectionId","commandId"]),
+  }).index("by_connection_command",["connectionId","commandId"]).index("by_permit_kind",["permitId","kind"]),
   enterpriseAppConnections: defineTable({
     installedEnrollment:v.optional(v.any()),
     resultScope: v.optional(v.object({ missionId:v.id("missions"), planId:v.id("missionPlans"), planRevision:v.number(), planDigest:v.string() })),

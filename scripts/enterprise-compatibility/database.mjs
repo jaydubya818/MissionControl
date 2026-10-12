@@ -83,6 +83,9 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
     }
     if (installedPermits) {
       await copyClosure("convex/sofieExecutionPermits.ts");
+      await copyClosure("convex/sofieFactoryResults.ts");
+      await copyFile(join(repo,"packages/shared/package.json"),join(root,"packages/shared/package.json"));
+      await symlink(join(repo,"packages/shared/node_modules"),join(root,"packages/shared/node_modules"));
       await copyClosure("convex/sofieExecutionPermitState.ts");
       await copyFile(join(repo,"scripts/qualification/installed-permit-fixture.js"),join(root,"convex/installedPermitFixture.js"));
     }
@@ -118,7 +121,7 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
         c.setAdminAuth(key, { subject, issuer: "https://fixture.example.test", email: `${subject}@example.test` });
         return c;
       }, setEnvironment(name, value) {
-        const installedFields=installedPermits?["MC_SOFIE_INSTALLED_ORIGINS","MC_SOFIE_CONNECTION_SECRETS","MC_SOFIE_PERMIT_SIGNING_KEYS","MC_CAPABILITY_ENVIRONMENT","MC_CAPABILITY_INSTALLATION_ID","MC_CAPABILITY_BINDINGS_JSON","MC_CAPABILITY_RECEIVER_RECOVERY_STATE","MC_CAPABILITY_RECEIVER_EPOCH"]:[];
+        const installedFields=installedPermits?["MC_SOFIE_FACTORY_RESULT_PINS","MC_SOFIE_INSTALLED_ORIGINS","MC_SOFIE_CONNECTION_SECRETS","MC_SOFIE_PERMIT_SIGNING_KEYS","MC_CAPABILITY_ENVIRONMENT","MC_CAPABILITY_INSTALLATION_ID","MC_CAPABILITY_BINDINGS_JSON","MC_CAPABILITY_RECEIVER_RECOVERY_STATE","MC_CAPABILITY_RECEIVER_EPOCH"]:[];
         if (![...installedFields,"MC_LOCAL_DELEGATION_QUALIFICATION", "MC_LOCAL_REPOSITORY_ADMISSION", "MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID", "MISSION_CONTROL_SERVICE_ID", "MISSION_CONTROL_SERVICE_COMMAND_SECRET", "MC_SOFIE_READINESS_ENVIRONMENT_ID", "MC_SOFIE_APPLICATION_SECRET", "MC_SOFIE_APPLICATION_KEY_ID", "MC_SOFIE_APPLICATION_OWNER_ID"].includes(name)) throw Error("Unapproved native fixture environment field");
         runFixtureCommand("SET_ENVIRONMENT", process.execPath, [cli, "env", "set", name, value, "--url", url, "--admin-key", key],
           { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" });

@@ -5,22 +5,24 @@ import {generateKeyPairSync,createHash,createHmac,randomUUID,randomBytes,verify}
 import {startFixtureDatabase} from '../enterprise-compatibility/database.mjs';
 import {canonicalServiceCommand} from '../../packages/shared/src/serviceCommandEnvelope.ts';
 import {signPolicyMessage,policyMessageHash,admissionActionDigest} from '../../convex/lib/capabilityOrderingWire.ts';
+import {factoryReadbackFixture} from '../../convex/__tests__/installedFactoryReadbackFixture.ts';
 import {canonicalPermitJson,permitDigest} from '../../packages/shared/src/executionPermit.ts';
 const root=resolve('.'),report={scope:'DISPOSABLE_CONVEX_SYNTHETIC_AUTH',status:'RUNNING',checks:[],paidOperations:0,installedAuthentication:'NOT_RUN'};
 const db=await startFixtureDatabase(root,{installedPermits:true});
 try{
+ const resultFixture=factoryReadbackFixture(),factoryVersion=resultFixture.permit.admission.factoryVersion;
  const now=Date.now(),sha='a'.repeat(64),{privateKey,publicKey}=generateKeyPairSync('ed25519');
  const keyId=createHash('sha256').update(publicKey.export({type:'spki',format:'der'})).digest('hex');
  const enrollment={schema:'mc-owner-enrollment/v1',environment:'APPROVED_NONPRODUCTION',installationId:'fixture-installation',revision:1,ownerId:'fixture-owner',ownerSubject:'fixture-owner',missionControlOwnerId:'placeholder',tenantId:'placeholder',projectId:'placeholder',connectionId:'placeholder',
  issuer:'https://mc.example.test',audience:'https://eve.example.test',clerkIssuer:'https://fixture.example.test',clerkAudience:'convex',clerkAuthorizedParty:'https://mc.example.test',activeFrom:now-1000,expiresAt:now+300000,revokedAt:null,
- factoryVersion:sha,executionContractSha256:sha,capabilityPolicySha256:sha,maxCostMicrousd:1300000,maxDurationSeconds:180,
+ factoryVersion,executionContractSha256:sha,capabilityPolicySha256:sha,maxCostMicrousd:1300000,maxDurationSeconds:180,
  permitKeys:[{keyId,publicKey:publicKey.export({type:'spki',format:'pem'}).toString(),activeFrom:now-1000,notAfter:now+600000,revokedAt:null}]};
  const s=await db.owner.mutation('installedPermitFixture:setup',{seed:db.seed,enrollment});
  const secret=randomBytes(32).toString('hex');
  db.setEnvironment('MC_SOFIE_INSTALLED_ORIGINS',JSON.stringify({environment:'APPROVED_NONPRODUCTION',issuer:enrollment.issuer,audience:enrollment.audience}));
  db.setEnvironment('MC_SOFIE_CONNECTION_SECRETS',JSON.stringify({[s.connectionId]:{keyId:'fixture-service',secret}}));
  db.setEnvironment('MC_SOFIE_PERMIT_SIGNING_KEYS',JSON.stringify({[keyId]:privateKey.export({type:'pkcs8',format:'pem'}).toString()}));
- const work={id:'fixture-work',version:1,generation:1,tupleSha256:sha},admission={factoryVersion:sha,executionContractSha256:sha,capabilityPolicySha256:sha,maxCostMicrousd:1300000,maxDurationSeconds:180};
+ const work={id:'fixture-work',version:1,generation:1,tupleSha256:sha},admission={factoryVersion,executionContractSha256:sha,capabilityPolicySha256:sha,maxCostMicrousd:1300000,maxDurationSeconds:180};
  const args={projectId:s.projectId,connectionId:s.connectionId,proposalId:s.proposalId,workOrderId:s.workOrderId,expectedPlanDigest:s.planDigest,expectedWorkOrderRevisionId:s.workOrderRevisionId,work,admission,idempotencyKey:'fixture-permit'};
  const sign=(capability,input,commandId=randomUUID())=>{const payloadJson=JSON.stringify(input),at=Date.now();const envelope={serviceId:'myeve-sofie-readiness-v1',capability,projectId:s.projectId,repositoryId:`connection:${s.connectionId}`,commandId,issuedAt:at,expiresAt:at+60000,payloadDigest:'sha256='+createHash('sha256').update(payloadJson).digest('hex')};return{payloadJson,envelope:{...envelope,signature:'sha256='+createHmac('sha256',secret).update(canonicalServiceCommand(envelope)).digest('hex')}};};
  const prepared=await db.anonymous.action('sofieExecutionPermits:preparePermit',sign('enterprise.preparePermit',{schema:'mc-permit-request/v1',...args}));
@@ -61,6 +63,32 @@ try{
  assert.equal(receipts[0].document.policyPairSha256,createHash('sha256').update(canonicalPermitJson(capabilityPermits)).digest('hex'));
  assert.ok(receipts[0].document.expiresAt-receipts[0].document.issuedAt<=10000);
  assert.equal((await db.owner.query('installedPermitFixture:rows',{table:'capabilityAdmissionReferences'})).length,2);
+ db.setEnvironment('MC_SOFIE_FACTORY_RESULT_PINS',JSON.stringify({[s.connectionId]:resultFixture.pins}));
+ const resultRead=await db.owner.mutation('sofieFactoryResultState:read',{permitId:document.permitId});
+ assert.equal(resultRead.document.work.id,work.id);
+ await assert.rejects(()=>db.other.mutation('sofieFactoryResultState:read',{permitId:document.permitId}));
+ const observation={permitId:document.permitId,missionId:s.missionId,workOrderId:s.workOrderId,work,observedAt:Date.now(),expiresAt:Date.now()+30000,status:'PENDING',result:null,enterpriseQualityGate:'NOT_ESTABLISHED',executionAuthority:'NONE',accountingAuthority:'MYEVE_FACTORY'};
+ const retainedArgs={permitId:document.permitId,permitSha256:permitDigest(document),pinsDigest:resultRead.pinsDigest,serviceKeyDigest:resultRead.serviceKeyDigest,observation};
+ await db.owner.mutation('sofieFactoryResultState:retain',retainedArgs);
+ // A real revision change, not an expired service response, must reject an in-flight observation.
+ const previousPlan=(await db.owner.query('installedPermitFixture:rows',{table:'missionPlans'})).find(p=>p._id===s.missionPlanId);
+ await db.owner.mutation('installedPermitFixture:patch',{id:s.missionPlanId,patch:{summary:'changed after read'}});
+ await assert.rejects(()=>db.owner.mutation('sofieFactoryResultState:retain',retainedArgs));
+ assert.equal((await db.owner.query('sofieExecutionPermitState:inspect',{projectId:s.projectId,connectionId:s.connectionId})).permits[0].factoryResult.status,'STALE');
+ await db.owner.mutation('installedPermitFixture:patch',{id:s.missionPlanId,patch:previousPlan.summary===undefined?{}:{summary:previousPlan.summary},unset:previousPlan.summary===undefined?['summary']:[]});
+ // Restore exact pre-read plan; fixture seed does not define summary.
+ const restoredPlan=(await db.owner.query('installedPermitFixture:rows',{table:'missionPlans'})).find(p=>p._id===s.missionPlanId);
+ assert.equal(resultRead.document.planDigest,(await import('../../packages/shared/src/sofieEnterprise.ts')).enterpriseDigest(restoredPlan));
+ const changedPins={...resultFixture.pins,verifierPolicySha256:'e'.repeat(64)};
+ db.setEnvironment('MC_SOFIE_FACTORY_RESULT_PINS',JSON.stringify({[s.connectionId]:changedPins}));
+ await assert.rejects(()=>db.owner.mutation('sofieFactoryResultState:retain',retainedArgs));
+ db.setEnvironment('MC_SOFIE_FACTORY_RESULT_PINS',JSON.stringify({[s.connectionId]:resultFixture.pins}));
+ db.setEnvironment('MC_SOFIE_CONNECTION_SECRETS',JSON.stringify({[s.connectionId]:{keyId:'fixture-service',secret:'rotated-'+secret}}));
+ await assert.rejects(()=>db.owner.mutation('sofieFactoryResultState:retain',retainedArgs));
+ assert.equal((await db.owner.query('sofieExecutionPermitState:inspect',{projectId:s.projectId,connectionId:s.connectionId})).permits[0].factoryResult.status,'STALE');
+ db.setEnvironment('MC_SOFIE_CONNECTION_SECRETS',JSON.stringify({[s.connectionId]:{keyId:'fixture-service',secret}}));
+ report.checks.push('service credential rotation fences in-flight Result and cached currentness');
+ report.checks.push('Result observation revalidates owner, current Plan and installed pins after network boundary');
  report.checks.push('canonical challenge action digest and replay','three concurrent positive receipts converge; two canonical references consumed');
  await db.restart();
  assert.equal((await db.owner.query('sofieExecutionPermitState:inspect',{projectId:s.projectId,connectionId:s.connectionId})).permits.length,1);
