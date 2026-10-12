@@ -81,13 +81,17 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
       await copyFile(join(repo, "scripts/qualification/native-fixture.js"), join(root, "convex/nativeFixture.js"));
       await copyFile(join(repo, "scripts/enterprise-golden-journey/isolation-fixture.js"), join(root, "convex/isolationFixture.js"));
     }
-    if (installedPermits) {
+    if (nativeExecution || installedPermits) {
+      // Both modes copy these handlers. Retain their shared-source closure and
+      // package context even when installed permit fixtures stay disabled.
       await copyClosure("convex/sofieExecutionPermits.ts");
       await copyClosure("convex/sofieFactoryResults.ts");
       await copyClosure("convex/sofiePermitControlDelivery.ts");
       await copyFile(join(repo,"packages/shared/package.json"),join(root,"packages/shared/package.json"));
       await symlink(join(repo,"packages/shared/node_modules"),join(root,"packages/shared/node_modules"));
       await copyClosure("convex/sofieExecutionPermitState.ts");
+    }
+    if (installedPermits) {
       await copyFile(join(repo,"scripts/qualification/installed-permit-fixture.js"),join(root,"convex/installedPermitFixture.js"));
     }
     if (canonicalAccounting) {

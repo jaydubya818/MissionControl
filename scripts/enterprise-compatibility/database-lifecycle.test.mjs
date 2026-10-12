@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat, readlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startFixtureDatabase } from './database.mjs';
@@ -64,3 +64,38 @@ it('cleans the owned directory when key generation fails before backend startup'
   const entries = await audits(); expect(entries.map(e => e.status)).toEqual(['CREATED', 'DESTROYED']);
   await expect(stat(entries[0].root)).rejects.toMatchObject({ code: 'ENOENT' });
 });
+
+it.each([{ nativeExecution: true, canonicalAccounting: true }, { installedPermits: true }])(
+  'retains copied handler dependencies without enabling unrelated fixtures: %j', async options => {
+    const files = {
+      'convex/lib/serviceCommandAuth.ts': '', 'convex/sofieEnterprise.ts': '', 'convex/lib/factoryMemory.ts': '',
+      'convex/sofieExecutionPermits.ts': 'import "../packages/shared/src/executionPermit";',
+      'convex/sofieFactoryResults.ts': 'import "../packages/shared/src/factoryResult/protocol";',
+      'convex/sofiePermitControlDelivery.ts': '', 'convex/sofieExecutionPermitState.ts': '',
+      'convex/lib/offlineAttemptBudget.ts': '', 'convex/lib/companyAccess.ts': '',
+      'packages/shared/src/executionPermit.ts': 'export const permit = true;',
+      'packages/shared/src/factoryResult/protocol.ts': 'import "./signature";',
+      'packages/shared/src/factoryResult/signature.ts': 'export const signature = true;',
+      'packages/shared/package.json': '{"type":"module"}',
+      'scripts/qualification/native-fixture.js': '', 'scripts/qualification/installed-permit-fixture.js': '',
+      'scripts/enterprise-golden-journey/isolation-fixture.js': '',
+      'scripts/enterprise-compatibility/accounting-fixture.js': '',
+    };
+    for (const [file, content] of Object.entries(files)) {
+      const path = join(root, file); await mkdir(join(path, '..'), { recursive: true }); await writeFile(path, content);
+    }
+    await mkdir(join(root, 'packages/shared/node_modules'));
+    const db = await startFixtureDatabase(root, options);
+    try {
+      for (const file of ['packages/shared/src/executionPermit.ts', 'packages/shared/src/factoryResult/protocol.ts',
+        'packages/shared/src/factoryResult/signature.ts', 'packages/shared/package.json'])
+        expect(await readFile(join(db.root, file), 'utf8')).toBe(files[file]);
+      expect(await readlink(join(db.root, 'packages/shared/node_modules'))).toBe(join(root, 'packages/shared/node_modules'));
+      const commands = vi.mocked(runFixtureCommand).mock.calls.map(([stage]) => stage);
+      expect(commands.includes('ENABLE_NATIVE')).toBe(!!options.nativeExecution);
+      expect(commands.includes('ENABLE_ACCOUNTING')).toBe(!!options.canonicalAccounting);
+      if (options.installedPermits) expect((await stat(join(db.root, 'convex/installedPermitFixture.js'))).isFile()).toBe(true);
+      else await expect(stat(join(db.root, 'convex/installedPermitFixture.js'))).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally { await db.destroy(); }
+  },
+);
