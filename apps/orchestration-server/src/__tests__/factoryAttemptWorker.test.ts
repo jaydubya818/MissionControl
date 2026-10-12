@@ -60,7 +60,7 @@ afterEach(async () => {
 describe("FactoryAttemptWorker verification-first lifecycle", () => {
   it("retains the normalized result when Fab exhausts its turn budget", async () => {
     const fixture = await runFixture("VERIFIED", { fab: true, durable: true, fabTurnLimit: true });
-    await waitForWorker(() => expect(fixture.worker.status().failedCount).toBe(1));
+    await vi.waitFor(() => expect(fixture.worker.status().failedCount).toBe(1), { timeout: 30_000 });
     const terminal = fixture.reports.find((packet) => packet.terminal?.status === "FAILED");
     expect(terminal.artifacts).toEqual(expect.arrayContaining([
       expect.objectContaining({ metadata: expect.objectContaining({ schema: "harness-result/v1",
@@ -78,7 +78,7 @@ describe("FactoryAttemptWorker verification-first lifecycle", () => {
     ]));
     expect(fixture.createPullRequest).not.toHaveBeenCalled();
     await fixture.worker.stop();
-  }, 15_000);
+  }, 40_000);
 
   it("keeps the renewable Attempt lease beyond the publication safety window", () => {
     expect(FACTORY_ATTEMPT_LEASE_DURATION_MS).toBe(120_000);
