@@ -42,6 +42,7 @@ const AUTHORIZATION_MARKERS = [
   // Signed service-command boundary (convex/serviceCommands.ts).
   "authorizeServiceCommand",
   "authorizeSofieApplicationCommand",
+  "authenticateInstalledSofieCommand",
   "claimScoped",
 ];
 

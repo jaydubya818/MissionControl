@@ -1,0 +1,116 @@
+import assert from 'node:assert/strict';
+import {resolve} from 'node:path';
+import {writeFile} from 'node:fs/promises';
+import {generateKeyPairSync,createHash,createHmac,randomUUID,randomBytes,verify} from 'node:crypto';
+import {startFixtureDatabase} from '../enterprise-compatibility/database.mjs';
+import {canonicalServiceCommand} from '../../packages/shared/src/serviceCommandEnvelope.ts';
+import {signPolicyMessage,policyMessageHash,admissionActionDigest} from '../../convex/lib/capabilityOrderingWire.ts';
+import {canonicalPermitJson,permitDigest} from '../../packages/shared/src/executionPermit.ts';
+const root=resolve('.'),report={scope:'DISPOSABLE_CONVEX_SYNTHETIC_AUTH',status:'RUNNING',checks:[],paidOperations:0,installedAuthentication:'NOT_RUN'};
+const db=await startFixtureDatabase(root,{installedPermits:true});
+try{
+ const now=Date.now(),sha='a'.repeat(64),{privateKey,publicKey}=generateKeyPairSync('ed25519');
+ const keyId=createHash('sha256').update(publicKey.export({type:'spki',format:'der'})).digest('hex');
+ const enrollment={schema:'mc-owner-enrollment/v1',environment:'APPROVED_NONPRODUCTION',installationId:'fixture-installation',revision:1,ownerId:'fixture-owner',ownerSubject:'fixture-owner',missionControlOwnerId:'placeholder',tenantId:'placeholder',projectId:'placeholder',connectionId:'placeholder',
+ issuer:'https://mc.example.test',audience:'https://eve.example.test',clerkIssuer:'https://fixture.example.test',clerkAudience:'convex',clerkAuthorizedParty:'https://mc.example.test',activeFrom:now-1000,expiresAt:now+300000,revokedAt:null,
+ factoryVersion:sha,executionContractSha256:sha,capabilityPolicySha256:sha,maxCostMicrousd:1300000,maxDurationSeconds:180,
+ permitKeys:[{keyId,publicKey:publicKey.export({type:'spki',format:'pem'}).toString(),activeFrom:now-1000,notAfter:now+600000,revokedAt:null}]};
+ const s=await db.owner.mutation('installedPermitFixture:setup',{seed:db.seed,enrollment});
+ const secret=randomBytes(32).toString('hex');
+ db.setEnvironment('MC_SOFIE_INSTALLED_ORIGINS',JSON.stringify({environment:'APPROVED_NONPRODUCTION',issuer:enrollment.issuer,audience:enrollment.audience}));
+ db.setEnvironment('MC_SOFIE_CONNECTION_SECRETS',JSON.stringify({[s.connectionId]:{keyId:'fixture-service',secret}}));
+ db.setEnvironment('MC_SOFIE_PERMIT_SIGNING_KEYS',JSON.stringify({[keyId]:privateKey.export({type:'pkcs8',format:'pem'}).toString()}));
+ const work={id:'fixture-work',version:1,generation:1,tupleSha256:sha},admission={factoryVersion:sha,executionContractSha256:sha,capabilityPolicySha256:sha,maxCostMicrousd:1300000,maxDurationSeconds:180};
+ const args={projectId:s.projectId,connectionId:s.connectionId,proposalId:s.proposalId,workOrderId:s.workOrderId,expectedPlanDigest:s.planDigest,expectedWorkOrderRevisionId:s.workOrderRevisionId,work,admission,idempotencyKey:'fixture-permit'};
+ const sign=(capability,input,commandId=randomUUID())=>{const payloadJson=JSON.stringify(input),at=Date.now();const envelope={serviceId:'myeve-sofie-readiness-v1',capability,projectId:s.projectId,repositoryId:`connection:${s.connectionId}`,commandId,issuedAt:at,expiresAt:at+60000,payloadDigest:'sha256='+createHash('sha256').update(payloadJson).digest('hex')};return{payloadJson,envelope:{...envelope,signature:'sha256='+createHmac('sha256',secret).update(canonicalServiceCommand(envelope)).digest('hex')}};};
+ const prepared=await db.anonymous.action('sofieExecutionPermits:preparePermit',sign('enterprise.preparePermit',{schema:'mc-permit-request/v1',...args}));
+ assert.equal(prepared.status,'OWNER_APPROVAL_REQUIRED');
+ await assert.rejects(()=>db.anonymous.mutation('sofieExecutionPermitState:approvePrepared',{projectId:s.projectId,requestId:prepared.requestId}));
+ await assert.rejects(()=>db.other.mutation('sofieExecutionPermitState:approvePrepared',{projectId:s.projectId,requestId:prepared.requestId}));
+ const approved=await Promise.all(Array.from({length:5},()=>db.owner.mutation('sofieExecutionPermitState:approvePrepared',{projectId:s.projectId,requestId:prepared.requestId},{skipQueue:true})));
+ assert.equal(new Set(approved.map(x=>x.document.permitId)).size,1);const document=approved[0].document;
+ report.checks.push('authenticated pending request cannot self-approve','five concurrent owner approvals converge on one permit and approval');
+ assert.equal((await db.owner.query('installedPermitFixture:rows',{table:'enterpriseExecutionPermits'})).length,1);
+ assert.equal((await db.owner.query('installedPermitFixture:rows',{table:'approvalDecisions'})).filter(a=>a.approvalType==='INSTALLED_EXECUTION_PERMIT').length,1);
+ const signed=await db.owner.action('sofieExecutionPermits:issue',{permitId:document.permitId});
+ assert.equal(verify(null,Buffer.from('mc-execution-permit/v1\n'+canonicalPermitJson(signed.document)),publicKey,Buffer.from(signed.signature,'base64url')),true);
+ await assert.rejects(()=>db.other.action('sofieExecutionPermits:issue',{permitId:document.permitId}));
+ report.checks.push('real Node action signs pinned Ed25519; foreign owner denied');
+ async function key(keyId){const pair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);return{keyId,jwk:await crypto.subtle.exportKey('jwk',pair.privateKey)};}
+ const sourceKeys={myeve:await key('myeve'),relay:await key('relay')},acknowledgmentKey=await key('mc');
+ const binding={ownerId:enrollment.ownerId,organizationId:'fixture-org',installationId:enrollment.installationId,backendId:'missioncontrol',incarnation:'fixture-incarnation',enrollmentVersion:1,tenantId:s.tenantId,projectId:s.projectId,ownerMemberId:s.memberId,agentId:'sofie',registryVersion:'registry',sourceKeys,acknowledgmentKey};
+ for(const [name,value] of Object.entries({MC_CAPABILITY_ENVIRONMENT:'qualification',MC_CAPABILITY_INSTALLATION_ID:binding.installationId,MC_CAPABILITY_BINDINGS_JSON:JSON.stringify([binding]),MC_CAPABILITY_RECEIVER_RECOVERY_STATE:'ACTIVE',MC_CAPABILITY_RECEIVER_EPOCH:binding.incarnation}))db.setEnvironment(name,value);
+ const identity={ownerId:binding.ownerId,organizationId:binding.organizationId,installationId:binding.installationId,backendId:binding.backendId,incarnation:binding.incarnation,enrollmentVersion:1};
+ async function fence(authority,version,operation){const value={...identity,authority,version,policyId:`${authority}-${version}`,kind:'FENCE',capabilityId:'missioncontrol',operation};const envelope=await signPolicyMessage(value,sourceKeys[authority]);const acknowledgment=await signPolicyMessage({...identity,authority,version,policyId:value.policyId,kind:'FENCE_ACK',fenceHash:await policyMessageHash(value)},acknowledgmentKey);await db.owner.mutation('capabilityPolicy:receiveFence',{envelope,acknowledgment});}
+ await fence('myeve',1,'enable');await fence('relay',1,'enable');
+ const commandId=randomUUID(),challenge=randomBytes(32).toString('hex');
+ const readInput={schema:'mc-approved-permit-read/v1',connectionId:s.connectionId,work,admissionCommandId:commandId,challenge};
+ const readArgs=sign('enterprise.readApprovedPermit',readInput);
+ const read=await db.anonymous.action('sofieExecutionPermits:readApproved',readArgs);
+ const again=await db.anonymous.action('sofieExecutionPermits:readApproved',readArgs);
+ assert.equal(read.capabilityChallenge.message,again.capabilityChallenge.message);
+ const native=JSON.parse(read.capabilityChallenge.message);
+ assert.equal(native.actionDigest,await admissionActionDigest({workId:work.id,missionId:s.missionId,generation:1,nativeSnapshot:{permitSha256:permitDigest(document)},args:{operation:'enterprise.authorizeAdmission',permitId:document.permitId,challenge,commandId}}));
+ const {kind:_,...common}=native;
+ const myeveMessage={...common,kind:'PERMIT',requiredCapabilities:['work','missioncontrol','enterprise.fleet'],agentRevision:1,sourcePermitHash:'SELF'};
+ const capabilityPermits={myeve:await signPolicyMessage(myeveMessage,sourceKeys.myeve),relay:await signPolicyMessage({...myeveMessage,authority:'relay',policyId:'relay-1',referenceId:randomUUID(),sourcePermitHash:await policyMessageHash(myeveMessage)},sourceKeys.relay)};
+ const admissionInput={schema:'mc-admission-challenge/v1',connectionId:s.connectionId,permitId:document.permitId,permitSha256:permitDigest(document),challenge,work,capabilityPermits};
+ const admissionArgs=sign('enterprise.authorizeAdmission',admissionInput,commandId);
+ const receipts=await Promise.all(Array.from({length:3},()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs)));
+ assert.equal(new Set(receipts.map(r=>canonicalPermitJson(r.document))).size,1);
+ assert.equal(receipts[0].document.policyPairSha256,createHash('sha256').update(canonicalPermitJson(capabilityPermits)).digest('hex'));
+ assert.ok(receipts[0].document.expiresAt-receipts[0].document.issuedAt<=10000);
+ assert.equal((await db.owner.query('installedPermitFixture:rows',{table:'capabilityAdmissionReferences'})).length,2);
+ report.checks.push('canonical challenge action digest and replay','three concurrent positive receipts converge; two canonical references consumed');
+ await db.restart();
+ assert.equal((await db.owner.query('sofieExecutionPermitState:inspect',{projectId:s.projectId,connectionId:s.connectionId})).permits.length,1);
+ report.checks.push('controller/database restart retains owner approval');
+ for(const id of [s.missionId,s.workOrderId]){
+   await db.owner.mutation('installedPermitFixture:patch',{id,patch:{state:'DONE'}});
+   await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs));
+   await assert.rejects(()=>db.owner.mutation('sofieExecutionPermitState:approve',{...args,idempotencyKey:randomUUID(),work:{...work,id:randomUUID()}}));
+   await db.owner.mutation('installedPermitFixture:patch',{id,patch:{state:'READY'}});
+ }
+ report.checks.push('terminal Mission and WorkOrder deny fresh approval and receipt');
+ await fence('myeve',2,'disable');
+ await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs));
+ await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:readApproved',sign('enterprise.readApprovedPermit',readInput)));
+ assert.equal((await db.owner.query('installedPermitFixture:rows',{table:'enterpriseExecutionPermits'}))[0].revokedAt,undefined);
+ report.checks.push('disable rejects new admission and replay without deleting prior approved Work');
+ const readControl=()=>db.anonymous.action('sofieExecutionPermits:readControl',sign('enterprise.readPermitControl',{schema:'mc-permit-control-read/v1',connectionId:s.connectionId,permitId:document.permitId}));
+ await db.owner.mutation('installedPermitFixture:disablePlan',{missionId:s.missionId,planId:s.missionPlanId});
+ const disabledControl=await readControl();assert.equal(disabledControl.control.document.operation,'disable_new');
+ const disabledAck={schema:'mc-permit-control-ack/v1',connectionId:s.connectionId,permitId:document.permitId,sequence:1,controlDigest:disabledControl.controlDigest,authority:'NEW_ADMISSIONS_DENIED',cleanup:'CONFIRMED'};
+ await db.anonymous.action('sofieExecutionPermits:acknowledgeControl',sign('enterprise.acknowledgePermitControl',disabledAck));
+ let lifecycle=await db.owner.query('sofieExecutionPermitState:inspect',{projectId:s.projectId,connectionId:s.connectionId});
+ assert.equal(lifecycle.permits[0].status,'NEW_ADMISSIONS_DENIED');
+ await db.owner.mutation('installedPermitFixture:patch',{id:s.connectionId,patch:{expiresAt:Date.now()-1,revokedAt:Date.now(),installedEnrollment:{...s.enrollment,expiresAt:Date.now()-1,revokedAt:Date.now()}}});
+ assert.equal((await db.owner.query('sofieOwnerReview:list',{projectId:s.projectId})).proposals[0].id,s.proposalId);
+ const proposalRow=(await db.owner.query('installedPermitFixture:rows',{table:'enterpriseMissionProposals'}))[0];
+ const ownerReview=await db.owner.mutation('sofieOwnerReview:inspect',{projectId:s.projectId,proposalId:s.proposalId,expectedDigest:proposalRow.digest});
+ assert.equal(ownerReview.lifecycleOnly,true);assert.equal(ownerReview.result,null);
+ assert.equal((await db.owner.query('sofieExecutionPermitState:pending',{projectId:s.projectId,connectionId:s.connectionId})).requests.length,0);
+ await assert.rejects(()=>db.other.query('sofieExecutionPermitState:inspect',{projectId:s.projectId,connectionId:s.connectionId}));
+ await assert.rejects(()=>db.other.mutation('sofieExecutionPermitState:revoke',{projectId:s.projectId,permitId:document.permitId}));
+ await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs));
+ report.checks.push('expired and revoked connection preserves exact-owner lifecycle view; foreign owner and new admission denied');
+ const revoked=await db.owner.mutation('sofieExecutionPermitState:revoke',{projectId:s.projectId,permitId:document.permitId});assert.equal(revoked.cleanup,'PENDING_BACKEND');assert.equal(revoked.authority,'PENDING_BACKEND');
+ await assert.rejects(()=>db.owner.action('sofieExecutionPermits:issue',{permitId:document.permitId}));
+ report.checks.push('explicit revoke fences permit and reports cleanup pending truthfully');
+ const control=await readControl();assert.equal(control.control.document.operation,'revoke');
+ assert.equal(verify(null,Buffer.from('mc-permit-control/v1\n'+canonicalPermitJson(control.control.document)),publicKey,Buffer.from(control.control.signature,'base64url')),true);
+ assert.equal(control.control.document.sequence,2);
+ await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:acknowledgeControl',sign('enterprise.acknowledgePermitControl',disabledAck)));
+ report.checks.push('disable-new acknowledgment cannot satisfy upgraded revoke sequence');
+ const ack={schema:'mc-permit-control-ack/v1',connectionId:s.connectionId,permitId:document.permitId,sequence:2,controlDigest:control.controlDigest,authority:'FENCED',cleanup:'PENDING_BACKEND'};
+ await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:acknowledgeControl',sign('enterprise.acknowledgePermitControl',{...ack,controlDigest:'b'.repeat(64)})));
+ await db.anonymous.action('sofieExecutionPermits:acknowledgeControl',sign('enterprise.acknowledgePermitControl',ack));
+ let state=await db.owner.query('sofieExecutionPermitState:inspect',{projectId:s.projectId,connectionId:s.connectionId});assert.equal(state.permits[0].authority,'FENCED');assert.equal(state.permits[0].cleanup,'PENDING_BACKEND');
+ await db.owner.mutation('installedPermitFixture:patch',{id:s.connectionId,patch:{revokedAt:Date.now()}});
+ assert.equal((await readControl()).controlDigest,control.controlDigest);
+ await db.anonymous.action('sofieExecutionPermits:acknowledgeControl',sign('enterprise.acknowledgePermitControl',{...ack,cleanup:'CONFIRMED'}));
+ await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:acknowledgeControl',sign('enterprise.acknowledgePermitControl',ack)));
+ report.checks.push('exact signed revocation readback survives connection revocation; wrong digest and regressing cleanup denied');
+
+ report.status='PASS';
+}finally{await db.destroy();await writeFile(process.argv[2]??'/private/tmp/mc-installed-permits.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));}

@@ -8,7 +8,7 @@ import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { ConvexHttpClient, ConvexClient } from "convex/browser";
 
-export async function startFixtureDatabase(repo, { canonicalAccounting = false, nativeExecution = false } = {}) {
+export async function startFixtureDatabase(repo, { canonicalAccounting = false, nativeExecution = false, installedPermits = false } = {}) {
   const binary = process.env.MC_COMPATIBILITY_CONVEX_BINARY;
   if (!binary) throw Error("MC_COMPATIBILITY_CONVEX_BINARY must identify a local Convex backend binary");
   const port = Number(process.env.MC_COMPATIBILITY_PORT ?? 3390);
@@ -70,7 +70,7 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
     await copyClosure("convex/schema.ts");
     await copyClosure("convex/factory/enterpriseCompatibility.ts");
     await copyFile(join(repo, "scripts/enterprise-compatibility/seed.js"), join(root, "convex/fixtureSeed.js"));
-    if (nativeExecution) {
+    if (nativeExecution || installedPermits) {
       // Include canonical dynamic internal references used by real workers and
       // scheduled verification. No recurring jobs, HTTP ingress or external auth.
       await cp(join(repo, "convex"), join(root, "convex"), { recursive: true, filter: source =>
@@ -80,6 +80,11 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
       await copyClosure("convex/lib/factoryMemory.ts");
       await copyFile(join(repo, "scripts/qualification/native-fixture.js"), join(root, "convex/nativeFixture.js"));
       await copyFile(join(repo, "scripts/enterprise-golden-journey/isolation-fixture.js"), join(root, "convex/isolationFixture.js"));
+    }
+    if (installedPermits) {
+      await copyClosure("convex/sofieExecutionPermits.ts");
+      await copyClosure("convex/sofieExecutionPermitState.ts");
+      await copyFile(join(repo,"scripts/qualification/installed-permit-fixture.js"),join(root,"convex/installedPermitFixture.js"));
     }
     if (canonicalAccounting) {
       await copyClosure("convex/lib/offlineAttemptBudget.ts");
@@ -100,20 +105,21 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
     } catch (error) { throw Error(`${error.message}; backend: ${JSON.stringify(await backendLog.diagnostic())}`); }
     function client(subject) {
       const c = new ConvexHttpClient(url);
-      c.setAdminAuth(key, { subject, issuer: "https://fixture.example.test", email: `${subject}@example.test` });
+      c.setAdminAuth(key, { subject, issuer: "https://fixture.example.test", email: `${subject}@example.test`, ...(installedPermits ? {aud:"convex",azp:"https://mc.example.test"} : {}) });
       return c;
     }
     const owner = client(nativeExecution ? "user_SyntheticHandoffQualification" : "fixture-owner"), other = client("fixture-other");
     const seed = await owner.mutation(nativeExecution ? "nativeFixture:seed" : "fixtureSeed:seed", {});
     return { root, seed, owner, other, peer: client("fixture-peer"), anonymous: new ConvexHttpClient(url), stop,
-      ...(nativeExecution ? { client, captureCompletedResultTiming(operation, retain) {
+      ...(nativeExecution || installedPermits ? { client, captureCompletedResultTiming(operation, retain) {
         return captureCompletedResultFunctionTiming(cursor => readFixtureFunctionLogPage(url, key, cursor), operation, retain);
       }, subscription(subject) {
         const c = new ConvexClient(url);
         c.setAdminAuth(key, { subject, issuer: "https://fixture.example.test", email: `${subject}@example.test` });
         return c;
       }, setEnvironment(name, value) {
-        if (!["MC_LOCAL_DELEGATION_QUALIFICATION", "MC_LOCAL_REPOSITORY_ADMISSION", "MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID", "MISSION_CONTROL_SERVICE_ID", "MISSION_CONTROL_SERVICE_COMMAND_SECRET", "MC_SOFIE_READINESS_ENVIRONMENT_ID", "MC_SOFIE_APPLICATION_SECRET", "MC_SOFIE_APPLICATION_KEY_ID", "MC_SOFIE_APPLICATION_OWNER_ID"].includes(name)) throw Error("Unapproved native fixture environment field");
+        const installedFields=installedPermits?["MC_SOFIE_INSTALLED_ORIGINS","MC_SOFIE_CONNECTION_SECRETS","MC_SOFIE_PERMIT_SIGNING_KEYS","MC_CAPABILITY_ENVIRONMENT","MC_CAPABILITY_INSTALLATION_ID","MC_CAPABILITY_BINDINGS_JSON","MC_CAPABILITY_RECEIVER_RECOVERY_STATE","MC_CAPABILITY_RECEIVER_EPOCH"]:[];
+        if (![...installedFields,"MC_LOCAL_DELEGATION_QUALIFICATION", "MC_LOCAL_REPOSITORY_ADMISSION", "MC_OFFLINE_QUALIFICATION_ENVIRONMENT_ID", "MISSION_CONTROL_SERVICE_ID", "MISSION_CONTROL_SERVICE_COMMAND_SECRET", "MC_SOFIE_READINESS_ENVIRONMENT_ID", "MC_SOFIE_APPLICATION_SECRET", "MC_SOFIE_APPLICATION_KEY_ID", "MC_SOFIE_APPLICATION_OWNER_ID"].includes(name)) throw Error("Unapproved native fixture environment field");
         runFixtureCommand("SET_ENVIRONMENT", process.execPath, [cli, "env", "set", name, value, "--url", url, "--admin-key", key],
           { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" });
       } } : {}),

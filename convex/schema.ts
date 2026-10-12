@@ -2046,7 +2046,25 @@ export const schemaTablesPartOne = {
   // -------------------------------------------------------------------------
   // SOFTWARE FACTORY: WORK ORDERS
   // -------------------------------------------------------------------------
+  enterprisePermitRequests: defineTable({
+    connectionId:v.id("enterpriseAppConnections"),projectId:v.id("projects"),tenantId:v.id("tenants"),ownerId:v.id("operators"),
+    missionId:v.id("missions"),workOrderId:v.id("workOrders"),proposalId:v.id("enterpriseMissionProposals"),intentKey:v.string(),
+    requestDigest:v.string(),request:v.any(),createdAt:v.number(),
+  }).index("by_connection_intent",["connectionId","intentKey"]),
+  enterpriseExecutionPermits: defineTable({
+    connectionId:v.id("enterpriseAppConnections"), proposalId:v.id("enterpriseMissionProposals"),
+    tenantId:v.id("tenants"), projectId:v.id("projects"), ownerId:v.id("operators"), missionId:v.id("missions"),
+    workOrderId:v.id("workOrders"), approvalId:v.id("approvalDecisions"), intentKey:v.string(), requestDigest:v.string(),
+    control:v.optional(v.object({sequence:v.number(),operation:v.union(v.literal("revoke"),v.literal("disable_new")),reason:v.string(),requestedAt:v.number(),acknowledgment:v.optional(v.object({controlDigest:v.string(),authority:v.union(v.literal("FENCED"),v.literal("NEW_ADMISSIONS_DENIED")),cleanup:v.union(v.literal("PENDING_BACKEND"),v.literal("CONFIRMED")),acknowledgedAt:v.number()}))})),
+    binding:v.string(), workKey:v.string(), document:v.any(), permitSha256:v.string(), createdAt:v.number(), revokedAt:v.optional(v.number()),
+  }).index("by_connection_intent",["connectionId","intentKey"]).index("by_binding",["binding"]).index("by_connection_work",["connectionId","workKey"]).index("by_mission",["missionId"]),
+  enterprisePermitAdmissionReceipts: defineTable({
+    kind:v.union(v.literal("CHALLENGE"),v.literal("ADMISSION")),
+    connectionId:v.id("enterpriseAppConnections"), permitId:v.id("enterpriseExecutionPermits"), commandId:v.string(),
+    payloadDigest:v.string(), document:v.any(), createdAt:v.number(),
+  }).index("by_connection_command",["connectionId","commandId"]),
   enterpriseAppConnections: defineTable({
+    installedEnrollment:v.optional(v.any()),
     resultScope: v.optional(v.object({ missionId:v.id("missions"), planId:v.id("missionPlans"), planRevision:v.number(), planDigest:v.string() })),
     tenantId: v.id("tenants"), projectId: v.id("projects"), ownerId: v.id("operators"),
     ownerMemberId: v.id("orgMembers"), owningTeamId: v.id("scrumTeams"),

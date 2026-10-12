@@ -1,3 +1,4 @@
+import { installedEnrollment, installedOrigins, installedServiceSecret, configuredConnectionSecret } from './installedSofieConnection';
 import type { MutationCtx } from '../_generated/server';
 import type { Id } from '../_generated/dataModel';
 import { COMPANY_PERMISSIONS, roleGrantsPermission, getOperatorRoles } from './companyAccess';
@@ -7,6 +8,11 @@ import { sha256Hex } from '../../packages/shared/src/canonicalDigest';
 const denied = (): never => { throw Error('ENTERPRISE_ACCESS_DENIED'); };
 export async function readiness(ctx: MutationCtx, projectId: Id<'projects'>) {
   const project = await ctx.db.get(projectId);
+  if (project?.metadata?.sofieMode === 'INSTALLED_NONPRODUCTION') {
+    installedOrigins();
+    if (!project.tenantId || project.metadata.productionAuthority !== false || !(await ctx.db.get(project.tenantId))?.active) return denied();
+    return project;
+  }
   const envId = process.env.MC_SOFIE_READINESS_ENVIRONMENT_ID;
   const environment = envId ? await ctx.db.get(envId as Id<'environments'>) : null;
   if (!project?.tenantId || project.enterpriseAccountingMode !== 'ISOLATED_DETERMINISTIC'
@@ -19,8 +25,11 @@ export async function readiness(ctx: MutationCtx, projectId: Id<'projects'>) {
 
 export async function currentConnection(ctx: MutationCtx, id: Id<'enterpriseAppConnections'>) {
   const connection = await ctx.db.get(id);
-  if (!connection || connection.ownerId !== process.env.MC_SOFIE_APPLICATION_OWNER_ID || connection.revokedAt !== undefined || connection.expiresAt <= Date.now()
-    || connection.keyId !== process.env.MC_SOFIE_APPLICATION_KEY_ID) return denied();
+  if (!connection || connection.revokedAt !== undefined || connection.expiresAt <= Date.now()) return denied();
+  if (connection.installedEnrollment !== undefined) {
+    await installedEnrollment(ctx, connection); installedServiceSecret(connection._id,connection.keyId);
+  }
+  else if (connection.ownerId !== process.env.MC_SOFIE_APPLICATION_OWNER_ID || connection.keyId !== process.env.MC_SOFIE_APPLICATION_KEY_ID) return denied();
   const project = await readiness(ctx, connection.projectId);
   const [owner, member, team] = await Promise.all([ctx.db.get(connection.ownerId), ctx.db.get(connection.ownerMemberId), ctx.db.get(connection.owningTeamId)]);
   const membership = await ctx.db.query('teamMemberships').withIndex('by_team_member', q => q.eq('teamId', connection.owningTeamId).eq('memberId', connection.ownerMemberId)).first();
@@ -37,7 +46,7 @@ export async function authorizeSofieApplicationCommand(args: { envelope: Service
   if (args.payloadJson.length > 16000) return denied();
   let request;
   try { request = validateEnterpriseRequest(JSON.parse(args.payloadJson)); } catch { return denied(); }
-  const secret = process.env.MC_SOFIE_APPLICATION_SECRET;
+  const secret = configuredConnectionSecret(request.connectionId) ?? process.env.MC_SOFIE_APPLICATION_SECRET;
   if (!secret || secret.length < 32 || validateServiceCommandEnvelope(args.envelope, Date.now(), { serviceId: SOFIE_APPLICATION, capability: request.operation })
     || args.envelope.payloadDigest !== `sha256=${sha256Hex(args.payloadJson)}` || args.envelope.repositoryId !== `connection:${request.connectionId}`) return denied();
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);

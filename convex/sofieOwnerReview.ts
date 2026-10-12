@@ -6,6 +6,7 @@ import {
   COMPANY_PERMISSIONS,
   requireWorkspaceAccess,
 } from "./lib/companyAccess";
+import { permitLifecycleOwner } from "./lib/executionPermitAuthority";
 import { currentConnection } from "./lib/sofieEnterpriseAuthority";
 import { enterpriseDigest } from "../packages/shared/src/sofieEnterprise";
 import { enterpriseMissionOwner } from "./lib/enterpriseMissionOwner";
@@ -31,6 +32,7 @@ async function ownedProposal(
     proposalId: Id<"enterpriseMissionProposals">;
     expectedDigest: string;
   },
+  lifecycleOnly = false,
 ) {
   const proposal = await ctx.db.get(args.proposalId);
   if (
@@ -50,7 +52,10 @@ async function ownedProposal(
     access.membership.operatorId !== proposal.ownerId
   )
     return denied();
-  const live = await currentConnection(ctx, proposal.connectionId);
+  const record = await ctx.db.get(proposal.connectionId);
+  const live = lifecycleOnly && record?.installedEnrollment !== undefined
+    ? await permitLifecycleOwner(ctx, proposal.connectionId)
+    : await currentConnection(ctx, proposal.connectionId);
   if (
     proposal.ownerId !== live.owner._id ||
     proposal.tenantId !== live.connection.tenantId ||
@@ -105,8 +110,8 @@ export const list = query({
       if (
         connection.projectId !== projectId ||
         connection.tenantId !== project.tenantId ||
-        connection.revokedAt !== undefined ||
-        connection.expiresAt <= Date.now()
+        (connection.installedEnrollment === undefined && (connection.revokedAt !== undefined ||
+        connection.expiresAt <= Date.now()))
       )
         continue;
       const proposals = await ctx.db
@@ -140,7 +145,10 @@ export const list = query({
 export const inspect = mutation({
   args: binding,
   handler: async (ctx, args) => {
-    const { proposal, connection } = await ownedProposal(ctx, args);
+    const { proposal, connection } = await ownedProposal(ctx, args, true);
+    const enrollment = connection.installedEnrollment;
+    const lifecycleOnly = enrollment !== undefined && (connection.revokedAt !== undefined || connection.expiresAt <= Date.now()
+      || enrollment.revokedAt !== null || enrollment.expiresAt <= Date.now() || enrollment.activeFrom > Date.now());
     const status =
       proposal.revokedAt !== undefined
         ? "REJECTED"
@@ -159,7 +167,7 @@ export const inspect = mutation({
     const [detail, { scope, result }] = await Promise.all([
       mission ? projectMission(ctx, mission, null) : Promise.resolve(null),
       (async () => {
-        const scope = mission?.currentPlanId
+        const scope = !lifecycleOnly && mission?.currentPlanId
           ? (await resultMissionScope(ctx, connection, mission._id)).scope
           : null;
         const result = scope ? await projectEnterpriseResult(
@@ -169,6 +177,8 @@ export const inspect = mutation({
       })(),
     ]);
     return {
+      lifecycleOnly,
+      connectionMode: connection.installedEnrollment === undefined ? 'ISOLATED_DETERMINISTIC' as const : 'INSTALLED_NONPRODUCTION' as const,
       proposalId: proposal._id,
       digest: proposal.digest,
       connectionId: connection._id,

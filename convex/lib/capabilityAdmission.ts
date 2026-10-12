@@ -12,19 +12,19 @@ export const capabilityPermitsValidator = v.object({ myeve: envelope, relay: env
 export type CapabilityPermits = { myeve: SignedPolicyMessage; relay: SignedPolicyMessage };
 type AdmissionInput = { workId: string; missionId: string; generation: number; args: Record<string, unknown>; capabilityId: string; nativeSnapshot: unknown; permits?: CapabilityPermits };
 
-export async function requireCapabilityAdmission(ctx: MutationCtx, record: AdmissionRecord, existingAdmission = false, input?: AdmissionInput) {
+export async function requireCapabilityAdmission(ctx: MutationCtx, record: AdmissionRecord, existingAdmission = false, input?: AdmissionInput, application?: { authenticatedOwnerId: string; policyOwnerId: string; installationId: string; replay: boolean }) {
   const configured = !!process.env.MC_CAPABILITY_BINDINGS_JSON;
   const enrollment = record.ownerMemberId && record.projectId ? await ctx.db.query('capabilityEnrolledOwners')
     .withIndex('by_owner', q => q.eq('memberId', record.ownerMemberId!).eq('projectId', record.projectId!)).unique() : null;
-  if (process.env.MC_CAPABILITY_CONTROL_ENABLED !== 'true' && !configured && !enrollment) return;
+  if (process.env.MC_CAPABILITY_CONTROL_ENABLED !== 'true' && !configured && !enrollment && !application) return;
   if (process.env.MC_CAPABILITY_ENVIRONMENT !== 'qualification'
     || !process.env.MC_CAPABILITY_INSTALLATION_ID?.trim())
     throw new Error('CAPABILITY_INSTALLATION_UNQUALIFIED');
   const identity = await ctx.auth.getUserIdentity();
   const owner = record.ownerMemberId ? await ctx.db.get(record.ownerMemberId) : null;
   const operator = owner?.operatorId ? await ctx.db.get(owner.operatorId) : null;
-  if (!identity || !record.tenantId || !record.projectId || !operator?.active
-    || operator.authId !== identity.subject || operator.tenantId !== record.tenantId
+  if (!record.tenantId || !record.projectId || !operator?.active
+    || (application ? operator._id !== application.authenticatedOwnerId : !identity || operator.authId !== identity.subject) || operator.tenantId !== record.tenantId
     || !owner?.active || owner?.tenantId !== record.tenantId || (owner.projectId && owner.projectId !== record.projectId))
     throw new Error('CAPABILITY_EXACT_OWNER_REQUIRED');
 
@@ -35,6 +35,7 @@ export async function requireCapabilityAdmission(ctx: MutationCtx, record: Admis
     && item.projectId === record.projectId && item.ownerMemberId === record.ownerMemberId);
   if (!binding || binding.installationId !== process.env.MC_CAPABILITY_INSTALLATION_ID)
     throw new Error('CAPABILITY_INSTALLATION_UNQUALIFIED');
+  if (application && (binding.ownerId !== application.policyOwnerId || binding.installationId !== application.installationId)) throw Error('CAPABILITY_ADMISSION_SCOPE');
   requireCapabilityReceiverRecovery(binding.incarnation);
   if (!enrollment || enrollment.installationId !== binding.installationId || enrollment.incarnation !== binding.incarnation)
     throw Error('CAPABILITY_ENROLLMENT_CHANGED');
@@ -43,15 +44,18 @@ export async function requireCapabilityAdmission(ctx: MutationCtx, record: Admis
     generation: input.generation, nativeSnapshot: input.nativeSnapshot, args: nativeArgs });
   let budgetMicros = Number.MAX_SAFE_INTEGER;
   let sourcePermitHash = '';
+  let expiresAt = Number.MAX_SAFE_INTEGER;
   const authorities: Array<{ scope: string; version: number; policyId: string; capabilityId: string }> = [];
   for (const authority of ['myeve', 'relay'] as const) {
     const permit = await verifyPolicyMessage(input.permits[authority], binding.sourceKeys[authority]);
     if (permit.kind !== 'PERMIT' || permit.authority !== authority) throw Error('CAPABILITY_PERMIT_REQUIRED');
     if (authority === 'myeve') sourcePermitHash = await policyMessageHash(permit);
     else if (permit.sourcePermitHash !== sourcePermitHash) throw Error('CAPABILITY_PROOF_PAIR_MISMATCH');
+    expiresAt = Math.min(expiresAt,permit.expiresAt);
     const scope = capabilityPolicyScope({ ...binding, authority });
     const fence = await ctx.db.query('capabilityPolicyFences').withIndex('by_scope', q => q.eq('scope', scope)).unique();
     if (!fence) throw Error('CAPABILITY_POLICY_REVALIDATION_UNAVAILABLE');
+    if (application && ['work','missioncontrol',input.capabilityId].includes(fence.capabilityId) && ['disable','pause','revoke'].includes(fence.operation)) throw Error('CAPABILITY_DISABLED');
     assertPolicyIdentity(permit, { ...binding, authority, version: fence.version, policyId: fence.policyId });
     if (permit.ownerId !== binding.ownerId || permit.organizationId !== binding.organizationId
       || permit.installationId !== binding.installationId || permit.backendId !== binding.backendId
@@ -61,13 +65,14 @@ export async function requireCapabilityAdmission(ctx: MutationCtx, record: Admis
       || permit.capabilityId !== input.capabilityId || !['work', 'missioncontrol', input.capabilityId].every(id => permit.requiredCapabilities.includes(id)) || permit.actionDigest !== actionDigest
       || permit.issuedAt > Date.now() || permit.expiresAt <= Date.now()) throw Error('CAPABILITY_ADMISSION_SCOPE');
     const consumed = await ctx.db.query('capabilityAdmissionReferences').withIndex('by_reference', q => q.eq('scope', scope).eq('referenceId', permit.referenceId)).unique();
-    if (consumed) throw Error('CAPABILITY_REFERENCE_CONSUMED');
-    await ctx.db.insert('capabilityAdmissionReferences', { scope, referenceId: permit.referenceId,
+    if (consumed && (!application?.replay || consumed.workId !== input.workId || consumed.missionId !== input.missionId
+      || consumed.version !== permit.version || consumed.policyId !== permit.policyId || consumed.actionDigest !== actionDigest)) throw Error('CAPABILITY_REFERENCE_CONSUMED');
+    if (!consumed) await ctx.db.insert('capabilityAdmissionReferences', { scope, referenceId: permit.referenceId,
       workId: input.workId, missionId: input.missionId, version: permit.version, policyId: permit.policyId, actionDigest });
     authorities.push({ scope, version: permit.version, policyId: permit.policyId, capabilityId: input.capabilityId });
     budgetMicros = Math.min(budgetMicros, permit.budgetMicros);
   }
-  return { budgetMicros, authorities };
+  return { budgetMicros, authorities, expiresAt };
 }
 
 

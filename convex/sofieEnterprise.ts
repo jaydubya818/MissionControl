@@ -1,3 +1,4 @@
+import { configuredConnectionSecret } from './lib/installedSofieConnection';
 import { projectEnterpriseResult, resultMissionScope } from './lib/sofieEnterpriseResult';
 import { v } from 'convex/values';
 import { sofieApplicationAction as action, sofieApplicationMutation as internalMutation, mutation } from './lib/missionScopedFunctions';
@@ -64,7 +65,7 @@ export const command = action({
     const response = await ctx.runMutation(makeFunctionReference<'mutation'>('sofieEnterprise:apply'), args);
     if (args.envelope.capability !== 'enterprise.result') return response;
     const authentication = { commandId:args.envelope.commandId, requestDigest:args.envelope.payloadDigest, expiresAt:Math.min(args.envelope.expiresAt,response.response.freshUntil) };
-    const key = await crypto.subtle.importKey('raw',new TextEncoder().encode(process.env.MC_SOFIE_APPLICATION_SECRET!),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+    const key = await crypto.subtle.importKey('raw',new TextEncoder().encode(configuredConnectionSecret(response.connectionId) ?? process.env.MC_SOFIE_APPLICATION_SECRET!),{name:'HMAC',hash:'SHA-256'},false,['sign']);
     const bytes = new TextEncoder().encode(enterpriseDigest({...response,authentication}));
     const signature = 'sha256:' + Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,bytes)), b=>b.toString(16).padStart(2,'0')).join('');
     return {...response,authentication:{...authentication,signature}};
@@ -116,7 +117,7 @@ export const apply = internalMutation({
             constraints: ['No execution authority. Separate canonical Plan approval and execution admission required.'], budgetUsd: 0,
             stopCondition: proposal.proposal.stopCondition, owner: String(owner._id),
             idempotencyKey: `sofie-proposal:${proposal._id}`, metadata: { schema: 'sofie-enterprise-intake/v1', proposalId: proposal._id, proposalDigest: proposal.digest,
-              applicationId: SOFIE_APPLICATION, synthetic: true, productionAuthority: false } },
+              applicationId: SOFIE_APPLICATION, synthetic: connection.installedEnrollment === undefined, productionAuthority: false } },
           { project, ownerMember: null, requestingOperatorId: owner._id, operator: { actorId: String(owner._id), actorSource: 'OWNER_AUTHORIZED_APPLICATION' } });
           await ctx.db.patch(proposal._id, { missionId: created.mission._id });
           response = { missionId: created.mission._id, proposalDigest: proposal.digest, created: true, executionAuthority: 'NONE' };

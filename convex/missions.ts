@@ -1,3 +1,4 @@
+import { revokePlanPermits } from './lib/permitLifecycle';
 import { requireCapabilityAdmission, capabilityPermitsValidator } from "./lib/capabilityAdmission";
 import { v, type Infer } from "convex/values";
 import { contributorMutation } from "./lib/missionScopedFunctions";
@@ -1060,6 +1061,7 @@ export const abandonPlanDraft = mutation({
     const operator = await resolveOperator(ctx);
     const now = Date.now();
     assertTransition(mission, "DRAFT");
+    await revokePlanPermits(ctx,mission._id,plan._id,"PLAN_SUPERSEDED");
     await ctx.db.patch(plan._id, { status: "SUPERSEDED", decisionReason: args.reason.trim(), decidedBy: operator.actorId, decidedAt: now, decidedActorSource: operator.actorSource });
     await ctx.db.patch(mission._id, { state: "DRAFT", updatedAt: now, requiredHumanAction: "Review the Mission definition before creating another plan." });
     const updated = await ctx.db.get(mission._id);
@@ -1139,6 +1141,7 @@ export const rejectPlan = mutation({
     const operator = await resolveOperator(ctx);
     const now = Date.now();
     assertTransition(mission, "DRAFT");
+    await revokePlanPermits(ctx,mission._id,plan._id,"PLAN_REJECTED");
     await ctx.db.patch(plan._id, { status: "REJECTED", decisionReason: args.reason.trim(), decidedBy: operator.actorId, decidedAt: now, decidedActorSource: operator.actorSource });
     await ctx.db.patch(mission._id, { state: "DRAFT", updatedAt: now, requiredHumanAction: "Revise the rejected plan before requesting another decision." });
     const updated = await ctx.db.get(mission._id);
@@ -1295,6 +1298,7 @@ export const approvePlan = mutation({
       qualityContractProjection: qualityContract.projection,
       qualityContractDigest: qualityContract.digest,
     });
+    if(mission.currentPlanId&&mission.currentPlanId!==plan._id)await revokePlanPermits(ctx,mission._id,mission.currentPlanId,"PLAN_REPLACED");
     await ctx.db.patch(mission._id, { state: "READY", currentPlanId: plan._id, updatedAt: now, requiredHumanAction: "Review released WorkOrders. Execution remains a separate governed action." });
 
     const releasedByBlueprint = new Map<string, any>();

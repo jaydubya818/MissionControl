@@ -1,0 +1,26 @@
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
+import {resolve,join} from 'node:path';
+import {createServer} from 'node:http';
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+const root=resolve('.'),out=resolve(process.argv[2]),ui=join(root,'apps/mission-control-ui'),require=createRequire(join(ui,'package.json'));
+await mkdir(out,{recursive:true});
+const entry=`import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{InstalledPermitPanel}from'${ui}/src/eos/views/InstalledPermitReview.tsx';
+const request={requestId:'request',missionId:'mission',workOrderId:'wo',work:{id:'Alpha Tasks',version:1,generation:1},admission:{maxCostMicrousd:1300000,maxDurationSeconds:180}};
+function Fixture(){const scenario=new URLSearchParams(location.search).get('scenario');const[state,setState]=useState(scenario==='loading'?null:{requests:scenario==='empty'?[]:[request],permits:JSON.parse(localStorage.getItem('permits')||'[]'),truncated:false});const[notice,setNotice]=useState('');
+const update=permits=>{localStorage.setItem('permits',JSON.stringify(permits));setState({...state,permits});};return <main><h1>Installed permit component qualification</h1><InstalledPermitPanel state={state} busy={false} error={scenario==='error'?'Installed setup unavailable':''} notice={notice} onRefresh={()=>location.reload()} onApprove={()=>{update([{permitId:'permit',missionId:'mission',workOrderId:'wo',work:request.work,status:'OWNER_APPROVED',authority:'PENDING_BACKEND',cleanup:'PENDING_BACKEND'}]);setNotice('Work binding approved. Backend admission remains required.');}} onRevoke={()=>{update(state.permits.map(p=>({...p,status:'REVOKED'})));setNotice('Revocation requested. Receiving authority pending backend confirmation.');}}/></main>};createRoot(document.getElementById('root')).render(<Fixture/>);`;
+await build({stdin:{contents:entry,loader:'tsx',resolveDir:ui},bundle:true,format:'esm',outfile:join(out,'app.js'),alias:{'@':join(ui,'src')},jsx:'automatic'});
+await writeFile(join(out,'index.html'),'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Installed permit qualification</title><style>body{font:16px system-ui;color:#18212b;background:#fafafa;margin:32px;max-width:900px}button{padding:10px;margin:8px;border:1px solid #536477;border-radius:6px;background:white;color:#18212b}button:disabled{color:#555}article,section{padding:16px;border:1px solid #8896a6;margin:12px 0}</style></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>');
+const server=createServer(async(req,res)=>{const file=req.url?.startsWith('/app.js')?'app.js':'index.html';res.setHeader('content-type',file.endsWith('.js')?'application/javascript':'text/html');res.end(await readFile(join(out,file)));});await new Promise(r=>server.listen(55841,'127.0.0.1',r));
+const browser=await chromium.launch({headless:true}),report={scope:'ACTUAL_COMPONENT_SYNTHETIC_STATE',authenticatedJourney:'NOT_RUN',checks:[],status:'RUNNING'};
+try{const page=await browser.newPage({viewport:{width:1200,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ await page.goto('http://127.0.0.1:55841/?scenario=loading');await page.getByRole('status').filter({hasText:'Loading'}).waitFor();report.checks.push('loading');
+ await page.goto('http://127.0.0.1:55841/?scenario=empty');await page.getByText(/No installed Work/).waitFor();report.checks.push('empty');
+ await page.goto('http://127.0.0.1:55841/?scenario=error');await page.getByRole('alert').waitFor();report.checks.push('setup error');
+ await page.goto('http://127.0.0.1:55841/');await page.getByText(/Limit \$1.30 and 180 seconds/).waitFor();await page.getByRole('button',{name:'Approve this Work binding'}).click();await page.getByRole('button',{name:'Work binding reviewed'}).waitFor();assert.equal(await page.getByRole('button',{name:'Work binding reviewed'}).isDisabled(),true);
+ await page.getByRole('button',{name:'Revoke Work binding'}).click();await page.getByText('Work Alpha Tasks: Revocation requested').waitFor();await page.getByText('Backend cleanup: pending confirmation.').waitFor();await page.reload();await page.getByText('Work Alpha Tasks: Revocation requested').waitFor();report.checks.push('owner action controls and truthful pending state','component reconnect preserves fixture state');
+ await page.addScriptTag({path:createRequire(require.resolve('@axe-core/playwright')).resolve('axe-core/axe.min.js')});const results=await page.evaluate(()=>window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}));assert.deepEqual(results.violations,[]);report.checks.push('WCAG 2.1 AA axe zero violations');
+ await page.screenshot({path:join(out,'revocation-pending.png'),fullPage:true});assert.deepEqual(errors,[]);report.status='PASS';
+}finally{await browser.close();await new Promise(r=>server.close(r));await writeFile(join(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));}

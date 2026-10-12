@@ -1,3 +1,4 @@
+import { InstalledPermitReview } from './InstalledPermitReview';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -81,7 +82,7 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
   const act = async (
     action: "AUTHORIZE_DRAFT" | "REVOKE" | "READ" | "ACCEPT" | "REJECT",
   ) => {
-    if (!review || pending.current) return;
+    if (!review || review.lifecycleOnly || pending.current) return;
     if (
       ["READ", "ACCEPT", "REJECT"].includes(action) &&
       review.status !== "CREATED"
@@ -206,6 +207,8 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
       {proposalId && !review && !error && (
         <p role="status">Loading owner review…</p>
       )}
+      {review?.connectionMode === 'INSTALLED_NONPRODUCTION' && review.missionId && <InstalledPermitReview projectId={projectId} connectionId={review.connectionId} missionId={review.missionId}/>}
+      {review?.lifecycleOnly && <p role="status">This connection cannot authorize new Work. Existing Work authorizations remain available for inspection and revocation.</p>}
       {review && (
         <>
           <h3 className="font-semibold">{review.proposal.title}</h3>
@@ -236,7 +239,7 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
               Mission {review.missionId ?? "Not created"}
             </p>
           </details>
-          {["PENDING", "AUTHORIZED"].includes(review.status) && (
+          {!review.lifecycleOnly && ["PENDING", "AUTHORIZED"].includes(review.status) && (
             <div className="flex flex-wrap gap-2">
               <Button
                 disabled={busy || review.status === "AUTHORIZED"}
