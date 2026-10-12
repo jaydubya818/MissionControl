@@ -1,4 +1,5 @@
 'use node';
+import {parseOwnerFactoryResultPins,verifyOwnerFactoryResult,type OwnerFactoryResultPins} from './ownerFactoryResult';
 import {createHash,createHmac,createPublicKey,timingSafeEqual,verify} from 'node:crypto';
 import {canonicalPermitJson,permitDigest,type ExecutionPermit} from '../../packages/shared/src/executionPermit';
 import {workSpendV2Schema,validateSpendBinding} from '../../packages/shared/src/factoryResult/factory-spend';
@@ -15,7 +16,8 @@ export interface FactoryResultPins {
  resultKeys:ResultKey[];receiptKeys:{keyId:string;publicKey:string}[];checkCommands:string[];allowedFiles:string[];
 }
 /** Pins are installed out of band per connection. Incoming evidence never supplies them. */
-export function parseFactoryResultPins(value:unknown):FactoryResultPins {
+export function parseFactoryResultPins(value:unknown):FactoryResultPins|OwnerFactoryResultPins {
+ if(object(value).schema==='mc-owner-factory-result-pins/v1')return parseOwnerFactoryResultPins(value);
  const p=object(value);exact(p,['factoryId','sourceDigest','configurationDigest','verifierPolicySha256','resultKeys','receiptKeys','checkCommands','allowedFiles']);
  if(p.factoryId!=='myfactory-external-alpha')deny();
  for(const name of ['sourceDigest','configurationDigest','verifierPolicySha256'])hex(p[name]);
@@ -47,7 +49,8 @@ function verifyFactorySignature(domain:string,document:unknown,signature:unknown
 }
 const criterionId=(index:number)=>{const h=createHash('sha256').update('EXTERNAL_ALPHA_CRITERION_V1:'+index).digest('hex').slice(0,32);return `${h.slice(0,8)}-${h.slice(8,12)}-8${h.slice(13,16)}-a${h.slice(17,20)}-${h.slice(20,32)}`;};
 /** Read-only evidence assessment. It cannot grant execution or settle accounting. */
-export function verifyInstalledFactoryResult(document:Record<string,any>,permit:ExecutionPermit,pins:FactoryResultPins,now=Date.now()) {
+export function verifyInstalledFactoryResult(document:Record<string,any>,permit:ExecutionPermit,pins:FactoryResultPins|OwnerFactoryResultPins,now=Date.now()) {
+ if('schema' in pins)return verifyOwnerFactoryResult(document,permit,pins,now);
  if(Buffer.byteLength(JSON.stringify(document))>MAX_RESULT_BYTES+512000)deny();
  if(digest({sourceDigest:pins.sourceDigest,configurationDigest:pins.configurationDigest})!==permit.admission.factoryVersion)deny();
  const base={permitId:permit.permitId,missionId:permit.missionId,workOrderId:permit.workOrderId,work:permit.work,observedAt:document.observedAt,expiresAt:document.expiresAt,enterpriseQualityGate:'NOT_ESTABLISHED',executionAuthority:'NONE',accountingAuthority:'MYEVE_FACTORY'} as const;

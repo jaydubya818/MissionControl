@@ -41,3 +41,26 @@ Qualification:27 signed Result/Proof/ledger tamper tests;2 owner action/transpor
 The existing durable permit control sequence is the outbox. With the explicit `MC_SOFIE_CONTROL_DELIVERY_ENABLED=true` installation gate, creation schedules one signed POST to the exact enrolled MyEve `/api/missioncontrol/control` origin. The flag is unset and no installed delivery was activated. Requests are bounded to8KiB, responses1KiB,5seconds, no redirects. HTTP200 `{received:true}` records delivery only; authority fencing and cleanup require the existing authenticated exact-sequence ACK. Failed delivery remains PENDING_BACKEND for the existing pull recovery. Stale delivery cannot update a newer sequence. Ordinary disable-new retains its distinct operation and preserves existing Work.
 
 Final local source checks for this slice:188Convex files/1756tests PASS,15disposable Convex checks PASS,Convex typecheck PASS. This also includes the signing-key natural-expiry correction after Result review. No provider operation, deployment, actual identity binding or installed Golden Journey was run. Final committed-source review/publication controls/hosted CI remain required.
+
+### Owner Factory Result compatibility
+
+`MC_SOFIE_FACTORY_RESULT_PINS[connectionId]` may explicitly select
+`mc-owner-factory-result-pins/v1` with the existing Factory ID, source and
+configuration digests, qualified profile hash, verifier policy hash, original
+Result public keys, check commands, and allowed files. This is source support;
+no installation, credentials, execution approval, or new profile is created.
+The original alpha pin shape and signature checks remain unchanged.
+
+The authenticated `mc-result-readback/v1` packet carries an explicit owner
+admission variant. Its immutable binding connects the original MC permit and
+admission command to the MyEve Work tuple, Factory request/digest/attempt,
+route decision/run, writer generation and dispatch identity. The consumer
+verifies the original signed Gate C envelope and canonical MyEve native Proof.
+An alpha authority document cannot substitute for this owner binding.
+
+Current cleanup/settlement observations require a successful backend read
+within 30 seconds (`backendObservedAt`), exact terminal writer identity,
+independent verifier cleanup, and complete known accounting. Diagnostic
+`observedAt` updates cannot refresh old backend evidence. UNKNOWN remains
+pending. Readback creates no execution authority, accounting mutation,
+enterprise QualityGate verdict, or owner acceptance.
