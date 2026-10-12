@@ -16,6 +16,10 @@ Native Missions/Attempts retain their original policy authority. Ordinary disabl
 
 Relay account epoch invalidation is admission freshness only. It must not turn a single-lease revoke into owner-wide active-Work revocation. Targeted Relay active-Work controls require a separate exact lease/agent/Work compatibility contract.
 
+Installation qualification must verify that Relay withholds new current-epoch permits when its organization or agent policy denies admission. MissionControl's Relay epoch check enforces freshness; Relay remains responsible for the policy decision before issuing a new signed permit.
+
+The installed Work review labels accounting and cleanup observations as reported by MyEve. On the owner Result path these terminal observations are authenticated by the MyEve service signature; the Factory Result has its own verification. The observation cache grants no execution, settlement, installation or enterprise acceptance authority. UI labels must preserve that distinction and hide expired observations.
+
 ## Qualification limits
 
 Composed local evidence uses real PostgreSQL, native Relay HTTP/policy/lease handlers, real Convex, actual browser login/Settings, signed-session Sofie capability handlers, ordinary/platform synthetic policies and reconnect. It performs no model invocation. Relay-agent qualification projection is a synthetic fixture, not a qualified live projection feed. Native execution fixtures do not prove resource execution or stop.

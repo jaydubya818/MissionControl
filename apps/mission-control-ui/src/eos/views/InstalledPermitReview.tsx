@@ -58,12 +58,12 @@ export function InstalledPermitPanel({state,busy,error,notice,onRefresh,onApprov
   {state?.permits.map(p=><article key={p.permitId} className="space-y-2 border-t border-line pt-3">
    <p>Work {p.work.id}: {p.status==='REVOKED'?(p.authority==='FENCED'?'Receiving authority fenced':'Revocation requested'):p.status==='NEW_ADMISSIONS_DENIED'?'New admissions denied; existing Work preserved':p.status==='EXPIRED'?'Approval expired':'Owner approved'}</p>
    {p.status==='REVOKED'&&<p>Backend cleanup: {p.cleanup === 'CONFIRMED' ? 'confirmed' : 'pending confirmation'}.</p>}
-   {p.factoryResult&&<div aria-label="Verified Factory evidence">
+   {p.factoryResult&&<div aria-label="Factory Result and MyEve reports">
     <p>{p.factoryResult.expiresAt<=now?'Factory evidence expired. Refresh before review.':`Factory evidence: ${p.factoryResult.status}`}</p>
     {p.factoryResult.expiresAt>now&&p.factoryResult.result&&<>
      <p>Candidate: {p.factoryResult.result.candidate}</p>
      <p>Independent verdict: {p.factoryResult.result.independentVerdict}. Proof outcome: {p.factoryResult.result.proofOutcome}.</p>
-     <p>Accounting exposure: {p.factoryResult.result.exposureUnknown?'UNKNOWN — reservation retained':'known'}. Cleanup: {p.factoryResult.result.cleanupConfirmed?'confirmed':'pending backend'}.</p>
+     <p>Accounting exposure reported by MyEve: {p.factoryResult.result.exposureUnknown?'UNKNOWN — reservation retained':'known'}. Cleanup reported by MyEve: {p.factoryResult.result.cleanupConfirmed?'confirmed':'pending backend'}.</p>
     </>}
     <p>Enterprise acceptance is not established by this evidence.</p>
    </div>}
