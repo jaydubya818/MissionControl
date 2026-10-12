@@ -1,3 +1,4 @@
+import {makeFunctionReference} from 'convex/server';
 import type { MutationCtx } from '../_generated/server';
 import type { Doc,Id } from '../_generated/dataModel';
 import {parseExecutionPermit,canonicalPermitJson} from '../../packages/shared/src/executionPermit';
@@ -18,6 +19,7 @@ export async function revokePermit(ctx:MutationCtx,row:Doc<'enterpriseExecutionP
  const now=Date.now();
  await ctx.db.patch(row._id,{revokedAt:now,control:{sequence:(row.control?.sequence??0)+1,operation,reason,requestedAt:now}});
  await ctx.db.patch(row.approvalId,{revokedAt:now});
+ if(process.env.MC_SOFIE_CONTROL_DELIVERY_ENABLED==='true')await ctx.scheduler.runAfter(0,makeFunctionReference<'action'>('sofiePermitControlDelivery:deliver'),{permitId:row._id,sequence:(row.control?.sequence??0)+1});
  await ctx.db.insert('missionEvents',{missionId:row.missionId,projectId:row.projectId,tenantId:row.tenantId,eventType:'INSTALLED_PERMIT_REVOKE_REQUESTED',
    actorType:'SYSTEM',actorId:row.ownerId,timestamp:now,summary:'New MissionControl admissions denied; receiving authority and cleanup pending',metadata:{permitId:row._id,reason}});
 }

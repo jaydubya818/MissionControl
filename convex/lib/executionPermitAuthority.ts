@@ -72,7 +72,7 @@ export async function authenticatePermitCommand(ctx: MutationCtx, envelope: Serv
   return live;
 }
 
-async function controlConnection(ctx:MutationCtx,id:Id<'enterpriseAppConnections'>,capability:string) {
+export async function controlConnection(ctx:MutationCtx,id:Id<'enterpriseAppConnections'>,capability:string) {
   if(!['enterprise.readPermitControl','enterprise.acknowledgePermitControl'].includes(capability))return permitDenied();
   const connection=await ctx.db.get(id);if(!connection)return permitDenied();
   const enrollment=parseOwnerEnrollment(connection.installedEnrollment),origins=installedOrigins();

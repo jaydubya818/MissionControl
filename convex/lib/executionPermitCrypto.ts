@@ -20,3 +20,10 @@ export function verifyPermitSignature<T extends ExecutionPermit | AdmissionRecei
     || createHash('sha256').update(publicKey.export({ type:'spki', format:'der' })).digest('hex') !== key.keyId
     || !verify(null, Buffer.from(permitSigningText(signed.document)), publicKey, signature)) return permitDenied();
 }
+
+export function signConfiguredPermitDocument(value:{document:ExecutionPermit|AdmissionReceipt|PermitControlDelivery;enrollment:OwnerEnrollment}) {
+  let keys:Record<string,string>; try{keys=JSON.parse(process.env.MC_SOFIE_PERMIT_SIGNING_KEYS??'null');}catch{return permitDenied();}
+  const available=value.enrollment.permitKeys.filter(k=>k.revokedAt===null&&k.activeFrom<=value.document.issuedAt&&k.notAfter>=value.document.expiresAt&&keys&&Object.prototype.hasOwnProperty.call(keys,k.keyId));
+  if(available.length!==1||value.document.expiresAt<=Date.now()) return permitDenied();
+  return signPermitDocument(value.document,value.enrollment,keys[available[0].keyId]);
+}

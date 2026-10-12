@@ -5,15 +5,9 @@ import { authenticateInstalledSofieCommand } from './lib/installedSofieTransport
 import { v } from 'convex/values';
 import { action } from './_generated/server';
 import { makeFunctionReference } from 'convex/server';
-import { signPermitDocument } from './lib/executionPermitCrypto';
+import { signConfiguredPermitDocument as signed } from './lib/executionPermitCrypto';
 import { permitDenied, type PermitControlDelivery, type ExecutionPermit, type AdmissionReceipt, type OwnerEnrollment } from '../packages/shared/src/executionPermit';
 const envelope=v.object({serviceId:v.string(),capability:v.string(),projectId:v.string(),repositoryId:v.string(),commandId:v.string(),issuedAt:v.number(),expiresAt:v.number(),payloadDigest:v.string(),signature:v.string()});
-function signed(value:{document:ExecutionPermit|AdmissionReceipt|PermitControlDelivery;enrollment:OwnerEnrollment}) {
-  let keys:Record<string,string>; try{keys=JSON.parse(process.env.MC_SOFIE_PERMIT_SIGNING_KEYS??'null');}catch{return permitDenied();}
-  const available=value.enrollment.permitKeys.filter(k=>k.revokedAt===null&&k.activeFrom<=value.document.issuedAt&&k.notAfter>=value.document.expiresAt&&keys&&Object.prototype.hasOwnProperty.call(keys,k.keyId));
-  if(available.length!==1||value.document.expiresAt<=Date.now()) return permitDenied();
-  return signPermitDocument(value.document,value.enrollment,keys[available[0].keyId]);
-}
 export const issue=action({args:{permitId:v.id('enterpriseExecutionPermits')},handler:async(ctx,args)=>{
   if(!await ctx.auth.getUserIdentity()) return permitDenied();
   const value=await ctx.runMutation(makeFunctionReference<'mutation'>('sofieExecutionPermitState:readForSigning'),args);

@@ -84,6 +84,7 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
     if (installedPermits) {
       await copyClosure("convex/sofieExecutionPermits.ts");
       await copyClosure("convex/sofieFactoryResults.ts");
+      await copyClosure("convex/sofiePermitControlDelivery.ts");
       await copyFile(join(repo,"packages/shared/package.json"),join(root,"packages/shared/package.json"));
       await symlink(join(repo,"packages/shared/node_modules"),join(root,"packages/shared/node_modules"));
       await copyClosure("convex/sofieExecutionPermitState.ts");

@@ -126,6 +126,10 @@ try{
  await assert.rejects(()=>db.owner.action('sofieExecutionPermits:issue',{permitId:document.permitId}));
  report.checks.push('explicit revoke fences permit and reports cleanup pending truthfully');
  const control=await readControl();assert.equal(control.control.document.operation,'revoke');
+ const delivery=await db.owner.mutation('sofiePermitControlDeliveryState:record',{permitId:document.permitId,sequence:2,controlDigest:control.controlDigest,outcome:'DELIVERED'});
+ assert.equal(delivery.authority,'PENDING_BACKEND');assert.equal(delivery.cleanup,'PENDING_BACKEND');
+ assert.equal((await db.owner.mutation('sofiePermitControlDeliveryState:record',{permitId:document.permitId,sequence:1,controlDigest:disabledControl.controlDigest,outcome:'DELIVERED'})).delivery,'SUPERSEDED');
+ report.checks.push('delivery success never substitutes for exact backend authority/cleanup acknowledgment');
  assert.equal(verify(null,Buffer.from('mc-permit-control/v1\n'+canonicalPermitJson(control.control.document)),publicKey,Buffer.from(control.control.signature,'base64url')),true);
  assert.equal(control.control.document.sequence,2);
  await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:acknowledgeControl',sign('enterprise.acknowledgePermitControl',disabledAck)));
