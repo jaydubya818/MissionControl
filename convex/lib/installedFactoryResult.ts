@@ -78,6 +78,8 @@ export function verifyInstalledFactoryResult(document:Record<string,any>,permit:
  validateSpendBinding(spend,{workId:permit.work.id,workGeneration:permit.work.generation,requestId:a.requestId,workOrderId:a.factoryWorkOrderId,deadline:a.admittedDeadline,remoteRunId:a.runId,factoryVersion:permit.admission.factoryVersion},authority.limits.factory.microusd/1000000);
  if(spend.operations.some(op=>op.workGeneration!==permit.work.generation||op.model!==authority.model.id))deny();
  const {manifest}=verifyResult(r.signedResult,{keys:pins.resultKeys,factoryId:pins.factoryId,requestId:a.requestId,workOrderId:a.factoryWorkOrderId,runId:a.runId,factoryVersion:permit.admission.factoryVersion,now});
+ const resultKey=pins.resultKeys.find(k=>k.factoryId===pins.factoryId&&k.keyId===manifest.keyId)!;
+ const keyExpiresAt=Date.parse(resultKey.notAfter);
  const e=manifest.execution,v=manifest.verification,c=manifest.candidate;
  if(!c||e.version!==2||e.requestDigest!==a.requestDigest||e.attemptNumber!==1||e.sourceDigest!==pins.sourceDigest||e.configurationDigest!==pins.configurationDigest
   ||e.inputCommit!==authority.source.baseSha||e.inputTree!==authority.source.treeSha||e.configuration.cloud?.verificationPolicySha256!==pins.verifierPolicySha256
@@ -104,7 +106,7 @@ export function verifyInstalledFactoryResult(document:Record<string,any>,permit:
  const settled=r.settlementState==='SETTLED'&&!exposureUnknown&&cleanupConfirmed&&accounting.unknownMicrousd===0&&accounting.reservedMicrousd===0
   &&attestation.quiescent===true&&spend.status==='KNOWN'&&spend.accountingComplete&&spend.retainedMicrousd===0&&spend.unknownExposureMicrousd===0;
  if(document.status==='SETTLED'&&!settled)deny();
- return {...base,expiresAt:Math.min(document.expiresAt,expiry),status:settled?'VERIFIED_SETTLED':'VERIFIED_PENDING',
+ return {...base,expiresAt:Math.min(document.expiresAt,expiry,keyExpiresAt),status:settled?'VERIFIED_SETTLED':'VERIFIED_PENDING',
   result:{resultId:r.resultId,manifestDigest:r.manifestDigest,proofHash:r.proofHash,candidate:c.commit,independentVerdict:independentPass?'PASS':'NOT_ESTABLISHED',
    proofOutcome:proof.outcome,accounting,exposureUnknown,cleanupConfirmed,ownerAcceptance:'SEPARATE_DECISION_REQUIRED'}};
 }

@@ -25,3 +25,5 @@ it('requires exact service HMAC even for an otherwise valid packet',()=>{const f
 
 it('does not report cleanup confirmed when signed Factory says non-quiescent',()=>{const f=fixture();f.document.status='PENDING';f.attestation.quiescent=false;f.readback.readbackSignature=f.factorySign('MYFACTORY_EXTERNAL_ALPHA_READBACK_V1',f.attestation);const result=f.run();expect(result.status).toBe('VERIFIED_PENDING');expect(result.result?.cleanupConfirmed).toBe(false);});
 it('rejects an inconsistent MyEve accounting projection instead of claiming reconciliation',()=>{const f=fixture();f.document.result.accounting.settledMicrousd=f.permit.admission.maxCostMicrousd+1;expect(f.run).toThrow();});
+
+it('bounds current Result evidence by signing key expiry inside response lifetime',()=>{const f=fixture();f.pins.resultKeys[0].notAfter=new Date(f.now+5000).toISOString();expect(f.run().expiresAt).toBe(f.now+5000);});
