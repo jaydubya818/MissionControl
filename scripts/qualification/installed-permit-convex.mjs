@@ -43,8 +43,8 @@ try{
  const binding={ownerId:enrollment.ownerId,organizationId:'fixture-org',installationId:enrollment.installationId,backendId:'missioncontrol',incarnation:'fixture-incarnation',enrollmentVersion:1,tenantId:s.tenantId,projectId:s.projectId,ownerMemberId:s.memberId,agentId:'sofie',registryVersion:'registry',sourceKeys,acknowledgmentKey};
  for(const [name,value] of Object.entries({MC_CAPABILITY_ENVIRONMENT:'qualification',MC_CAPABILITY_INSTALLATION_ID:binding.installationId,MC_CAPABILITY_BINDINGS_JSON:JSON.stringify([binding]),MC_CAPABILITY_RECEIVER_RECOVERY_STATE:'ACTIVE',MC_CAPABILITY_RECEIVER_EPOCH:binding.incarnation}))db.setEnvironment(name,value);
  const identity={ownerId:binding.ownerId,organizationId:binding.organizationId,installationId:binding.installationId,backendId:binding.backendId,incarnation:binding.incarnation,enrollmentVersion:1};
- async function fence(authority,version,operation){const value={...identity,authority,version,policyId:`${authority}-${version}`,kind:'FENCE',capabilityId:'missioncontrol',operation};const envelope=await signPolicyMessage(value,sourceKeys[authority]);const acknowledgment=await signPolicyMessage({...identity,authority,version,policyId:value.policyId,kind:'FENCE_ACK',fenceHash:await policyMessageHash(value)},acknowledgmentKey);await db.owner.mutation('capabilityPolicy:receiveFence',{envelope,acknowledgment});}
- await fence('myeve',1,'enable');await fence('relay',1,'enable');
+ async function fence(authority,version,operation){const value={...identity,authority,version,policyId:`${authority}-${version}`,kind:'FENCE',capabilityId:authority==='relay'?'work':'missioncontrol',operation};const envelope=await signPolicyMessage(value,sourceKeys[authority]);const acknowledgment=await signPolicyMessage({...identity,authority,version,policyId:value.policyId,kind:'FENCE_ACK',fenceHash:await policyMessageHash(value)},acknowledgmentKey);await db.owner.mutation('capabilityPolicy:receiveFence',{envelope,acknowledgment});}
+ await fence('myeve',1,'enable');await fence('relay',1,'disable'); // Canonical Relay epoch invalidation is not an owner preference disable.
  const commandId=randomUUID(),challenge=randomBytes(32).toString('hex');
  const readInput={schema:'mc-approved-permit-read/v1',connectionId:s.connectionId,work,admissionCommandId:commandId,challenge};
  const readArgs=sign('enterprise.readApprovedPermit',readInput);
@@ -57,12 +57,27 @@ try{
  const myeveMessage={...common,kind:'PERMIT',requiredCapabilities:['work','missioncontrol','enterprise.fleet'],agentRevision:1,sourcePermitHash:'SELF'};
  const capabilityPermits={myeve:await signPolicyMessage(myeveMessage,sourceKeys.myeve),relay:await signPolicyMessage({...myeveMessage,authority:'relay',policyId:'relay-1',referenceId:randomUUID(),sourcePermitHash:await policyMessageHash(myeveMessage)},sourceKeys.relay)};
  const admissionInput={schema:'mc-admission-challenge/v1',connectionId:s.connectionId,permitId:document.permitId,permitSha256:permitDigest(document),challenge,work,capabilityPermits};
- const admissionArgs=sign('enterprise.authorizeAdmission',admissionInput,commandId);
+ let admissionArgs=sign('enterprise.authorizeAdmission',admissionInput,commandId);
  const receipts=await Promise.all(Array.from({length:3},()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs)));
  assert.equal(new Set(receipts.map(r=>canonicalPermitJson(r.document))).size,1);
  assert.equal(receipts[0].document.policyPairSha256,createHash('sha256').update(canonicalPermitJson(capabilityPermits)).digest('hex'));
  assert.ok(receipts[0].document.expiresAt-receipts[0].document.issuedAt<=10000);
  assert.equal((await db.owner.query('installedPermitFixture:rows',{table:'capabilityAdmissionReferences'})).length,2);
+ report.checks.push('current Relay permit admits after canonical disable epoch invalidation');
+ await fence('relay',2,'disable');
+ await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs),/CAPABILITY_POLICY_IDENTITY_MISMATCH/);
+ report.checks.push('new Relay epoch still rejects previously signed admission proof');
+ async function freshCurrentAdmission(){
+  const commandId=randomUUID(),challenge=randomBytes(32).toString('hex');
+  const read=await db.anonymous.action('sofieExecutionPermits:readApproved',sign('enterprise.readApprovedPermit',{...readInput,admissionCommandId:commandId,challenge}));
+  const {kind:_,...current}=JSON.parse(read.capabilityChallenge.message);
+  const source={...current,kind:'PERMIT',requiredCapabilities:['work','missioncontrol','enterprise.fleet'],agentRevision:1,sourcePermitHash:'SELF'};
+  const pair={myeve:await signPolicyMessage(source,sourceKeys.myeve),relay:await signPolicyMessage({...source,authority:'relay',version:2,policyId:'relay-2',referenceId:randomUUID(),sourcePermitHash:await policyMessageHash(source)},sourceKeys.relay)};
+  admissionArgs=sign('enterprise.authorizeAdmission',{...admissionInput,challenge,capabilityPermits:pair},commandId);
+  await db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs);
+ }
+ await freshCurrentAdmission();
+ report.checks.push('fresh current Relay proof restores positive admission before isolated negatives');
  db.setEnvironment('MC_SOFIE_FACTORY_RESULT_PINS',JSON.stringify({[s.connectionId]:resultFixture.pins}));
  const resultRead=await db.owner.mutation('sofieFactoryResultState:read',{permitId:document.permitId});
  assert.equal(resultRead.document.work.id,work.id);
@@ -94,14 +109,16 @@ try{
  assert.equal((await db.owner.query('sofieExecutionPermitState:inspect',{projectId:s.projectId,connectionId:s.connectionId})).permits.length,1);
  report.checks.push('controller/database restart retains owner approval');
  for(const id of [s.missionId,s.workOrderId]){
+   await freshCurrentAdmission();
    await db.owner.mutation('installedPermitFixture:patch',{id,patch:{state:'DONE'}});
-   await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs));
+   await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs),/MISSIONCONTROL_PERMIT_DENIED/);
    await assert.rejects(()=>db.owner.mutation('sofieExecutionPermitState:approve',{...args,idempotencyKey:randomUUID(),work:{...work,id:randomUUID()}}));
    await db.owner.mutation('installedPermitFixture:patch',{id,patch:{state:'READY'}});
  }
  report.checks.push('terminal Mission and WorkOrder deny fresh approval and receipt');
+ await freshCurrentAdmission();
  await fence('myeve',2,'disable');
- await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs));
+ await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:authorizeAdmission',admissionArgs),/CAPABILITY_DISABLED/);
  await assert.rejects(()=>db.anonymous.action('sofieExecutionPermits:readApproved',sign('enterprise.readApprovedPermit',readInput)));
  assert.equal((await db.owner.query('installedPermitFixture:rows',{table:'enterpriseExecutionPermits'}))[0].revokedAt,undefined);
  report.checks.push('disable rejects new admission and replay without deleting prior approved Work');

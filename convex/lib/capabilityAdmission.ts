@@ -55,7 +55,9 @@ export async function requireCapabilityAdmission(ctx: MutationCtx, record: Admis
     const scope = capabilityPolicyScope({ ...binding, authority });
     const fence = await ctx.db.query('capabilityPolicyFences').withIndex('by_scope', q => q.eq('scope', scope)).unique();
     if (!fence) throw Error('CAPABILITY_POLICY_REVALIDATION_UNAVAILABLE');
-    if (application && ['work','missioncontrol',input.capabilityId].includes(fence.capabilityId) && ['disable','pause','revoke'].includes(fence.operation)) throw Error('CAPABILITY_DISABLED');
+    // MyEve fences express owner preference/control. Relay fences invalidate an epoch;
+    // its current signed permit independently proves eligibility under that epoch.
+    if (application && authority === 'myeve' && ['work','missioncontrol',input.capabilityId].includes(fence.capabilityId) && ['disable','pause','revoke'].includes(fence.operation)) throw Error('CAPABILITY_DISABLED');
     assertPolicyIdentity(permit, { ...binding, authority, version: fence.version, policyId: fence.policyId });
     if (permit.ownerId !== binding.ownerId || permit.organizationId !== binding.organizationId
       || permit.installationId !== binding.installationId || permit.backendId !== binding.backendId
