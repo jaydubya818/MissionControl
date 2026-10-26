@@ -48,19 +48,19 @@ crons.daily(
   internal.telegram.prepareDailyCEOBrief
 );
 
-// Detect stale agent heartbeats every 2 minutes (runs no-op unless HEARTBEAT_RECOVERY_ENABLED=true in Convex env)
+// Detect stale agent heartbeats every 10 minutes (was 2; free-plan budget) (runs no-op unless HEARTBEAT_RECOVERY_ENABLED=true in Convex env)
 // Recovery: quarantine agent, block tasks, create alerts. Threshold: HEARTBEAT_STALE_MINUTES (default 5).
 // Set HEARTBEAT_IGNORE_NEVER=true to skip agents that have never sent a heartbeat.
 crons.interval(
   "detect stale heartbeats",
-  { minutes: 2 },
+  { minutes: 10 },
   internal.agents.detectStaleAgents
 );
 
-// Auto-route execution requests every 5 minutes
+// Auto-route execution requests every 15 minutes (was 5; free-plan budget)
 crons.interval(
   "auto-route executions",
-  { minutes: 5 },
+  { minutes: 15 },
   internal.executorRouter.autoRoute
 );
 
@@ -71,10 +71,10 @@ crons.interval(
   internal.migrations.backfillInstanceRefs.guardMigrationHealth
 );
 
-// Execute due scheduled jobs every minute
+// Execute due scheduled jobs every 5 minutes (was 1; cut to stay within Convex free plan)
 crons.interval(
   "execute scheduled jobs",
-  { minutes: 1 },
+  { minutes: 5 },
   internal.scheduledJobs.executeDue
 );
 
