@@ -1,3 +1,4 @@
+// Cadences cut ~90% (Oct 26 2026) to keep the jaydubya818 Convex team on the free plan.
 /**
  * Convex Cron Jobs
  *
@@ -15,14 +16,14 @@ const crons = cronJobs();
 // Expire approvals past their expiresAt every 15 minutes
 crons.interval(
   "expire stale approvals",
-  { minutes: 15 },
+  { minutes: 60 },
   api.approvals.expireStale
 );
 
 // Escalate pending approvals breaching SLA every 10 minutes
 crons.interval(
   "escalate overdue approvals",
-  { minutes: 10 },
+  { minutes: 60 },
   api.approvals.escalateOverdue,
   {}
 );
@@ -30,7 +31,7 @@ crons.interval(
 // Detect loops (comment storms, review ping-pong, repeated failures) every 15 minutes
 crons.interval(
   "detect loops",
-  { minutes: 15 },
+  { minutes: 60 },
   internal.loops.detectLoops
 );
 
@@ -53,28 +54,28 @@ crons.daily(
 // Set HEARTBEAT_IGNORE_NEVER=true to skip agents that have never sent a heartbeat.
 crons.interval(
   "detect stale heartbeats",
-  { minutes: 2 },
+  { minutes: 30 },
   internal.agents.detectStaleAgents
 );
 
 // Auto-route execution requests every 5 minutes
 crons.interval(
   "auto-route executions",
-  { minutes: 5 },
+  { minutes: 30 },
   internal.executorRouter.autoRoute
 );
 
 // Guard against migration drift (missing instance refs or tenant IDs) every 30 minutes
 crons.interval(
   "guard ARM migration health",
-  { minutes: 30 },
+  { hours: 24 },
   internal.migrations.backfillInstanceRefs.guardMigrationHealth
 );
 
 // Execute due scheduled jobs every minute
 crons.interval(
   "execute scheduled jobs",
-  { minutes: 1 },
+  { minutes: 15 },
   internal.scheduledJobs.executeDue
 );
 
@@ -82,7 +83,7 @@ crons.interval(
 // The scan creates reviewable proposals; it never dispatches work automatically.
 crons.interval(
   "scan opted-in repetitive tasks",
-  { hours: 1 },
+  { hours: 6 },
   internal.factory.repetitiveTasks.scanScheduled
 );
 
@@ -90,21 +91,21 @@ crons.interval(
 // explicitly scheduled the scanner. The result remains proposal-only.
 crons.interval(
   "scan opted-in factory learning evidence",
-  { hours: 1 },
+  { hours: 6 },
   internal.factory.learning.scanScheduled
 );
 
 // LEVEL_1 Automations create approval-gated, read-only WorkOrders only.
 crons.interval(
   "create due automation review gates",
-  { hours: 1 },
+  { hours: 6 },
   internal.automationScheduler.evaluateDue
 );
 
 // Evaluate alert rules (e.g. daily cost exceeded) every hour
 crons.interval(
   "evaluate alert rules",
-  { hours: 1 },
+  { hours: 6 },
   internal.alertRules.evaluateRules
 );
 
