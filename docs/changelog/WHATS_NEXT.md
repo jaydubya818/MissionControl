@@ -402,11 +402,11 @@ Create `DEPLOYMENT_RESULTS.md`:
 ## 📚 Resources
 
 ### Documentation
-- **Getting Started:** [GETTING_STARTED.md](GETTING_STARTED.md)
-- **Deployment:** [DEPLOY_NOW.md](DEPLOY_NOW.md)
-- **Integration:** [docs/OPENCLAW_INTEGRATION.md](docs/OPENCLAW_INTEGRATION.md)
-- **Telegram:** [docs/TELEGRAM_COMMANDS.md](docs/TELEGRAM_COMMANDS.md)
-- **Runbook:** [docs/RUNBOOK.md](docs/RUNBOOK.md)
+- **Getting Started:** [GETTING_STARTED.md](../guides/GETTING_STARTED.md)
+- **Deployment:** [DEPLOY_NOW.md](../guides/DEPLOY_NOW.md)
+- **Integration:** [docs/OPENCLAW_INTEGRATION.md](../architecture/OPENCLAW_INTEGRATION.md)
+- **Telegram:** [docs/TELEGRAM_COMMANDS.md](../guides/TELEGRAM_COMMANDS.md)
+- **Runbook:** [docs/RUNBOOK.md](../runbook/RUNBOOK.md)
 
 ### Quick Links
 - **Production UI:** https://mission-control-dnnwuy2xm-jaydubya818.vercel.app
