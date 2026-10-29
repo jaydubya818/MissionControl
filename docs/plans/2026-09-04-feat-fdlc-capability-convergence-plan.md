@@ -465,7 +465,7 @@ This map covers all 44 chapters from the [Guide contents](https://ai-software-fa
 - [Factory Memory](../architecture/factory-memory-context-intelligence.md).
 - [Factory Learning](../architecture/factory-learning-continuous-improvement.md).
 - [Loop Engineering](../software-factory/LOOP_ENGINEERING.md).
-- [Pilot todo 059](../../todos/059-in-progress-p1-real-product-repository-pilot.md), [incident todo 060](../../todos/060-ready-p1-factory-incident-command.md), [MCP todo 061](../../todos/061-ready-p1-governed-read-only-mcp.md), [shared intent todo 062](../../todos/062-ready-p1-shared-builder-intent.md), [economics todo 063](../../todos/063-ready-p1-outcome-economics-routing.md).
+- [Pilot todo 059](../../todos/059-in-progress-p1-real-product-repository-pilot.md), [incident todo 060](../../todos/060-complete-p1-factory-incident-command.md), [MCP todo 061](../../todos/061-complete-p1-governed-read-only-mcp.md), [shared intent todo 062](../../todos/062-complete-p1-shared-builder-intent.md), [economics todo 063](../../todos/063-in-progress-p1-outcome-economics-routing.md).
 
 The pinned-main URLs earlier in this plan intentionally reference files absent from this older checkout. Reassess them on the implementation baseline rather than creating similarly named replacements here.
 

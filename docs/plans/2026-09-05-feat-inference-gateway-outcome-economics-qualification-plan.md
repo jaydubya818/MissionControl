@@ -19,7 +19,7 @@ autonomous routing, broaden tool authority, or optimize for token volume.
 
 This plan implements the existing Phase 5 section of the
 [production convergence plan](2026-08-25-feat-software-factory-production-convergence-plan.md)
-and existing [todo 063](../../todos/063-ready-p1-outcome-economics-routing.md).
+and existing [todo 063](../../todos/063-in-progress-p1-outcome-economics-routing.md).
 It is the bounded inference-accounting qualification slice of that larger todo;
 it creates no parallel roadmap item and does not complete todo 063's compute,
 sandbox, platform, human-attention, adoption, or customer-outcome economics.
