@@ -395,6 +395,6 @@ MIT
 
 ## Support
 
-- **Documentation:** [docs/OPENCLAW_INTEGRATION.md](../../docs/OPENCLAW_INTEGRATION.md)
+- **Documentation:** [docs/OPENCLAW_INTEGRATION.md](../../docs/architecture/OPENCLAW_INTEGRATION.md)
 - **Issues:** [GitHub Issues](https://github.com/jaydubya818/MissionControl/issues)
 - **Discord:** [Join our Discord](#)
