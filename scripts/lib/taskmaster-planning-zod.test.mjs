@@ -92,7 +92,7 @@ describe("Taskmaster planning path under the repository Zod override", () => {
 
   it("runs Taskmaster generateTasksFromPRD through generateObject on the installed Zod 4 schema", async () => {
     const requests = [];
-    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-api03-taskmaster-zod-smoke-key");
+    vi.stubEnv("ANTHROPIC_API_KEY", "tm-offline-anthropic-key");
     globalThis.fetch = async (_input, init) => {
       const body = JSON.parse(init.body);
       requests.push(body);
