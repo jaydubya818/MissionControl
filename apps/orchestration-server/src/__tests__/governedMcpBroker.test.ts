@@ -154,26 +154,29 @@ describe("governed read-only MCP broker", () => {
     expect(context7ToolVersion()).toEqual(controlPlaneContext7ToolVersion());
   });
 
-  it("reports the pinned and installed SDK identity and rejects coherent grants for the old SDK before transport", async () => {
+  it("reports the pinned and installed SDK identity and rejects coherent grants for previous SDK identities before transport", async () => {
     const pinned = JSON.parse(await readFile(resolve(REPO_ROOT, "apps/orchestration-server/package.json"), "utf8"));
     const installed = JSON.parse(await readFile(resolve(REPO_ROOT, "apps/orchestration-server/node_modules/@modelcontextprotocol/sdk/package.json"), "utf8"));
+    expect(context7ToolVersion().sdk.version).toBe("1.32.2");
     expect(context7ToolVersion().sdk.version).toBe(pinned.dependencies["@modelcontextprotocol/sdk"]);
     expect(context7ToolVersion().sdk.version).toBe(installed.version);
-    let calls = 0;
-    const value = await fixture({ invoke: async () => { calls += 1; return successfulOutput; } });
-    const old = structuredClone(value.authority.toolVersion.snapshot);
-    Object.assign(old.sdk, { version: "1.26.0" });
-    const digest = mcpToolVersionDigest(old);
-    value.authority.toolVersion.snapshot = old;
-    value.authority.toolVersion.digest = digest;
-    value.authority.grant.snapshot.toolVersionSnapshot = old;
-    value.authority.grant.snapshot.toolVersionDigest = digest;
-    value.request.toolVersionDigest = digest;
-    value.authority.grant.digest = mcpToolGrantDigest(value.authority.grant.snapshot);
-    value.request.toolGrantDigest = value.authority.grant.digest;
-    value.authority.executionProfile.toolGrant = { id: value.authority.grant.id, digest: value.authority.grant.digest, snapshot: value.authority.grant.snapshot };
-    await expect(value.broker.call(brokerInput(value))).rejects.toMatchObject({ code: "SERVER_SUBSTITUTION" });
-    expect(calls).toBe(0);
+    for (const oldVersion of ["1.31.0", "1.26.0"] as const) {
+      let calls = 0;
+      const value = await fixture({ invoke: async () => { calls += 1; return successfulOutput; } });
+      const old = structuredClone(value.authority.toolVersion.snapshot);
+      Object.assign(old.sdk, { version: oldVersion });
+      const digest = mcpToolVersionDigest(old);
+      value.authority.toolVersion.snapshot = old;
+      value.authority.toolVersion.digest = digest;
+      value.authority.grant.snapshot.toolVersionSnapshot = old;
+      value.authority.grant.snapshot.toolVersionDigest = digest;
+      value.request.toolVersionDigest = digest;
+      value.authority.grant.digest = mcpToolGrantDigest(value.authority.grant.snapshot);
+      value.request.toolGrantDigest = value.authority.grant.digest;
+      value.authority.executionProfile.toolGrant = { id: value.authority.grant.id, digest: value.authority.grant.digest, snapshot: value.authority.grant.snapshot };
+      await expect(value.broker.call(brokerInput(value))).rejects.toMatchObject({ code: "SERVER_SUBSTITUTION" });
+      expect(calls).toBe(0);
+    }
   });
 
   it("authorizes only the exact real-service operation, scope, and contract identity offline", async () => {

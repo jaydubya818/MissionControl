@@ -4,19 +4,6 @@
   "reviewedOn": "2026-11-02",
   "acceptances": [
     {
-      "advisoryId": "1119676",
-      "package": "@ai-sdk/provider-utils",
-      "severity": "low",
-      "owner": "Mission Control repository owner",
-      "acceptedVersions": ["3.0.21"],
-      "scopes": ["all"],
-      "rationale": "This unpatched package is reachable only through the manually invoked Taskmaster planning CLI and is absent from the production dependency audit and runtime.",
-      "controls": ["manual development CLI only", "not executed by CI", "not bundled or deployed", "no upstream patched version exists"],
-      "reviewBy": "2026-10-15",
-      "expiresOn": "2026-11-15",
-      "migrationPlan": "Re-evaluate Taskmaster or its provider-utils dependency when an upstream patched release is available."
-    },
-    {
       "advisoryId": "1243661",
       "package": "@hono/node-server",
       "severity": "moderate",

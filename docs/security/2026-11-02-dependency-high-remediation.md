@@ -61,6 +61,11 @@ moderates. Each has a same-major patch, so they are upgraded rather than accepte
   before transport. Fresh qualification is required before activation.
 - Runtime contract remains **v63**. No Convex public function signatures changed.
 - Zod 4.3.6 → 4.6.6 is same-major. `@ai-sdk/*` peers already allow `^4.1.8`.
+  Taskmaster's `generateTasksFromPRD` schema parses and round-trips through
+  AI SDK `generateObject` on the overridden Zod 4.6.6 (`scripts/lib/taskmaster-planning-zod.test.mjs`).
+- Stale low advisory 1119676 (`@ai-sdk/provider-utils` 3.0.21) was removed from
+  `dependency-risk-acceptances.json`; the existing `@ai-sdk/provider-utils@<3.0.28`
+  override already moved Taskmaster onto 3.0.28, so the finding is no longer in the audit.
 - Vite 6.4.3 → 6.4.5 and Vitest 4.1.11 → 4.1.12 are patch releases.
 - Hono 4.13.7 → 4.13.11 required an explicit `MiddlewareHandler` return type on
   `requireAuth()` so TypeScript 2742 declaration emit stays portable. Auth
