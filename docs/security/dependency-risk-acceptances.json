@@ -8,13 +8,13 @@
       "package": "@hono/node-server",
       "severity": "moderate",
       "owner": "Mission Control repository owner",
-      "acceptedVersions": ["1.19.17"],
+      "acceptedVersions": ["1.19.18"],
       "scopes": ["production", "all"],
       "rationale": "The advisory is limited to serveStatic double-decoding a request path. Mission Control's orchestration server imports only Hono() and serve() from @hono/node-server and never calls serveStatic. No 1.x patched release exists; the patched line is 2.1.3+, which requires Node >=20 and would raise the declared Node >=18 floor. High-severity findings are not accepted.",
       "controls": [
         "no serveStatic import or call in apps/orchestration-server",
         "orchestration exposes JSON API routes only",
-        "SDK override keeps @hono/node-server on 1.19.17 rather than resolving 2.x",
+        "SDK override keeps @hono/node-server on 1.19.18 rather than resolving 2.x",
         "hono itself is patched to 4.13.11 for the related serveStatic advisory 1242595"
       ],
       "reviewBy": "2026-11-16",
