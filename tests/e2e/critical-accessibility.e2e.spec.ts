@@ -126,6 +126,9 @@ for (const entry of CRITICAL_ROUTES) {
 test("dashboard next-action controls have no serious accessibility violations", async ({ page }, testInfo) => {
   await page.goto("/v2/home");
   await expect(page.getByRole("region", { name: "Start here" })).toBeVisible();
+  for (const label of [/Needs your decision/, /Blocked/, /Failed/]) {
+    await expect(page.getByTestId("start-here").getByRole("button", { name: label })).toBeVisible();
+  }
   const violations = await getAccessibilityViolations(page, testInfo, "dashboard-next-actions", '[data-testid="start-here"]');
   expect(violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
 });
