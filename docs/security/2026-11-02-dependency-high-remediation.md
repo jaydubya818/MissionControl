@@ -52,7 +52,7 @@ moderates. Each has a same-major patch, so they are upgraded rather than accepte
 
 | Advisory | Package | Exploitable? | Disposition |
 | --- | --- | --- | --- |
-| [1243661](https://github.com/advisories/GHSA-rmxm-3fg6-px4f) | `@hono/node-server` 1.19.17 | No. `serveStatic` is unused. Orchestration uses `Hono` + `serve` only. | Recorded acceptance. Patched line is 2.1.3+ (`engines.node >=20`). |
+| [1243661](https://github.com/advisories/GHSA-rmxm-3fg6-px4f) | `@hono/node-server` 1.19.17 (now 1.19.18, see note below) | No. `serveStatic` is unused. Orchestration uses `Hono` + `serve` only. | Recorded acceptance. Patched line is 2.1.3+ (`engines.node >=20`). |
 
 ## Compatibility
 
@@ -70,7 +70,10 @@ moderates. Each has a same-major patch, so they are upgraded rather than accepte
 - Hono 4.13.7 → 4.13.11 required an explicit `MiddlewareHandler` return type on
   `requireAuth()` so TypeScript 2742 declaration emit stays portable. Auth
   behavior is unchanged.
-- `@hono/node-server` stays on 1.19.17; Node >=18 floor is unchanged.
+- `@hono/node-server` stayed on 1.19.17 in this PR; Node >=18 floor is unchanged.
+  Superseded by PR #245, which pins **1.19.18** to close GHSA-jpvv-r467-5p4w
+  (`serve()` backslash path) and keeps the 1243661 acceptance. See
+  [2026-11-03-hono-node-server-1243661.md](2026-11-03-hono-node-server-1243661.md).
 - `@mission-control/cli`, `@mission-control/openclaw-sdk`, and
   `@mission-control/capability-control` do not depend on the patched packages.
   MyEve `missioncontrol-consumer` is not in this repository; no public package
