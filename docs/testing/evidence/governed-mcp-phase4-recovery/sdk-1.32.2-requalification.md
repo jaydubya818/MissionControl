@@ -23,9 +23,13 @@ pinned identity using the existing qualification path:
    `phase4-context7-profile-qualification-sdk-1.32.2:<repositoryId>`
 
 The run is an in-memory Convex handler fixture
-(`convex/__tests__/phase4SdkRequalification.test.ts`). It does not write a
-production database, does not start enterprise execution, and does not touch
-Relay/MissionControl factory work orders WO-001..014.
+(`convex/__tests__/phase4SdkRequalification.test.ts`). Happy-path qualification
+uses an authenticated operator with `factory.approve`. An operator that only
+has `factory.automation.manage` is denied on `qualifyVersion` and profile
+`qualify`. Model-route identity is created through
+`registerExactRoute` / `promoteExactRoute` with the real evidence-file digest.
+It does not write a production database, does not start enterprise execution,
+and does not touch Relay/MissionControl factory work orders WO-001..014.
 
 ## Observed fixture identity
 
@@ -36,8 +40,12 @@ Relay/MissionControl factory work orders WO-001..014.
   a different identity and is rejected as an idempotency collision when reused
   against the 1.32.2 snapshot
 - Profile remains `UNQUALIFIED`/`DISABLED` until the evidence-qualified
-  mutation; admission after qualification is `PRODUCTION_PILOT_ELIGIBLE` on
-  the isolated fixture profile only, never a production Factory
+  mutation; admission after qualification is exactly
+  `PRODUCTION_PILOT_ELIGIBLE` on the isolated fixture profile only, never a
+  production Factory
+- Grant snapshot is `query-docs`, `credentialClass=NONE`,
+  `maxCallsPerAttempt=1`, `destination=mcp.context7.com:443`,
+  `revocationMode=DENY_NEW_CALLS`
 
 ## What this does not authorize
 
