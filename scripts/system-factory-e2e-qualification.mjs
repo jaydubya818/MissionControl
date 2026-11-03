@@ -107,6 +107,7 @@ const steps = [
       "exec", "vitest", "run",
       "convex/__tests__/missionPlan.test.ts",
       "convex/__tests__/governedMcp.test.ts",
+      "convex/__tests__/phase4SdkRequalification.test.ts",
       "convex/__tests__/missionSpec.test.ts",
       "convex/__tests__/missionSpecAuthority.test.ts",
       "convex/__tests__/missionWorkOrderContract.test.ts",
