@@ -10,6 +10,12 @@ import {
   harnessCapabilityManifestDigest,
   harnessRuntimeArtifactDigest,
 } from "@mission-control/workflow-engine/harness-contract";
+import {
+  phase4Context7GrantRegistrationKey,
+  phase4Context7ProfileQualificationKey,
+  phase4Context7ProfileRegistrationKey,
+  phase4Context7ToolVersionRegistrationKey,
+} from "./lib/phase4-mcp-qualification.mjs";
 
 const CONVEX_URL = process.env.CONVEX_URL ?? "http://127.0.0.1:3224";
 if (CONVEX_URL !== "http://127.0.0.1:3224") {
@@ -196,7 +202,7 @@ await client.mutation(fn("modelCatalog:promoteExactRoute"), {
 
 const tool = await client.mutation(fn("factory/governedMcp:registerContext7QueryDocs"), {
   projectId,
-  registrationIdempotencyKey: `phase4-context7-v4.0.5:${repositoryId}`,
+  registrationIdempotencyKey: phase4Context7ToolVersionRegistrationKey(repositoryId),
 });
 await client.mutation(fn("factory/governedMcp:qualifyVersion"), {
   toolVersionId: tool.toolVersionId,
@@ -210,13 +216,13 @@ const grant = await client.mutation(fn("factory/governedMcp:createGrant"), {
   toolVersionId: tool.toolVersionId,
   grantKey: "phase4-context7-query-docs",
   expiresAt: validUntil,
-  registrationIdempotencyKey: `phase4-context7-grant:${repositoryId}`,
+  registrationIdempotencyKey: phase4Context7GrantRegistrationKey(repositoryId),
 });
 
 const profileResult = await client.mutation(fn("factory/executionProfiles:registerVersion"), {
   projectId,
   profileKey: "phase4-context7-codex",
-  registrationIdempotencyKey: `phase4-context7-profile:${repositoryId}`,
+  registrationIdempotencyKey: phase4Context7ProfileRegistrationKey(repositoryId),
   executor: { adapter: "codex", version: "v1" },
   executionBackend: "persistent-worker",
   modelCatalogId,
@@ -227,7 +233,7 @@ const profileBefore = await client.query(fn("factory/executionProfiles:get"), { 
 await client.mutation(fn("factory/executionProfiles:qualify"), {
   executionProfileId: profileResult.executionProfileId,
   expectedProfileDigest: profileBefore.profile.profileDigest,
-  qualificationIdempotencyKey: `phase4-context7-profile-qualification:${repositoryId}`,
+  qualificationIdempotencyKey: phase4Context7ProfileQualificationKey(repositoryId),
   evidenceReference: "docs/testing/evidence/governed-mcp-phase4-recovery/first-live-call-preflight.md",
   evidenceDigest: evidenceDigest("docs/testing/evidence/governed-mcp-phase4-recovery/first-live-call-preflight.md"),
   workloadClasses: ["SOFTWARE_CHANGE"],

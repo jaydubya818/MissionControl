@@ -502,7 +502,7 @@ Current public client/backend runtime contract: **v63**. Version 63 adds receive
 observed-cost reconciliation for terminal Fab Attempts. Version 62 combines that
 contract with authenticated capability challenges and ordered policy proofs for
 Mission and WorkOrder admission. Clients and the backend must advance together.
-SDK-qualified MCP snapshots bind to version 1.31.0 and require fresh qualification
+SDK-qualified MCP snapshots bind to version 1.32.2 and require fresh qualification
 before activation.
 
 ### Local Research Lab retry qualification

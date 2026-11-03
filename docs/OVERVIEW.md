@@ -218,7 +218,7 @@ v63 adds fail-closed host recovery quarantine and signed native lifecycle acknow
 
 v62 combines that contract with authenticated capability challenges and ordered
 policy proofs for Mission and WorkOrder admission. Clients and the backend must
-advance together. MCP snapshots bind to SDK 1.31.0; older SDK qualification cannot
+advance together. MCP snapshots bind to SDK 1.32.2; older SDK qualification cannot
 authorize the upgraded runtime. Activation requires fresh qualification.
 
 Inference receipt v3 retains valid observed overruns and route drift with explicit

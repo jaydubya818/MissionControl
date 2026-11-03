@@ -4,7 +4,7 @@
  * Authorization: Bearer <token>. When neither is set, requests are allowed (dev mode).
  */
 
-import type { Context, Next } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { timingSafeEqual } from "node:crypto";
 
 const PUBLIC_ROUTES = new Set([
@@ -31,8 +31,8 @@ export function orchestrationAuthFailure(
     : { status: 401, error: "Unauthorized" };
 }
 
-export function requireAuth() {
-  return async (c: Context, next: Next) => {
+export function requireAuth(): MiddlewareHandler {
+  return async (c, next) => {
     const method = c.req.method.toUpperCase();
     if (isPublicOrchestrationRoute(method, c.req.path)) {
       await next();

@@ -76,7 +76,17 @@ describe("governed MCP control-plane identity", () => {
   });
 });
 
- it.each([qualificationFixtureToolVersionSnapshot(implementationDigest), context7ToolVersionSnapshot()])("binds new snapshots to the patched SDK and rejects old qualification identity", snapshot => {
-   expect(snapshot.sdk.version).toBe("1.31.0");
-   expect(mcpToolVersionIssues({ ...snapshot, sdk: { ...snapshot.sdk, version: "1.26.0" } })).toContain("tool-version-substituted");
- });
+const previousSdkIdentities = ["1.31.0", "1.26.0"] as const;
+
+it.each(
+  [qualificationFixtureToolVersionSnapshot(implementationDigest), context7ToolVersionSnapshot()].flatMap((snapshot) =>
+    previousSdkIdentities.map((oldVersion) => ({
+      admission: snapshot.admission,
+      oldVersion,
+      snapshot,
+    })),
+  ),
+)("binds $admission snapshots to SDK 1.32.2 and rejects $oldVersion", ({ snapshot, oldVersion }) => {
+  expect(snapshot.sdk.version).toBe("1.32.2");
+  expect(mcpToolVersionIssues({ ...snapshot, sdk: { ...snapshot.sdk, version: oldVersion } })).toContain("tool-version-substituted");
+});
