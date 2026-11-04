@@ -47,8 +47,16 @@ it('preserves the same owned database across restart and confirms cleanup only a
   expect((await audits()).map(e => e.status)).toEqual(['CREATED', 'DESTROYED']);
   await expect(stat(db.root)).rejects.toMatchObject({ code: 'ENOENT' });
 });
+it('allows repeated cleanup without masking the original setup failure', async () => {
+  const db = await startFixtureDatabase(root);
+  await db.destroy();
+  await expect(db.destroy()).resolves.toBeUndefined();
+  await expect(db.restart()).rejects.toThrow('already been destroyed');
+  expect((await audits()).map(e => e.status)).toEqual(['CREATED', 'DESTROYED']);
+});
 it('removes owned files but does not attest DESTROYED when stopping the backend fails', async () => {
   const db = await startFixtureDatabase(root); state.stopFails = true;
+  await expect(db.destroy()).rejects.toThrow('STOP_REFUSED');
   await expect(db.destroy()).rejects.toThrow('STOP_REFUSED');
   expect((await audits()).map(e => e.status)).toEqual(['CREATED']);
   await expect(stat(db.root)).rejects.toMatchObject({ code: 'ENOENT' });

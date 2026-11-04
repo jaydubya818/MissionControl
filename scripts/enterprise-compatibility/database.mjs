@@ -21,6 +21,7 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
   const url = `http://127.0.0.1:${port}`;
   let backend;
   let backendLog;
+  let destruction;
   const env = { PATH: process.env.PATH, HOME: process.env.HOME, CI: "1", CONVEX_TELEMETRY_DISABLED: "1",
     CONVEX_SELF_HOSTED_URL: url };
   async function start() {
@@ -44,7 +45,12 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
     try { if (backend?.pid && backend.exitCode === null && backend.signalCode === null) { const exited = once(backend, "exit"); backend.kill("SIGTERM"); await exited; } }
     finally { await backendLog?.close(); backendLog = undefined; }
   }
-  async function destroy() { try { await stop(); } finally { await rm(root, { recursive: true }); } await audit("DESTROYED"); }
+  function destroy() {
+    return destruction ??= (async () => {
+      try { await stop(); } finally { await rm(root, { recursive: true, force: true }); }
+      await audit("DESTROYED");
+    })();
+  }
   const copied = new Set();
   async function copyClosure(relative) {
     if (copied.has(relative)) return; copied.add(relative);
@@ -121,6 +127,9 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
           { cwd: root, env, encoding: "utf8", timeout: 20000, stdio: "pipe" });
       } } : {}),
       destroy,
-      restart: async () => { await stop(); await start(); }, copied: [...copied] };
+      restart: async () => {
+        if (destruction) throw Error("Disposable fixture has already been destroyed.");
+        await stop(); await start();
+      }, copied: [...copied] };
   } catch (error) { await destroy(); throw error; }
 }
