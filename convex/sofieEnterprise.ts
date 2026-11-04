@@ -75,7 +75,7 @@ export const apply = internalMutation({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args) => {
     const request = validateEnterpriseRequest(JSON.parse(args.payloadJson));
-    const { connection, project, owner } = await currentConnection(ctx, request.connectionId as Id<'enterpriseAppConnections'>);
+    const { connection, project, owner, member } = await currentConnection(ctx, request.connectionId as Id<'enterpriseAppConnections'>);
     if (args.envelope.projectId !== project._id || args.envelope.expiresAt <= Date.now()) return denied();
     const receipt = await ctx.db.query('serviceCommandReceipts').withIndex('by_command', q => q.eq('commandId', args.envelope.commandId)).first();
     if (receipt && (receipt.serviceId !== SOFIE_APPLICATION || receipt.payloadDigest !== args.envelope.payloadDigest
@@ -114,10 +114,11 @@ export const apply = internalMutation({
         if (!proposal.missionId) {
           const created = await createAuthorizedMissionDraft(ctx, { projectId: project._id, title: proposal.proposal.title, objective: proposal.proposal.objective,
             constraints: ['No execution authority. Separate canonical Plan approval and execution admission required.'], budgetUsd: 0,
-            stopCondition: proposal.proposal.stopCondition, owner: String(owner._id),
+            stopCondition: proposal.proposal.stopCondition, owner: member.name,
+            ownerMemberId: member._id, owningTeamId: connection.owningTeamId,
             idempotencyKey: `sofie-proposal:${proposal._id}`, metadata: { schema: 'sofie-enterprise-intake/v1', proposalId: proposal._id, proposalDigest: proposal.digest,
               applicationId: SOFIE_APPLICATION, synthetic: true, productionAuthority: false } },
-          { project, ownerMember: null, requestingOperatorId: owner._id, operator: { actorId: String(owner._id), actorSource: 'OWNER_AUTHORIZED_APPLICATION' } });
+          { project, ownerMember: member, requestingOperatorId: owner._id, operator: { actorId: String(owner._id), actorSource: 'OWNER_AUTHORIZED_APPLICATION' } });
           await ctx.db.patch(proposal._id, { missionId: created.mission._id });
           response = { missionId: created.mission._id, proposalDigest: proposal.digest, created: true, executionAuthority: 'NONE' };
         } else response = { missionId: proposal.missionId, proposalDigest: proposal.digest, created: false, executionAuthority: 'NONE' };
