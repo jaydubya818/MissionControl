@@ -1,10 +1,13 @@
 import { assertCapabilityWorkAuthority, capabilityWorkRestriction } from '../lib/capabilityWorkControl';
 import { reconcileFabObservedCost } from "../lib/fabCostPersistence";
+import { serviceInternalMutation, serviceInternalQuery, serviceInternalAction } from "../lib/missionScopedFunctions";
+import { serviceAttemptEffects } from "../lib/missionServiceAuthority";
+import { assertEnterpriseAttemptExecution } from "../lib/enterpriseAttemptAccounting";
 import { resolveCurrentAttemptExecutionProfile, executionProfileProjectionFromFactoryVersion, hasAnyExecutionProfileBinding } from "../lib/attemptExecutionProfile";
 import { NO_INFERENCE_CONSTRAINT, isNoInferenceConstraint } from "../lib/offlineExecutionPolicy";
 import { v } from "convex/values";
 import { dockerRequestRecoveryMatches } from "../lib/dockerAllocationRecovery";
-import { internalAction, internalMutation, internalQuery, mutation } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery, mutation } from "../lib/missionScopedFunctions";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
@@ -48,18 +51,17 @@ import {
   legacyQualityGateSubjectDigest,
 } from "../lib/qualityGateDecision";
 import { createGitVerificationSubject, createPrepublicationGitVerificationSubject, createGitSubjectPublicationBinding } from "@mission-control/workflow-engine/verification-subject";
-import { sha256Hex } from "@mission-control/shared";
+import { sha256Hex, canonicalDigest } from "@mission-control/shared";
 import {
   harnessRuntimeArtifactDigest,
   harnessRuntimeArtifactIssues,
 } from "@mission-control/workflow-engine/harness-contract";
 import { deriveVerificationIndependence } from "@mission-control/workflow-engine/verification-independence";
 import { requireRepositoryDispatchAdmission } from "./incidentControls";
-import { evaluateVerificationDecision } from "@mission-control/workflow-engine/verification-decision";
+import { persistPolicyV2Evaluation } from "../lib/policyV2EvaluationPersistence";
 import {
   compilePolicyV2VerificationPlan,
   effectivePolicyV2VerificationChecks,
-  normalizePolicyV2VerificationResults,
 } from "../lib/policyV2Verification";
 import { buildFactoryExecutionManifest, factorySandboxResourceName } from "../lib/executionManifest";
 import { snapshotWorkflowDefinition } from "../lib/workflowSnapshot";
@@ -99,6 +101,7 @@ import { offlineAttemptSourceCurrentnessIssues } from "../lib/factoryAttempt";
 import { validateOfflineAttemptEvidence } from "../lib/offlineAttemptEvidence";
 import { canonicalIsolatedInvocation, renderMarkdownCandidate } from "@mission-control/workflow-engine/harness-contract";
 import { offlineAttemptClaimWindowExpired, reserveOfflineAttemptBudget } from "../lib/offlineAttemptBudget";
+import { freezeNativeEngineeringTariff } from "../lib/nativeEngineeringTariff";
 import { buildWorkOrderTaskAuthority, workOrderTaskAuthorityIssue } from "../lib/taskAuthority";
 import {
   assertLocalRepositoryHost,
@@ -216,64 +219,6 @@ function isDecomposedExecutionManifest(manifest: any) {
     || manifest?.version === "factory-execution-manifest/v4";
 }
 
-function executionProfileEvidence(run: any) {
-  if (!run?.executionProfileId) return undefined;
-  const profile = run.executionProfileSnapshot as Record<string, any> | undefined;
-  const qualification = run.executionProfileQualificationSnapshot as Record<string, any> | undefined;
-  const selectedIsolation = (run.executionManifest as Record<string, any> | undefined)?.harness?.isolation;
-  return {
-    profileId: String(run.executionProfileId),
-    profileKey: run.executionProfileKey,
-    version: run.executionProfileVersion,
-    profileDigest: run.executionProfileDigest,
-    qualificationDigest: run.executionProfileQualificationDigest,
-    qualificationEvidence: qualification?.evidence,
-    qualificationValidUntil: qualification?.validUntil,
-    ...(profile?.harness ? {
-      harness: {
-        adapter: profile.harness.adapter,
-        version: profile.harness.version,
-        capabilityManifestDigest: profile.harness.capabilityManifestDigest,
-        effectiveConfigSha256: profile.harness.effectiveConfigSha256,
-      },
-    } : {}),
-    ...(profile?.runtimeArtifact?.digest ? { runtimeArtifactDigest: profile.runtimeArtifact.digest } : {}),
-    ...(profile?.executionBackend ? { executionBackend: profile.executionBackend } : {}),
-    ...(profile?.modelRoute ? {
-      modelRoute: profile.executionBackend === "isolated-container" ? profile.modelRoute : {
-        catalogId: profile.modelRoute.catalogId,
-        routeDigest: profile.modelRoute.routeDigest,
-        qualificationDigest: profile.modelRoute.qualificationDigest,
-      },
-    } : {}),
-    ...(profile?.sandboxProfile ? {
-      sandboxProfile: {
-        profileId: profile.sandboxProfile.profileId,
-        profileDigest: profile.sandboxProfile.profileDigest,
-      },
-    } : {}),
-    ...(profile?.toolGrant ? {
-      toolGrant: {
-        grantId: profile.toolGrant.grantId,
-        grantDigest: profile.toolGrant.grantDigest,
-        operation: profile.toolGrant.grantSnapshot?.operation,
-        expiresAt: profile.toolGrant.grantSnapshot?.expiresAt,
-        admission: profile.toolGrant.grantSnapshot?.toolVersionSnapshot?.admission === "QUALIFIED_REAL_READ_ONLY_SERVICE"
-          ? "QUALIFIED_REAL_READ_ONLY_SERVICE"
-          : "QUALIFICATION_FIXTURE",
-      },
-    } : { toolCapability: "NO_TOOL_CAPABILITY" }),
-    ...(typeof selectedIsolation === "string" ? { selectedIsolation } : {}),
-  };
-}
-
-function assertReportedExecutionProfileEvidence(metadata: any, expected: ReturnType<typeof executionProfileEvidence>) {
-  if (metadata?.executionProfile === undefined) return;
-  if (!expected
-    || computeCanonicalHash(metadata.executionProfile) !== computeCanonicalHash(expected)) {
-    throw new Error("Factory evidence Execution Profile identity does not match the frozen Attempt.");
-  }
-}
 
 function factoryExecutionStepMatchesModelRoute(step: any, routeSnapshot: Record<string, any> | undefined) {
   if (!routeSnapshot
@@ -285,7 +230,7 @@ function factoryExecutionStepMatchesModelRoute(step: any, routeSnapshot: Record<
   return step.modelConfiguration?.temperature === routeSnapshot.reasoningConfig?.temperature
     && step.modelConfiguration?.maxTokens === routeSnapshot.reasoningConfig?.maxTokens;
 }
-export const resolveScope = internalQuery({
+export const resolveScope = serviceInternalQuery(Object.keys(serviceAttemptEffects))({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
@@ -539,7 +484,7 @@ async function validateReadOnlyCandidateRecovery(ctx: any, run: any): Promise<bo
   return true;
 }
 
-export const claimInternal = internalMutation({
+export const claimInternal = serviceInternalMutation(["attempts.claim", "verification:claim"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     leaseId: v.string(),
@@ -554,6 +499,7 @@ export const claimInternal = internalMutation({
     const run = await ctx.db.get(args.workflowRunId);
     if (!run) throw new Error("Factory attempt not found.");
     await assertCapabilityWorkAuthority(ctx, run);
+    await assertEnterpriseAttemptExecution(ctx, run, "isolated-container");
     if (args.requiredAttemptPurpose && (run.attemptPurpose ?? "IMPLEMENTATION") !== args.requiredAttemptPurpose) {
       throw new Error(`Attempt capability is not valid for ${run.attemptPurpose ?? "IMPLEMENTATION"}.`);
     }
@@ -1344,7 +1290,7 @@ export const authorizePublicationInternal = internalMutation({
   },
 });
 
-export const renewInternal = internalMutation({
+export const renewInternal = serviceInternalMutation(["attempts.renew", "verification:renew"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     leaseId: v.string(),
@@ -1388,33 +1334,8 @@ export const renewInternal = internalMutation({
   },
 });
 
-function validateStoredOfflineResponse(
-  artifact: any,
-  request: Parameters<typeof validateOfflineAttemptEvidence>[1],
-  run: any,
-  args: any,
-) {
-  const metadata = artifact?.metadata;
-  if (!run || !artifact || artifact.workflowRunId !== run._id || artifact.projectId !== run.projectId
-    || artifact.tenantId !== run.tenantId || artifact.workOrderId !== run.workOrderId
-    || artifact.missionId !== run.missionId || artifact.artifactType !== "STRUCTURED_OUTPUT"
-    || artifact.idempotencyKey !== `factory:${run.runId}:${args.leaseId}:offline-response`
-    || artifact.producer !== `service:${args.ownerId}`
-    || metadata?.schema !== "factory-offline-attempt-evidence/v1" || metadata.evidenceOrigin !== "CONTROL_FIXTURE"
-    || metadata.authority !== "NONE" || metadata.behavioralPass !== false
-    || metadata.leaseId !== args.leaseId || metadata.workerId !== args.workerId
-    || metadata.workerSessionId !== args.workerSessionId || metadata.workerGeneration !== args.workerGeneration
-    || metadata.executionManifestDigest !== run.executionManifestDigest
-    || !["CURRENT_AT_INGESTION", "STALE_FENCED"].includes(metadata.disposition)) {
-    throw new Error("Stored offline response provenance is invalid.");
-  }
-  assertReportedExecutionProfileEvidence(metadata, executionProfileEvidence(run));
-  const parsed = validateOfflineAttemptEvidence(metadata.packet, request);
-  if (parsed.packetDigest !== artifact.contentHash) throw new Error("Stored offline response digest is invalid.");
-  return parsed;
-}
 
-export const reportInternal = internalMutation({
+export const reportInternal = serviceInternalMutation(["attempts.report"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     leaseId: v.string(),
@@ -1950,7 +1871,7 @@ export const reportInternal = internalMutation({
   },
 });
 
-export const reportVerificationInternal = internalMutation({
+export const reportVerificationInternal = serviceInternalMutation(["verification:report"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     leaseId: v.string(),
@@ -2276,6 +2197,12 @@ export const reportVerificationInternal = internalMutation({
     const plan = verificationRun.verificationPlan;
     const requiredEvidenceById = new Map(plan.requiredEvidence.map((item: any) => [item.id, item]));
     const evidenceInputs: any[] = [];
+    const nativeCandidateObservation = retainedOffline?.evidence.schema === "factory-isolated-execution-evidence/v3" ? {
+      candidateCommit: args.packet.offlineVerification.candidateObservation.candidateSha,
+      candidateTree: args.packet.offlineVerification.candidateObservation.treeSha,
+      observedAt: args.packet.offlineVerification.candidateObservation.observedAt,
+      expiresAt: args.packet.offlineVerification.candidateObservation.observedAt + 60000,
+    } : undefined;
     const evidenceEnvelopeIds: any[] = [];
     const evidenceIdsByCheck = new Map<string, any[]>();
     const reportedCheckIds = new Set<string>();
@@ -2364,6 +2291,8 @@ export const reportVerificationInternal = internalMutation({
           recordedAt: now,
           metadata: {
             serverDerivedIndependence: true,
+            ...(nativeCandidateObservation ? { nativeCandidateObservation,
+              nativeCandidateObservationDigest: canonicalDigest("native-candidate-observation/v1", nativeCandidateObservation) } : {}),
             ...(offlineResult ? { evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false,
               retainedResponseArtifactId: retainedOfflineArtifact._id, retainedResponseDigest: retainedOffline!.packetDigest } : {}),
             verifierMetadata: draft.metadata,
@@ -2384,129 +2313,19 @@ export const reportVerificationInternal = internalMutation({
         });
       }
     }
-    const normalizedResults = normalizePolicyV2VerificationResults({
-      workOrder,
-      plan,
-      packetChecks: packet.checks,
-      evidenceIdsByCheck,
-    });
-    const decision = evaluateVerificationDecision({
-      plan,
-      evidence: evidenceInputs,
-      runStatus: "COMPLETED",
-      independence: independence as any,
-      requireHumanReview: workOrder.verificationContract.requireHumanReview,
-      evaluatedAt: now,
-    });
-    await ctx.db.patch(verificationRun._id, {
-      status: "COMPLETED",
-      checks: normalizedResults.checks,
-      criterionCoverage: normalizedResults.criterionCoverage,
-      coverage: decision.coverage,
-      requirementsPassed: decision.passedRequirementIds.length,
-      requirementsFailed: decision.failedRequirementIds.length + decision.uncoveredRequirementIds.length,
-      violations: [...decision.failedRequirementIds, ...decision.uncoveredRequirementIds, ...decision.uncoveredRiskIds],
-      verdict: decision.verdict ?? undefined,
-      verdictReasons: decision.reasons,
-      independence: independence as any,
-      independenceValid: independence.passed,
-      decisionInputDigest: decision.decisionInputDigest,
-      isolationAttestation: isolation,
-      completedAt: now,
-      durationMs: Math.max(0, now - verificationRun.startedAt),
-      evaluatedAt: now,
-    });
-    const validUntil = verificationValidUntil(DEFAULT_GOVERNANCE_POLICY, now);
-    const receiptId = await ctx.db.insert("verificationReceipts", {
-      tenantId: run.tenantId,
-      projectId: run.projectId,
-      missionId: run.missionId,
-      workOrderId: workOrder._id,
-      receiptScope: "WORK_ORDER",
-      workflowRunId: run._id,
-      verificationRunId: verificationRun._id,
-      sourceAttemptId: sourceAttempt._id,
-      verificationAttemptId: run._id,
-      verificationSubjectId: verificationRun.verificationSubjectId,
-      verificationSubjectDigest: verificationRun.verificationSubjectDigest,
-      verificationContractDigest: verificationRun.verificationContractDigest,
-      verificationPlanId: plan.planId,
-      verificationPlanDigest: plan.planDigest,
-      workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
-      idempotencyKey: `policy-v2-receipt:${String(verificationRun._id)}`,
-      verificationMethod: "COMMAND",
-      commandOrCheck: "Frozen policy-v2 Verification Plan",
-      result: decision.reasons.join(" "),
-      verifier: `service:${args.ownerId}`,
-      status: decision.verdict === "VERIFIED" ? "PASSED" : decision.verdict === "REQUIRES_HUMAN_REVIEW" ? "PENDING" : "FAILED",
-      evidenceEnvelopeIds,
-      verdict: decision.verdict ?? undefined,
-      independenceValid: independence.passed,
-      decisionInputDigest: decision.decisionInputDigest,
-      verdictReasons: decision.reasons,
-      checks: normalizedResults.checks,
-      criterionCoverage: normalizedResults.criterionCoverage,
-      requirementsPassed: decision.passedRequirementIds.length,
-      requirementsFailed: decision.failedRequirementIds.length + decision.uncoveredRequirementIds.length,
-      violations: [...decision.failedRequirementIds, ...decision.uncoveredRequirementIds, ...decision.uncoveredRiskIds],
-      approvalRequirements: workOrder.requiredApprovals,
-      riskLevel: workOrder.riskLevel,
-      riskReasons: workOrder.riskReasons,
-      sourceRevision: sourceAttempt.executionBaseSha ?? packet.sourceRevision,
-      candidateRevision: packet.candidateRevision,
-      validUntil,
-      recordedAt: now,
-      metadata: {
-        policyVersion: 2,
-        serverDerivedIndependence: true,
+    const { decision, receiptId, normalizedResults, validUntil } = await persistPolicyV2Evaluation(ctx, {
+      workOrder, plan, packet, evidenceIdsByCheck, evidenceEnvelopeIds, evidenceInputs,
+      independence, isolation, verificationRun, run, sourceAttempt, now, ownerId: args.ownerId,
+      receiptMetadata: { policyVersion: 2, serverDerivedIndependence: true,
         ...(offlineResult ? { qualificationOnly: true, evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false,
           retainedResponseArtifactId: retainedOfflineArtifact._id, retainedResponseDigest: retainedOffline!.packetDigest } : {}),
         ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
       },
+      criterionMetadata: { policyVersion: 2,
+        ...(offlineResult ? { qualificationOnly: true, evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false } : {}),
+        ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
+      },
     });
-    for (const criterion of workOrder.acceptanceCriteria) {
-      const criterionEvidence = normalizedResults.checks.filter((check: any) => check.acceptanceCriterionIds.includes(criterion.id));
-      const coverage = normalizedResults.criterionCoverage.find((item: any) => item.criterionId === criterion.id);
-      await ctx.db.insert("verificationReceipts", {
-        tenantId: run.tenantId,
-        projectId: run.projectId,
-        missionId: run.missionId,
-        workOrderId: workOrder._id,
-        receiptScope: "ACCEPTANCE_CRITERION",
-        acceptanceCriterionId: criterion.id,
-        workflowRunId: run._id,
-        verificationRunId: verificationRun._id,
-        sourceAttemptId: sourceAttempt._id,
-        verificationAttemptId: run._id,
-        verificationSubjectId: verificationRun.verificationSubjectId,
-        verificationSubjectDigest: verificationRun.verificationSubjectDigest,
-        verificationContractDigest: verificationRun.verificationContractDigest,
-        verificationPlanId: plan.planId,
-        verificationPlanDigest: plan.planDigest,
-        workOrderRevisionNumber: workOrder.currentRevisionNumber ?? 1,
-        idempotencyKey: `policy-v2-criterion:${String(verificationRun._id)}:${criterion.id}`,
-        verificationMethod: criterion.verificationMethod,
-        commandOrCheck: criterionEvidence.map((check: any) => check.checkId).join(", "),
-        result: decision.reasons.join(" "),
-        verifier: `service:${args.ownerId}`,
-        status: decision.verdict === "VERIFIED" && coverage?.status === "EVIDENCED" ? "PASSED" : "FAILED",
-        evidenceEnvelopeIds: coverage?.evidenceIds ?? [],
-        verdict: decision.verdict ?? undefined,
-        independenceValid: independence.passed,
-        decisionInputDigest: decision.decisionInputDigest,
-        verdictReasons: decision.reasons,
-        sourceRevision: sourceAttempt.executionBaseSha ?? packet.sourceRevision,
-        candidateRevision: packet.candidateRevision,
-        validUntil,
-        recordedAt: now,
-        metadata: {
-          policyVersion: 2,
-          workOrderReceiptId: receiptId,
-          ...(offlineResult ? { qualificationOnly: true, evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE", behavioralPass: false } : {}),
-          ...(profileEvidence ? { executionProfile: profileEvidence } : {}),
-        },
-      });
-    }
     await ctx.db.patch(run._id, {
       status: "COMPLETED",
       completedAt: now,
@@ -2618,7 +2437,7 @@ async function persistPrepublicationCandidate(ctx: any, run: any, candidate: any
   return { subject };
 }
 
-export const scheduleCandidateVerificationInternal = internalMutation({
+export const scheduleCandidateVerificationInternal = serviceInternalMutation(["attempts.report"])({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
     const source = await ctx.db.get(args.workflowRunId);
@@ -2632,7 +2451,7 @@ export const scheduleCandidateVerificationInternal = internalMutation({
   },
 });
 
-export const candidateVerificationDispatchFailedInternal = internalMutation({
+export const candidateVerificationDispatchFailedInternal = serviceInternalMutation(["attempts.report"])({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
     const source = await ctx.db.get(args.workflowRunId);
@@ -2648,7 +2467,7 @@ export const candidateVerificationDispatchFailedInternal = internalMutation({
 });
 
 // Separate transactions preserve the checkpoint and a useful failure state if dispatch fails.
-export const dispatchCandidateVerificationInternal = internalAction({
+export const dispatchCandidateVerificationInternal = serviceInternalAction(["attempts.report"])({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
     try { await ctx.runMutation(internal.factory.attempts.scheduleCandidateVerificationInternal, args); }
@@ -3245,7 +3064,7 @@ export const resumeVerification = mutation({
   },
 });
 
-export const scheduleVerificationInternal = internalMutation({
+export const scheduleVerificationInternal = serviceInternalMutation(["attempts.report"])({
   args: { sourceAttemptId: v.id("workflowRuns") },
   handler: async (ctx, args): Promise<any> => {
     const sourceAttempt = await ctx.db.get(args.sourceAttemptId);
@@ -3261,7 +3080,7 @@ export const scheduleVerificationInternal = internalMutation({
   },
 });
 
-export const syncCompletedVerificationOutcomeInternal = internalMutation({
+export const syncCompletedVerificationOutcomeInternal = serviceInternalMutation(["verification:report"])({
   args: {
     workflowRunId: v.id("workflowRuns"),
     verificationRunId: v.id("verificationRuns"),
@@ -3308,8 +3127,23 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   const definitions = await ctx.db.query("factoryDefinitions")
     .withIndex("by_repository", (q: any) => q.eq("repositoryId", sourceAttempt.repositoryId))
     .collect();
-  const definition = definitions.find((candidate: any) => candidate.status === "ACTIVE"
+  let definition = definitions.find((candidate: any) => candidate.status === "ACTIVE"
     && candidate.purpose === "VERIFICATION" && candidate.activeVersionId);
+  if (sourceAttempt.executionManifest?.harness?.adapter === "isolated-invocation" && sourceAttempt.executionManifest.harness.version === "3") {
+    const producerVersion = await ctx.db.get(sourceAttempt.factoryDefinitionVersionId);
+    const eligible = [];
+    for (const candidate of definitions.filter((d: any) => d.status === "ACTIVE" && d.purpose === "VERIFICATION" && d.activeVersionId)) {
+      const candidateVersion = await ctx.db.get(candidate.activeVersionId);
+      if (candidateVersion?.executor?.adapter === "isolated-invocation" && candidateVersion.executor.version === "3"
+        && candidateVersion.executionBackend === "isolated-container"
+        && candidateVersion.harnessRuntimeArtifactDigest === producerVersion?.harnessRuntimeArtifactDigest
+        && candidateVersion.verifierIds.length > 0
+        && candidateVersion.verifierIds.length === producerVersion?.verifierIds.length
+        && candidateVersion.verifierIds.every((id: any) => producerVersion.verifierIds.includes(id))) eligible.push(candidate);
+    }
+    if (eligible.length !== 1) throw new Error("Exact native verification contract requires one matching qualified Verification Factory.");
+    definition = eligible[0];
+  }
   if (!definition) throw new Error("Candidate is ready, but no active Verification Factory is configured for this repository.");
   const version = await ctx.db.get(definition.activeVersionId);
   if (!version || version.factoryDefinitionId !== definition._id || version.purpose !== "VERIFICATION"
@@ -3707,7 +3541,10 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
           qualificationSnapshot: modelRoute!.qualificationSnapshot,
         },
       });
-  await ctx.db.patch(workflowRunId, { executionManifest: executionManifest.manifest, executionManifestDigest: executionManifest.digest });
+  const nativeAuthorization = executionCostAuthorization
+    ? await freezeNativeEngineeringTariff(ctx, executionCostAuthorization, executionManifest.manifest, mission) : undefined;
+  await ctx.db.patch(workflowRunId, { executionManifest: executionManifest.manifest, executionManifestDigest: executionManifest.digest,
+    ...(nativeAuthorization ? { executionCostAuthorization: nativeAuthorization } : {}) });
   const verificationRunId = await ctx.db.insert("verificationRuns", {
     tenantId: workOrder.tenantId,
     projectId: workOrder.projectId,
@@ -4302,7 +4139,10 @@ async function insertEvent(ctx: any, run: any, event: any) {
   const existing = await ctx.db.query("runEvents")
     .withIndex("by_idempotency", (q: any) => q.eq("idempotencyKey", event.idempotencyKey))
     .first();
-  if (existing) return { event: existing, created: false };
+  if (existing) {
+    if (existing.workflowRunId !== run._id) throw Error("EVENT_IDEMPOTENCY_SCOPE_CONFLICT");
+    return { event: existing, created: false };
+  }
   const eventId = await ctx.db.insert("runEvents", {
     tenantId: run.tenantId,
     projectId: run.projectId,
@@ -4908,3 +4748,4 @@ export const reconcileObservedCost = mutation({
     return result;
   },
 });
+import { executionProfileEvidence, assertReportedExecutionProfileEvidence, validateStoredOfflineResponse } from "../lib/offlineStoredResponse";

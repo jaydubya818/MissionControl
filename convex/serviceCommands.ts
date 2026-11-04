@@ -1,5 +1,6 @@
+import { serviceAttemptEffects } from "./lib/missionServiceAuthority";
 import { v, ConvexError } from "convex/values";
-import { action, internalMutation, internalQuery } from "./_generated/server";
+import { missionAuthorityDatabase, missionServiceBinding, action, serviceAttemptAction, bindServiceAttempt, serviceInternalMutation, internalMutation, internalQuery } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import { makeFunctionReference } from "convex/server";
 import type { Id } from "./_generated/dataModel";
@@ -186,20 +187,18 @@ export const resolvePrEvidenceScope = internalQuery({
   },
 });
 
-export const claim = internalMutation({
+export const claim = serviceInternalMutation(Object.keys(serviceAttemptEffects))({
   args: { envelope },
   handler: async (ctx, args) => {
-    const existing = await ctx.db.query("serviceCommandReceipts")
+    const existing = await missionAuthorityDatabase(ctx).query("serviceCommandReceipts")
       .withIndex("by_command", (q) => q.eq("commandId", args.envelope.commandId))
+      .filter(q => q.and(q.eq(q.field("signatureStatus"), "VALID"), q.neq(q.field("status"), "DENIED")))
       .first();
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        attemptCount: existing.attemptCount + 1,
-        replayDetectedAt: Date.now(),
-      });
-      return { accepted: false as const, receiptId: existing._id };
-    }
+    if (existing) return { accepted: false as const, receiptId: null };
+    const authority = missionServiceBinding(ctx);
     const receiptId = await ctx.db.insert("serviceCommandReceipts", {
+      ...(authority ? { tenantId: authority.tenantId, projectId: authority.projectId, missionId: authority.missionId,
+        workOrderId: authority.workOrderId, workflowRunId: authority.workflowRunId } : {}),
       serviceId: args.envelope.serviceId,
       capability: args.envelope.capability,
       commandId: args.envelope.commandId,
@@ -228,7 +227,6 @@ export const deny = internalMutation({
       .withIndex("by_command", (q) => q.eq("commandId", args.envelope.commandId))
       .first();
     if (existing) {
-      await ctx.db.patch(existing._id, { attemptCount: existing.attemptCount + 1, replayDetectedAt: Date.now() });
       return existing._id;
     }
     return await ctx.db.insert("serviceCommandReceipts", {
@@ -250,7 +248,7 @@ export const deny = internalMutation({
   },
 });
 
-export const complete = internalMutation({
+export const complete = serviceInternalMutation(Object.keys(serviceAttemptEffects))({
   args: {
     receiptId: v.id("serviceCommandReceipts"),
     status: v.union(v.literal("SUCCEEDED"), v.literal("FAILED")),
@@ -413,7 +411,7 @@ export const ingestReceiptPacket = action({
   },
 });
 
-export const claimFactoryAttempt = action({
+export const claimFactoryAttempt = serviceAttemptAction({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
     const payload = await authorize(ctx, args.envelope, args.payloadJson, "attempts.claim");
@@ -444,7 +442,7 @@ export const claimFactoryAttempt = action({
   },
 });
 
-export const renewFactoryAttempt = action({
+export const renewFactoryAttempt = serviceAttemptAction({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
     const payload = await authorize(ctx, args.envelope, args.payloadJson, "attempts.renew");
@@ -477,7 +475,7 @@ export const renewFactoryAttempt = action({
   },
 });
 
-export const reportFactoryAttempt = action({
+export const reportFactoryAttempt = serviceAttemptAction({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
     const payload = await authorize(ctx, args.envelope, args.payloadJson, "attempts.report");
@@ -666,7 +664,7 @@ export const appendInferenceReconciliation = action({
   },
 });
 
-export const claimVerificationAttempt = action({
+export const claimVerificationAttempt = serviceAttemptAction({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
     const payload = await authorize(ctx, args.envelope, args.payloadJson, "verification:claim");
@@ -695,7 +693,7 @@ export const claimVerificationAttempt = action({
   },
 });
 
-export const renewVerificationAttempt = action({
+export const renewVerificationAttempt = serviceAttemptAction({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
     const payload = await authorize(ctx, args.envelope, args.payloadJson, "verification:renew");
@@ -726,7 +724,7 @@ export const renewVerificationAttempt = action({
   },
 });
 
-export const reportVerificationAttempt = action({
+export const reportVerificationAttempt = serviceAttemptAction({
   args: { envelope, payloadJson: v.string() },
   handler: async (ctx, args): Promise<any> => {
     const payload = await authorize(ctx, args.envelope, args.payloadJson, "verification:report");
@@ -1294,7 +1292,11 @@ async function authorize(ctx: any, candidate: ServiceCommandEnvelope, payloadJso
     throw new Error(`Service command denied (${reason}).`);
   }
   try {
-    return JSON.parse(payloadJson);
+    const payload = JSON.parse(payloadJson);
+    if (["attempts.claim", "attempts.renew", "attempts.report", "verification:claim", "verification:renew", "verification:report"].includes(capability)) {
+      bindServiceAttempt(ctx, { serviceId: candidate.serviceId, workflowRunId: payload.workflowRunId, capability, expiresAt: candidate.expiresAt });
+    }
+    return payload;
   } catch {
     await ctx.runMutation(internal.serviceCommands.deny, { envelope: candidate, signatureStatus: "VALID", reason: "payload-json-invalid" });
     throw new Error("Service command denied (payload-json-invalid).");

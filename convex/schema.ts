@@ -1,3 +1,5 @@
+import { fixtureRegistration, fixtureBudget, trialState } from "./lib/enterpriseCompatibilityValidators";
+import { enterpriseReservationValidator, enterpriseSettlementValidator } from "./lib/enterpriseAccountingValidators";
 import { providerPriceValidator, providerReservationValidator, providerUsageValidator } from "./lib/providerLiabilityValidators";
 import { capabilityPolicyTables } from './lib/capabilityPolicySchema';
 /**
@@ -1020,6 +1022,7 @@ export const schemaTablesPartOne = {
   // PROJECTS (Multi-Project Workspaces)
   // -------------------------------------------------------------------------
   projects: defineTable({
+    enterpriseAccountingMode: v.optional(v.literal("ISOLATED_DETERMINISTIC")),
     // ARM: Tenant scope (optional for migration; will be required after backfill)
     tenantId: v.optional(v.id("tenants")),
     
@@ -1251,7 +1254,22 @@ export const schemaTablesPartOne = {
       "usage.providerRequestId",
     ]) ,
 
+  factoryDelegationTrials: defineTable({
+    tenantId: v.id("tenants"), projectId: v.id("projects"), missionId: v.id("missions"),
+    factoryDefinitionId: v.id("factoryDefinitions"), delegationId: v.string(),
+    partnerRequestId: v.string(), partnerWorkId: v.string(),
+    binding: v.any(), bindingDigest: v.string(), registrationDigest: v.string(),
+    resultInputDigest: v.optional(v.string()), qualityGateDecisionId: v.optional(v.id("qualityGateDecisions")),
+    state: trialState, observationRevision: v.number(), observationDigest: v.optional(v.string()),
+    partnerWorkOrderId: v.optional(v.string()), partnerRunId: v.optional(v.string()),
+    cancelRequested: v.boolean(), closed: v.boolean(), createdAt: v.number(), updatedAt: v.number(),
+  }).index("by_project_delegation", ["projectId", "delegationId"])
+    .index("by_factory", ["factoryDefinitionId"])
+    .index("by_project_request", ["projectId", "partnerRequestId"])
+    .index("by_project_work", ["projectId", "partnerWorkId"]),
+
   factoryDefinitions: defineTable({
+    enterpriseRegistration: v.optional(fixtureRegistration),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
     repositoryId: v.id("workspaceRepositories"),
@@ -1678,6 +1696,11 @@ export const schemaTablesPartOne = {
   // are deliberately excluded; the digest and scoped identity are sufficient
   // for audit, idempotency, and incident investigation.
   serviceCommandReceipts: defineTable({
+    tenantId: v.optional(v.id("tenants")),
+    projectId: v.optional(v.id("projects")),
+    missionId: v.optional(v.id("missions")),
+    workOrderId: v.optional(v.id("workOrders")),
+    workflowRunId: v.optional(v.id("workflowRuns")),
     serviceId: v.string(),
     capability: v.string(),
     commandId: v.string(),
@@ -2023,10 +2046,28 @@ export const schemaTablesPartOne = {
   // -------------------------------------------------------------------------
   // SOFTWARE FACTORY: WORK ORDERS
   // -------------------------------------------------------------------------
+  enterpriseAppConnections: defineTable({
+    resultScope: v.optional(v.object({ missionId:v.id("missions"), planId:v.id("missionPlans"), planRevision:v.number(), planDigest:v.string() })),
+    tenantId: v.id("tenants"), projectId: v.id("projects"), ownerId: v.id("operators"),
+    ownerMemberId: v.id("orgMembers"), owningTeamId: v.id("scrumTeams"),
+    applicationId: v.literal("myeve-sofie-readiness-v1"), keyId: v.string(),
+    expiresAt: v.number(), revokedAt: v.optional(v.number()), createdAt: v.number(),
+  }).index("by_owner", ["ownerId"]),
+
+  enterpriseMissionProposals: defineTable({
+    connectionId: v.id("enterpriseAppConnections"), tenantId: v.id("tenants"), projectId: v.id("projects"),
+    ownerId: v.id("operators"), intentKey: v.string(), digest: v.string(),
+    proposal: v.object({ title: v.string(), objective: v.string(), workstreams: v.array(v.string()),
+      milestones: v.array(v.string()), stopCondition: v.string(), budgetMicrousd: v.literal(0) }),
+    createdAt: v.number(), expiresAt: v.number(), authorizedAt: v.optional(v.number()),
+    authorizedDigest: v.optional(v.string()), revokedAt: v.optional(v.number()), missionId: v.optional(v.id("missions")),
+  }).index("by_connection_intent", ["connectionId", "intentKey"]),
+
   missions: defineTable({
     capabilityAuthorities: v.optional(v.array(v.object({
       scope: v.string(), version: v.number(), policyId: v.string(), capabilityId: v.string(),
     }))),
+    ownerOperatorId: v.optional(v.id("operators")),    enterpriseFixtureBudget: v.optional(fixtureBudget),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.optional(v.id("projects")),
     idempotencyKey: v.optional(v.string()),
@@ -4619,6 +4660,7 @@ export const schemaTablesPartOne = {
     .index("by_work_order", ["workOrderId"]),
 
   inferenceRouteComparisons: defineTable({
+    missionIds: v.optional(v.array(v.id("missions"))),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
     leftRouteDigest: v.string(),
@@ -4644,6 +4686,7 @@ export const schemaTablesPartOne = {
   // AGENT PERFORMANCE (Learning System — Aggregated Metrics)
   // -------------------------------------------------------------------------
   agentPerformance: defineTable({
+    sourceTaskIds: v.optional(v.array(v.id("tasks"))),
     tenantId: v.optional(v.id("tenants")),
     agentId: v.id("agents"),
     projectId: v.optional(v.id("projects")),
@@ -4817,6 +4860,7 @@ export const schemaTablesPartTwo = {
     .index("by_fixture", ["fixtureKey"]),
 
   missionAssignments: defineTable({
+    operatorId: v.optional(v.id("operators")),
     tenantId: v.id("tenants"),
     projectId: v.id("projects"),
     missionId: v.id("missions"),
@@ -5473,6 +5517,7 @@ export const schemaTablesPartTwo = {
       authorizedAt: v.number(),
     }), v.object({
       schema: v.literal("work-order-offline-cost-authorization/v1"),
+      enterprise: v.optional(enterpriseReservationValidator),
       policyEnvelopeId: v.string(),
       policyEnvelopeDigest: v.string(),
       workOrderPolicyDigest: v.string(),
@@ -5504,6 +5549,8 @@ export const schemaTablesPartTwo = {
       varianceUsd: v.optional(v.number()),
       authorizedAt: v.number(),
     }))),
+    enterpriseSettlement: v.optional(enterpriseSettlementValidator),
+    enterpriseAccountingParent: v.optional(v.object({ workflowRunId: v.id("workflowRuns"), reservationDigest: v.string(), bindingDigest: v.string(), resultDigest: v.string() })),
     stopCondition: v.optional(v.string()),
     scheduledWindow: v.optional(v.object({
       startsAt: v.number(),
@@ -6176,6 +6223,7 @@ export const schemaTablesPartTwo = {
   // WORKFLOW METRICS (Aggregated Workflow Performance Stats)
   // -------------------------------------------------------------------------
   workflowMetrics: defineTable({
+    sourceWorkflowRunIds: v.optional(v.array(v.id("workflowRuns"))),
     // ARM: Tenant scope (optional, backfill later)
     tenantId: v.optional(v.id("tenants")),
     // Identity
@@ -8332,6 +8380,7 @@ export const schemaTablesPartTwo = {
   // HARNESS ENGINEERING: META LOOP SUGGESTIONS
   // -------------------------------------------------------------------------
   metaLoopSuggestions: defineTable({
+    sourceMissionIds: v.optional(v.array(v.id("missions"))),
     projectId: v.optional(v.id("projects")),
     kind: v.union(
       v.literal("VERIFIER"),

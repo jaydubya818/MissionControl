@@ -106,7 +106,7 @@ describe("requiresApproval", () => {
   it("requires approval when the estimated cost exceeds the remaining budget", () => {
     const result = requiresApproval("GREEN", "LEAD", 5, 4.5);
     expect(result.required).toBe(true);
-    expect(result.reason).toBe("Estimated cost ($5.00) exceeds remaining budget ($4.50)");
+    expect(result.reason).toBe("Estimated cost exceeds the available budget");
   });
 
   it("allows a cost that exactly equals the remaining budget", () => {

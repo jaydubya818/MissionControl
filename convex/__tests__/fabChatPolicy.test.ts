@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { describe, expect, it } from "vitest";
 import { buildOperatorPersonalization, buildProactiveItems, redactFabContextText, reserveProviderBudget, selectFabRoute } from "../fabChat";
 

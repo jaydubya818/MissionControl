@@ -4,7 +4,7 @@
  * Provides health and readiness checks for monitoring.
  */
 
-import { query } from "./_generated/server";
+import { query } from "./lib/missionScopedFunctions";
 import { v } from "convex/values";
 
 // ============================================================================

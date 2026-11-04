@@ -11,15 +11,19 @@ import { isolatedInvocationIssues, invocationCompositionIssues, invocationDigest
 const exec = promisify(execFile);
 export { ISOLATED_CONTAINER_POLICY, ISOLATED_CONTAINER_POLICY_DIGEST } from "../../../packages/workflow-engine/src/isolatedInvocation.js";
 import { ISOLATED_CONTAINER_POLICY_DIGEST } from "../../../packages/workflow-engine/src/isolatedInvocation.js";
+import { assertIsolatedRuntimeImageBinding, inspectIsolatedRuntimeImage, type IsolatedRuntimeImageBinding,
+  type IsolatedRuntimeImageEvidence } from "../../../packages/workflow-engine/src/isolatedRuntimeImage.js";
 
 interface Prepared { request: IsolatedInvocation; context: HarnessExecutionContext }
 export interface IsolatedExecutorResult extends ExecutorResult {
-  invocationEvidence: { schema: "factory-isolated-execution-evidence/v2"; evidenceOrigin: "CONTROL_FIXTURE"; authority: "NONE";
+  invocationEvidence: { schema: "factory-isolated-execution-evidence/v2" | "factory-isolated-execution-evidence/v3"; evidenceOrigin: "CONTROL_FIXTURE"; authority: "NONE";
     container: { name: string; id: string | null };
+    runtimeImage?: IsolatedRuntimeImageEvidence | null;
+    containerImageId?: string | null;
     stdoutBase64: string; capturedStdoutSha256: string; truncated: boolean; exitCode: number | null; cleanupVerified: boolean;
     validatedRuntimeResult: IsolatedInvocationResult | null };
 }
-interface HandleState { stdout: Buffer; truncated: boolean; exitCode: number | null; validatedRuntimeResult: IsolatedInvocationResult | null; prepared: Prepared; name: string; containerId?: string; promise: Promise<IsolatedInvocationResult>; fence?: InvocationStatus; cleanupFailed: boolean; child?: ChildProcess; startedAt: number; cancellation: AbortController; dockerConfig?: string }
+interface HandleState { stdout: Buffer; truncated: boolean; exitCode: number | null; validatedRuntimeResult: IsolatedInvocationResult | null; prepared: Prepared; name: string; containerId?: string; runtimeImage?: IsolatedRuntimeImageEvidence; containerImageId?: string; promise: Promise<IsolatedInvocationResult>; fence?: InvocationStatus; cleanupFailed: boolean; child?: ChildProcess; startedAt: number; cancellation: AbortController; dockerConfig?: string }
 
 /** Offline adapter only. No production registry backend is advertised until governed profile admission exists. */
 export class IsolatedInvocationAdapter implements HarnessExecutorAdapter<Prepared, object> {
@@ -29,13 +33,18 @@ export class IsolatedInvocationAdapter implements HarnessExecutorAdapter<Prepare
   private readonly handles = new WeakMap<object, HandleState>();
   private readonly collected = new WeakSet<object>();
   private readonly cleaned = new WeakSet<object>();
+  private readonly imageBinding?: IsolatedRuntimeImageBinding;
   constructor(composition: InvocationComposition,
     private readonly authority: (request: IsolatedInvocation, phase: "DISPATCH" | "RESULT") => Promise<boolean>,
-    private readonly dockerExecutable: string) {
+    private readonly dockerExecutable: string, imageBinding?: IsolatedRuntimeImageBinding) {
     if (invocationCompositionIssues(composition).length || composition.isolationDigest !== ISOLATED_CONTAINER_POLICY_DIGEST
       || composition.bridge.id !== "isolated-invocation" || composition.bridge.version !== "1"
       || composition.backend.id !== "docker-chroot-offline" || composition.backend.version !== "1") throw new Error("Unsupported exact composition");
     this.composition = structuredClone(composition);
+    if (imageBinding) {
+      assertIsolatedRuntimeImageBinding(imageBinding, composition.runtimeImage);
+      this.imageBinding = Object.freeze(structuredClone(imageBinding));
+    }
   }
   capabilities(): HarnessExecutorCapabilities {
     return { contractVersion: GENERIC_HARNESS_CONTRACT_VERSION, adapter: "isolated-invocation", version: "1", displayName: "Offline isolated invocation",
@@ -103,6 +112,11 @@ export class IsolatedInvocationAdapter implements HarnessExecutorAdapter<Prepare
     const abort = () => { void this.cancelState(handle).catch(() => { handle.cleanupFailed = true; }); };
     try {
       handle.dockerConfig = await mkdtemp(join(tmpdir(), "mc-offline-docker-"));
+      if (this.imageBinding) {
+        handle.runtimeImage = await this.bounded(this.resolveImage(handle), handle);
+        // Select exactly once, before spawning. No fallback after an ambiguous run.
+        args[args.indexOf(request.composition.runtimeImage)] = handle.runtimeImage.selectedReference;
+      }
       if (context.signal?.aborted || handle.fence || Date.now() - startedAt >= request.limits.timeoutMs) {
         handle.fence ??= context.signal?.aborted ? "CANCELED" : "TIMED_OUT";
         throw new Error(handle.fence);
@@ -165,6 +179,14 @@ export class IsolatedInvocationAdapter implements HarnessExecutorAdapter<Prepare
           const id = (await readFile(join(handle.dockerConfig, "container.id"), "utf8")).trim();
           if (!/^[a-f0-9]{64}$/.test(id)) throw new Error("Invalid Docker container identity");
           handle.containerId = id;
+          if (this.imageBinding) {
+            const observed = await exec(this.dockerExecutable, [...this.dockerOptions(handle), "container", "inspect", "--format", "{{.Image}}", id],
+              { timeout: 10_000, maxBuffer: 128_000, env: { PATH: "/usr/local/bin:/usr/bin:/bin" } });
+            handle.containerImageId = observed.stdout.trim();
+            if (![this.imageBinding.manifestDigest, this.imageBinding.configDigest].includes(handle.containerImageId)) {
+              handle.fence ??= "INFRASTRUCTURE_FAILURE";
+            }
+          }
         } catch { if (handle.validatedRuntimeResult) handle.fence ??= "INFRASTRUCTURE_FAILURE"; }
       }
       await this.stop(handle);
@@ -195,6 +217,22 @@ export class IsolatedInvocationAdapter implements HarnessExecutorAdapter<Prepare
     if (!handle.dockerConfig) throw new Error("Isolated Docker configuration is missing");
     return ["--host", "unix:///var/run/docker.sock", "--config", handle.dockerConfig];
   }
+  private async resolveImage(handle: HandleState): Promise<IsolatedRuntimeImageEvidence> {
+    const binding = this.imageBinding!;
+    for (const reference of [binding.manifestDigest, binding.configDigest]) {
+      let stdout: string;
+      try {
+        ({ stdout } = await exec(this.dockerExecutable, [...this.dockerOptions(handle), "image", "inspect", reference],
+          { timeout: 10_000, maxBuffer: 128_000, env: { PATH: "/usr/local/bin:/usr/bin:/bin" } }));
+      } catch (error) {
+        const failure = error as { code?: unknown; stderr?: unknown };
+        if (failure.code === 1 && typeof failure.stderr === "string" && failure.stderr.trim() === `Error response from daemon: No such image: ${reference}`) continue;
+        throw error;
+      }
+      return inspectIsolatedRuntimeImage(binding, reference, JSON.parse(stdout));
+    }
+    throw new Error("Exact qualified OCI image is unavailable");
+  }
   private async stop(handle: HandleState) {
     if (!handle.dockerConfig) return;
     const resource = handle.containerId ?? handle.name;
@@ -223,8 +261,9 @@ export class IsolatedInvocationAdapter implements HarnessExecutorAdapter<Prepare
     }
     if (handle.fence) receipt = invocationResult(handle.prepared.request, handle.fence, receipt.startedAt);
     return { executionId: receipt.executionId, status: receipt.status === "SUCCESS" ? "COMPLETED" : receipt.status === "CANCELED" ? "CANCELED" : "FAILED", output: JSON.stringify(receipt),
-      invocationEvidence: { schema: "factory-isolated-execution-evidence/v2", evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE",
+      invocationEvidence: { schema: this.imageBinding ? "factory-isolated-execution-evidence/v3" : "factory-isolated-execution-evidence/v2", evidenceOrigin: "CONTROL_FIXTURE", authority: "NONE",
         container: { name: handle.name, id: handle.containerId ?? null },
+        ...(this.imageBinding ? { runtimeImage: structuredClone(handle.runtimeImage ?? null), containerImageId: handle.containerImageId ?? null } : {}),
         stdoutBase64: handle.stdout.toString("base64"), capturedStdoutSha256: `sha256:${createHash("sha256").update(handle.stdout).digest("hex")}`,
         truncated: handle.truncated, exitCode: handle.exitCode, cleanupVerified: !handle.cleanupFailed, validatedRuntimeResult: structuredClone(handle.validatedRuntimeResult) } };
   }

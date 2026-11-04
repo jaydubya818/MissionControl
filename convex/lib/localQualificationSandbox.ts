@@ -3,7 +3,7 @@ import { isolatedSandboxIssues, isolatedSandboxDigest, isolatedSandboxAdmission,
 import { loadLocalRepositoryAdmission } from "./localRepositoryAdmission.js";
 import type { QueryCtx } from "../_generated/server.js";
 import type { Id } from "../_generated/dataModel.js";
-import { ISOLATED_INVOCATION_EFFECTIVE_CONFIG, ISOLATED_INVOCATION_RUNTIME_ARTIFACT } from "@mission-control/workflow-engine/harness-contract";
+import { findKnownIsolatedHarness } from "@mission-control/workflow-engine/harness-contract";
 import type { OfflineExecutionPolicy } from "./offlineExecutionPolicy.js";
 
 export const LOCAL_SANDBOX_SCHEMA = "local-qualification-sandbox/v1";
@@ -18,9 +18,12 @@ export function offlineSandboxIssues(snapshot: any): string[] {
   if (snapshot?.schema !== LOCAL_SANDBOX_SCHEMA) return isolatedSandboxIssues(snapshot);
   const { localQualification, ...base } = snapshot;
   const errors = isolatedSandboxIssues({ ...base, schema: "factory-sandbox-profile/v2" });
-  if (snapshot.imageDigest !== ISOLATED_INVOCATION_RUNTIME_ARTIFACT.imageDigest
-    || snapshot.bridgeDigest !== ISOLATED_INVOCATION_EFFECTIVE_CONFIG.bridgeImplementationDigest
-    || snapshot.backendDigest !== ISOLATED_INVOCATION_EFFECTIVE_CONFIG.backendImplementationDigest) errors.push("local-sandbox-runtime-unadmitted");
+  if (!["2", "3"].some(version => {
+    const registered = findKnownIsolatedHarness(version)!;
+    return snapshot.imageDigest === registered.runtime.imageDigest
+      && snapshot.bridgeDigest === registered.config.bridgeImplementationDigest
+      && snapshot.backendDigest === registered.config.backendImplementationDigest;
+  })) errors.push("local-sandbox-runtime-unadmitted");
   if (!exact(localQualification, ["repositoryId", "repositoryAdmissionDigest", "environmentId", "projectId", "tenantId",
     "operatorId", "program", "operations", "risk", "inference", "transmission", "publication", "production"])
     || !sha(localQualification.repositoryAdmissionDigest)

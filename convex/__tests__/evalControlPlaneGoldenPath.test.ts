@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { describe, expect, it } from "vitest";
 import scenarioEvidence from "../../docs/testing/evidence/system-factory-e2e-v2/scenario-evidence.json";
 import {

@@ -198,7 +198,7 @@ export function requiresApproval(
   ) {
     return {
       required: true,
-      reason: `Estimated cost ($${estimatedCost.toFixed(2)}) exceeds remaining budget ($${budgetRemaining.toFixed(2)})`,
+      reason: "Estimated cost exceeds the available budget",
     };
   }
 

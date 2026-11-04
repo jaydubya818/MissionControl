@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { describe, expect, it } from "vitest";
 import {
   CODEX_V1_HARNESS_MANIFEST,

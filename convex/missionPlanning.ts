@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, type MutationCtx } from "./lib/missionScopedFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   harnessCapabilityRequirementsSatisfied,

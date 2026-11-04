@@ -1,0 +1,1808 @@
+{
+  "now": 1791594629397,
+  "binding": {
+    "schema": "factory-delegation-binding/v1",
+    "delegationId": "hybrid-25b9f130-baf7-4eaf-af12-91ee9f474a69",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "missionId": "ks7wrf3n1fwzbqayxzc4qcm39n8g10z8",
+    "missionSpecRevisionId": "kn7nf2f4hab02xvpmwmery5nqs8g1dfs",
+    "missionPlanId": "k97j4cwgpgmn5p4qetapsa7q9n8g082x",
+    "missionPlanRevision": 1,
+    "missionPlanDigest": "sha256:5393268393b47f0970ebf645330f09fe626406d4af4fcc09fbfc55e85fbab5d1",
+    "workOrderId": "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y",
+    "workOrderRevisionId": "xh7m5zxf954mhp5kpv06n1yq698g0m8h",
+    "workOrderRevisionNumber": 2,
+    "taskId": "v57yx095f8wsxjqs803kv35zbs8g0kjp",
+    "workflowRunId": "y57k6nbq5ff05rc250gdf2zjxx8g12fz",
+    "executionManifestDigest": "sha256:0c8fba2c8ba2547e0c7cecf4f47ac1653e0bfb8840b5936afe65e35196818a9b",
+    "qualityContractDigest": "sha256:404df2f22140b5960dabdcafe4faa219ab0f884786bd651901dd462d61fbacf7",
+    "authorityGeneration": 1,
+    "factoryId": "myfactory-local-qualification",
+    "factoryVersion": "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95",
+    "executionProtocol": "MYFACTORY_EXECUTION_V2",
+    "clientId": "missioncontrol-local",
+    "ownerScope": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "partnerWorkId": "299902da-ac38-438d-8d3d-f3b1be5f0824",
+    "partnerWorkGeneration": 1,
+    "partnerRequestId": "d04e6cd6-aed5-4254-a50d-043abbbe4740",
+    "partnerRequestDigest": "015969ef9aa43dc2b5b659dc015e33f4c45134d8bfd984f6b8a8ec67623e07ae",
+    "repositoryId": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+    "repository": "jaydubya818/MyFactory",
+    "baseCommit": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+    "baseTree": "1084844b1454165358e51248afe8676f96daf17c",
+    "sourceSnapshotDigest": "sha256:588d21f052a094b50c9ec63d5ffcef122edf3e86fea4be17fc4468f9ae16fa48",
+    "executionProfileDigest": "sha256:a56c8020d26b59181a15f0a85b0db710c4cf3f4e509ad4d3e2a72f3c9235f5ff",
+    "modelPolicyDigest": "sha256:5d194389f32c1a00b8cf8fec55c5148e853817e8d8a59eb02d4a9af1ff41cf0c",
+    "verificationPolicyDigest": "sha256:8e4df86832ee72ebfc49983382359097f7ceae2a191de4511288277cf8505e4c",
+    "allowedEffects": [
+      "repository.read",
+      "sandbox.write",
+      "candidate.create",
+      "verification.request"
+    ],
+    "budgetReservationId": "hybrid-25b9f130-baf7-4eaf-af12-91ee9f474a69",
+    "maxSpendMicrousd": 80,
+    "issuedAt": 1791594628187,
+    "expiresAt": 1791594804030,
+    "deadline": 1791594804030
+  },
+  "run": {
+    "_creationTime": 1791594629146.1165,
+    "_id": "y57k6nbq5ff05rc250gdf2zjxx8g12fz",
+    "attemptPurpose": "IMPLEMENTATION",
+    "checkpointAt": 1791594629146,
+    "checkpointSummary": "Dispatch accepted; awaiting executor binding.",
+    "context": {
+      "authorityScope": {
+        "authorityRef": "work-order:xs7wqwpr5rm2rcggst4j0zdadx8g1x1y:revision:2:desired-outcome",
+        "kind": "WORK_ORDER_DESIRED_OUTCOME",
+        "objective": "Execute the preserved deterministic MyFactory slug fixture with signed independent verification.",
+        "workOrderId": "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y",
+        "workOrderRevisionNumber": 2
+      },
+      "revisionNumber": 2,
+      "source": "workOrders.dispatch",
+      "task": "Execute exact local MyFactory delegation",
+      "taskAttemptNumber": 1,
+      "taskId": "v57yx095f8wsxjqs803kv35zbs8g0kjp",
+      "taskRetryNumber": 0,
+      "workOrderDesiredOutcome": "Execute the preserved deterministic MyFactory slug fixture with signed independent verification.",
+      "workOrderId": "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y"
+    },
+    "currentStepIndex": 0,
+    "environmentId": "qx73ccgyn9bdmzc721f1a49v098g14xg",
+    "escalationOwner": "nd7twe28ytw35403v0xsz93vx58g19qg",
+    "evidenceState": "UNKNOWN",
+    "executionBaseSha": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+    "executionCostAuthorization": {
+      "actualCost": {
+        "reason": "Resource cost has not been measured; no provider execution is authorized.",
+        "status": "UNAVAILABLE"
+      },
+      "authorizationDigest": "68969ccb450af8c33f32daf8d90e92d1840d81e1e0e7112a8da19f40bcc9d89a",
+      "authorizedAt": 1791594629354,
+      "budgetSource": "WORK_ORDER_IMPLEMENTATION_POLICY",
+      "enterprise": {
+        "attemptId": "lf24i84p",
+        "authorizedAt": 1791594629354,
+        "bindingDigest": "sha256:4cd70152967bf354e1d56c11b4841a81d5e82ddfabce1685cd64b58921350177",
+        "ceilingMicrousd": 80,
+        "dailyCeilingMicrousd": 1000000,
+        "delegationId": "hybrid-25b9f130-baf7-4eaf-af12-91ee9f474a69",
+        "digest": "70ed8020f904d66265132d8d0028e616cdba94f944c5b1784e2328bd0a7a5490",
+        "executionProfileDigest": "sha256:a56c8020d26b59181a15f0a85b0db710c4cf3f4e509ad4d3e2a72f3c9235f5ff",
+        "expiresAt": 1791594804030,
+        "factoryId": "myfactory-local-qualification",
+        "factoryVersion": "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95",
+        "idempotencyKey": "hybrid-25b9f130-baf7-4eaf-af12-91ee9f474a69",
+        "missionCeilingMicrousd": 100000,
+        "missionId": "ks7wrf3n1fwzbqayxzc4qcm39n8g10z8",
+        "modelPolicyDigest": "sha256:5d194389f32c1a00b8cf8fec55c5148e853817e8d8a59eb02d4a9af1ff41cf0c",
+        "ownerId": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+        "policyCeilingMicrousd": 1000000,
+        "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+        "provider": "local-docker",
+        "schema": "enterprise-attempt-reservation/v1",
+        "tariff": {
+          "approvedAt": 1791594629187,
+          "approvedBy": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+          "baseBindingDigest": "sha256:ee6a318388252a951e87ea06add39f50bd97017b0efd315319f7a0c485780ebd",
+          "baseManifestDigest": "sha256:b3b0966cb76c2baa691233dbe4dee53dd2156fa3aad07cbe6e74845de8580ba9",
+          "basis": "DETERMINISTIC_ENGINEERING_ZERO_CHARGE",
+          "digest": "sha256:df5615f608f6cb098deb54e3ed4644a4759f348a9321ccdf5cfe4066e26b14f6",
+          "expiresAt": 1791594804030,
+          "schema": "enterprise-engineering-tariff/v1"
+        },
+        "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+        "workOrderCeilingMicrousd": 80,
+        "workOrderId": "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y",
+        "workOrderRevisionId": "xh7m5zxf954mhp5kpv06n1yq698g0m8h",
+        "workOrderRevisionNumber": 2
+      },
+      "estimatedCostUsd": 8e-05,
+      "estimationInputs": {
+        "approvedWorkOrderCapUsd": 8e-05,
+        "factoryBudget": {
+          "maxAttempts": 1,
+          "maxCostUsd": 8e-05,
+          "maxRuntimeMinutes": 3
+        },
+        "method": "FULL_RESOURCE_CEILING_RESERVATION",
+        "missionBudgetRemainingUsd": 0.1,
+        "policyBudgetRemainingUsd": 1,
+        "priorAttemptCount": 0
+      },
+      "executionProfileDigest": "sha256:a56c8020d26b59181a15f0a85b0db710c4cf3f4e509ad4d3e2a72f3c9235f5ff",
+      "factoryConfigurationDigest": "factory-v1-59e23be5",
+      "hardLimitUsd": 8e-05,
+      "maxProviderCalls": 0,
+      "maxProviderLiabilityUsd": 0,
+      "policyEnvelopeDigest": "745745657387397399909cdcfd1ce809aea19fbef57b2e818360519af084fb65",
+      "policyEnvelopeId": "nx7t84rcmx8spvg6naycdxnved8g0teh",
+      "priorCommittedUsd": 0,
+      "remainingBeforeReservationUsd": 8e-05,
+      "reservationId": "lf24i84p",
+      "reservedCostUsd": 8e-05,
+      "schema": "work-order-offline-cost-authorization/v1",
+      "workOrderPolicyDigest": "d9223643d67dbbfb944f04328b56d782ac6a2d9fae51c6a15c6c6ec8106e9129"
+    },
+    "executionEnvironment": "LOCAL",
+    "executionManifest": {
+      "authority": "PENDING_EXACT_OWNER_APPROVAL",
+      "baseCommit": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+      "baseTree": "1084844b1454165358e51248afe8676f96daf17c",
+      "configurationDigest": "factory-v1-59e23be5",
+      "definitionVersionId": "v17bm4jj9z93gc2vpa6r7pdfed8g0djf",
+      "delegatedSourceRepository": "jaydubya818/MyFactory",
+      "executionProfileDigest": "sha256:a56c8020d26b59181a15f0a85b0db710c4cf3f4e509ad4d3e2a72f3c9235f5ff",
+      "factoryId": "myfactory-local-qualification",
+      "factoryVersion": "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95",
+      "missionId": "ks7wrf3n1fwzbqayxzc4qcm39n8g10z8",
+      "missionPlanId": "k97j4cwgpgmn5p4qetapsa7q9n8g082x",
+      "ownerId": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+      "planDigest": "sha256:d36c5fbc1d1ecb02cc075d637c9328a86f12e608b7a143339a5e3e7c2e0e906c",
+      "productionAuthority": "NONE",
+      "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+      "publicationAuthority": "NONE",
+      "qualityContractDigest": "sha256:404df2f22140b5960dabdcafe4faa219ab0f884786bd651901dd462d61fbacf7",
+      "repository": "local-qualification/82346a57-79ca-414a-81ab-a10def97f1cd",
+      "repositoryId": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+      "runId": "lf24i84p",
+      "schema": "enterprise-local-delegation-preparation/v1",
+      "taskId": "v57yx095f8wsxjqs803kv35zbs8g0kjp",
+      "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+      "verificationContractDigest": "sha256:5b712e37643574dac8feffc038eeae7377ddb3da197ac0b17e11e4c5d085e2da",
+      "workOrderId": "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y",
+      "workOrderRevisionId": "xh7m5zxf954mhp5kpv06n1yq698g0m8h",
+      "workOrderRevisionNumber": 2,
+      "workflowDigest": "sha256:9e989f68ba99ac683b52b786459988960a4ff6dafa5926564185213e3e55acef"
+    },
+    "executionManifestDigest": "sha256:0c8fba2c8ba2547e0c7cecf4f47ac1653e0bfb8840b5936afe65e35196818a9b",
+    "executionProfileDigest": "sha256:a56c8020d26b59181a15f0a85b0db710c4cf3f4e509ad4d3e2a72f3c9235f5ff",
+    "executorAdapter": "myfactory-local-delegation",
+    "executorHostId": "native-successor-worker",
+    "executorVersion": "1",
+    "factoryConfigurationDigest": "factory-v1-59e23be5",
+    "factoryDefinitionVersionId": "v17bm4jj9z93gc2vpa6r7pdfed8g0djf",
+    "factoryPurpose": "SOFTWARE",
+    "initialInput": "Execute exact local MyFactory delegation",
+    "isMutating": true,
+    "maxConcurrency": 1,
+    "metadata": {
+      "codeScopeIds": [
+        "qs7wfer80dz4qj0gry1q3f13ws8g030q"
+      ],
+      "dispatchIdempotencyKey": "hybrid-delegated-dispatch",
+      "enterpriseDelegationApprovalId": "m97bs6xcz08akjbvntwqyxbtsh8g1pj7",
+      "enterpriseDelegationId": "hybrid-25b9f130-baf7-4eaf-af12-91ee9f474a69",
+      "executionEnvironment": "LOCAL",
+      "executionManifestDigest": "sha256:b3b0966cb76c2baa691233dbe4dee53dd2156fa3aad07cbe6e74845de8580ba9",
+      "executorHostId": "native-successor-worker",
+      "ownerMemberId": "nd7twe28ytw35403v0xsz93vx58g19qg",
+      "owningTeamId": "td7r1g6t4ezj1txe555cednwps8g02k2",
+      "scopeReceiptId": "t57pa6qxgj5c9spkjrw9sk1zk98g11z4",
+      "taskAttemptNumber": 1,
+      "taskId": "v57yx095f8wsxjqs803kv35zbs8g0kjp",
+      "taskRetryNumber": 0
+    },
+    "missionId": "ks7wrf3n1fwzbqayxzc4qcm39n8g10z8",
+    "missionRole": "WORKER",
+    "parentTaskId": "v57yx095f8wsxjqs803kv35zbs8g0kjp",
+    "planningRepositorySha": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+    "policyEnvelopeId": "nx7t84rcmx8spvg6naycdxnved8g0teh",
+    "primaryTraceId": "wd7qa96hkb1mjee074dpgmbv0n8g06a9",
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "qualityContractDigest": "sha256:404df2f22140b5960dabdcafe4faa219ab0f884786bd651901dd462d61fbacf7",
+    "repositoryId": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+    "reservedCostUsd": 8e-05,
+    "runId": "lf24i84p",
+    "spentUsd": 0,
+    "startedAt": 1791594629146,
+    "status": "PENDING",
+    "steps": [
+      {
+        "dependsOn": [],
+        "failurePolicy": "RETRY",
+        "kind": "GATE",
+        "retryCount": 0,
+        "status": "PENDING",
+        "stepId": "delegate"
+      }
+    ],
+    "stopCondition": "No paid inference; No production authority; No publication; Only the approved MyFactory slug fixture path may change",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "topology": "LINEAR",
+    "totalSteps": 1,
+    "verificationContractDigest": "sha256:5b712e37643574dac8feffc038eeae7377ddb3da197ac0b17e11e4c5d085e2da",
+    "workOrderId": "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y",
+    "workOrderRevisionId": "xh7m5zxf954mhp5kpv06n1yq698g0m8h",
+    "workOrderRevisionNumber": 2,
+    "workflowId": "hybrid-delegated",
+    "workflowSnapshot": {
+      "active": true,
+      "agents": [
+        {
+          "id": "delegation-boundary",
+          "persona": "Await authenticated MyFactory Result; no model execution."
+        }
+      ],
+      "description": "Exact local delegated execution only.",
+      "maxConcurrency": 1,
+      "name": "Qualified MyFactory local delegation",
+      "steps": [
+        {
+          "agent": "",
+          "expects": "Authenticated Factory Result",
+          "id": "delegate",
+          "input": "Await exact owner-approved delegated admission and authenticated Factory Result.",
+          "kind": "GATE",
+          "outputSchema": {
+            "properties": {
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          "retryLimit": 0,
+          "timeoutMinutes": 3
+        }
+      ],
+      "topology": "LINEAR",
+      "version": 1,
+      "workflowId": "hybrid-delegated"
+    },
+    "workflowVersion": 1
+  },
+  "workOrder": {
+    "_creationTime": 1791594617742.1626,
+    "_id": "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y",
+    "acceptanceCriteria": [
+      {
+        "description": "A separate verifier Attempt compares exact immutable candidate bytes. Evidence: Candidate commit and tree, separate verifier, exact runtime response, Quality Contract.",
+        "id": "delegated-slug",
+        "requiredEvidence": [
+          {
+            "category": "TEST_RESULT",
+            "independent": true,
+            "minimumCount": 1
+          }
+        ],
+        "requirementIds": [
+          "REQ-001"
+        ],
+        "status": "PENDING",
+        "title": "delegated-slug",
+        "verificationMethod": "TEST"
+      }
+    ],
+    "approvalStatus": "APPROVED",
+    "assignedSquad": "Qualification",
+    "autonomyLevel": "LEVEL_2",
+    "blockingIssue": "Missing receipts: delegated-slug",
+    "branchStrategy": "qualification-only-unpublished",
+    "changeBudget": {
+      "allowDependencyChanges": false,
+      "allowInfrastructureChanges": false,
+      "allowMigrations": false,
+      "allowSchemaChanges": false,
+      "allowedCommandClasses": [
+        "TEST"
+      ],
+      "allowedPaths": [
+        "fixtures/cloud-work/project-slug/slug.mjs"
+      ],
+      "deniedPaths": [
+        ".env*",
+        ".git/**",
+        ".github/workflows/**",
+        ".mission-control/**"
+      ],
+      "maxFilesChanged": 1,
+      "maxLinesChanged": 100,
+      "prohibitedCommandClasses": [
+        "DESTRUCTIVE",
+        "PRODUCTION_ACCESS",
+        "SECRETS_ACCESS",
+        "PUBLISH",
+        "INFRASTRUCTURE",
+        "MIGRATION"
+      ]
+    },
+    "codeScopeIds": [
+      "qs7wfer80dz4qj0gry1q3f13ws8g030q"
+    ],
+    "constraints": [
+      "No paid inference",
+      "No production authority",
+      "No publication",
+      "Only the approved MyFactory slug fixture path may change"
+    ],
+    "context": "Isolated qualification only.",
+    "createdAt": 1791594617742,
+    "currentExecutionRunId": "y57k6nbq5ff05rc250gdf2zjxx8g12fz",
+    "currentRevisionId": "xh7m5zxf954mhp5kpv06n1yq698g0m8h",
+    "currentRevisionNumber": 2,
+    "dependencies": [],
+    "desiredOutcome": "Execute the preserved deterministic MyFactory slug fixture with signed independent verification.",
+    "executionEnvironment": "LOCAL",
+    "idempotencyKey": "mission-plan:k97j4cwgpgmn5p4qetapsa7q9n8g082x:release:v1:work-order:delegated-slug",
+    "isMutating": true,
+    "kind": "SOFTWARE_CHANGE",
+    "metadata": {
+      "approvedWorkflowVersion": 1,
+      "estimatedCostUsd": 0,
+      "implementationPolicy": {
+        "allowedCommands": [
+          "node -e deterministic-byte-verification"
+        ],
+        "independentVerification": {
+          "args": [
+            "-e",
+            "process.exit(0)"
+          ],
+          "category": "CONTRACT_TEST",
+          "commandClass": "TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "executable": "node",
+          "timeoutMs": 10000
+        },
+        "maxAttempts": 1,
+        "maxCostUsd": 8e-05,
+        "maxFilesChanged": 1,
+        "maxLinesChanged": 100,
+        "stopCondition": "Stop after immutable candidate capture.",
+        "timeoutMinutes": 3
+      },
+      "independentVerification": {
+        "minimumBoundary": "SEPARATE_ATTEMPT",
+        "subject": "IMMUTABLE_CANDIDATE_SHA",
+        "verifierId": "factory-command/v1"
+      },
+      "missionBlueprintId": "delegated-slug",
+      "planApprovalRequirements": [],
+      "rollbackApproach": "Discard unpublished candidate worktrees.",
+      "scopePolicyRequirements": {
+        "approvalPolicies": [],
+        "owningTeamIds": [],
+        "requiredReviewers": [
+          "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq"
+        ],
+        "requiresCrossTeamReview": false,
+        "verificationPolicies": []
+      },
+      "specVerificationExpectationIds": [
+        "VERIFY-001"
+      ]
+    },
+    "missionId": "ks7wrf3n1fwzbqayxzc4qcm39n8g10z8",
+    "missionPlanId": "k97j4cwgpgmn5p4qetapsa7q9n8g082x",
+    "missionPlanRevision": 1,
+    "missionRole": "WORKER",
+    "missionSequence": 2,
+    "missionSpecLineage": {
+      "checklistLineage": {
+        "evidenceBearingVerificationItemIds": [
+          "CHECK-001"
+        ],
+        "governanceConstraintItemIds": [],
+        "requirementsQualityItemIds": []
+      },
+      "missionSpecDigest": "sha256:3eecfef9be17d05a651c21a6167c77c422e4a161a7e937e527ef932cc409deb3",
+      "missionSpecQualityEvaluationId": "kh7rhn660n2gy8azeq7nqn3ezd8g04ww",
+      "missionSpecRevisionId": "kn7nf2f4hab02xvpmwmery5nqs8g1dfs",
+      "projectConstitutionDigest": "sha256:1d65587a34d372e0ca8697dca3f8c321ec58fca65e161cdbd9b929840dcd50fe",
+      "projectConstitutionRevisionId": "p97zg1mdyehydjckhywgh8r4358g1h8r",
+      "requirementsCoverage": {
+        "complete": true,
+        "digest": "sha256:451e7db51a0f4d4affaad57c1747bf65373db9b1dc89b59a2401cb5fd5158c04",
+        "rows": [
+          {
+            "acceptanceCriterionIds": [
+              "delegated-slug",
+              "exact-document",
+              "integration-proof"
+            ],
+            "acceptanceExpectationIds": [
+              "AC-001"
+            ],
+            "complete": true,
+            "planAssertionIds": [
+              "delegated-slug",
+              "exact-document",
+              "integration-proof"
+            ],
+            "specRequirementId": "REQ-001",
+            "verificationCheckIds": [
+              "spec:VERIFY-001"
+            ],
+            "workOrderBlueprintIds": [
+              "delegated-slug",
+              "integration-proof",
+              "native-document"
+            ]
+          }
+        ],
+        "schemaVersion": 1
+      }
+    },
+    "negativeConstraints": [
+      {
+        "description": "The local Factory may not access production services or provider control planes.",
+        "id": "mission:no-production-access",
+        "type": "NO_PRODUCTION_ACCESS"
+      },
+      {
+        "description": "The candidate and evidence may not contain plaintext credentials or secrets.",
+        "id": "mission:no-plaintext-secrets",
+        "type": "NO_PLAINTEXT_SECRETS"
+      },
+      {
+        "description": "The executor may not weaken or rewrite its frozen independent verification contract.",
+        "id": "mission:verification-contract-protected",
+        "type": "NO_VERIFICATION_CONFIG_CHANGES"
+      }
+    ],
+    "ownerMemberId": "nd7twe28ytw35403v0xsz93vx58g19qg",
+    "owningTeamId": "td7r1g6t4ezj1txe555cednwps8g02k2",
+    "planningRepositorySha": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+    "positiveConstraints": [
+      "Only the approved MyFactory slug fixture path may change"
+    ],
+    "priority": 3,
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "qualityContractDigest": "sha256:404df2f22140b5960dabdcafe4faa219ab0f884786bd651901dd462d61fbacf7",
+    "releasedAt": 1791594617742,
+    "repository": "local-qualification/82346a57-79ca-414a-81ab-a10def97f1cd",
+    "repositoryId": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+    "requestedBy": "user_SyntheticHandoffQualification",
+    "requestingOperatorId": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "requiredApprovals": [
+      "HUMAN_REVIEW"
+    ],
+    "requiredHumanAction": "Missing verification receipts for delegated-slug",
+    "requirements": [
+      {
+        "category": "FUNCTIONAL",
+        "description": "Execute native, delegated, and downstream integration WorkOrders with separate verification and exact accounting settlement.",
+        "id": "REQ-001",
+        "priority": "MUST",
+        "title": "Composed deterministic proof",
+        "type": "FUNCTIONAL"
+      }
+    ],
+    "riskLevel": "LOW",
+    "riskReasons": [
+      "Operator-selected low risk."
+    ],
+    "scopeEnforcementVersion": 1,
+    "sourceOfTruthRefs": [
+      {
+        "kind": "REPO",
+        "label": "Admitted fixture",
+        "location": "docs/qualification.md"
+      }
+    ],
+    "specificationValidatedAt": 1791594629084,
+    "specificationVersion": 2,
+    "state": "DISPATCHED",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "title": "Qualified delegated slug change",
+    "updatedAt": 1791594629203,
+    "verificationContract": {
+      "checks": [
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "trim-and-case",
+          "mandatory": true,
+          "name": "trim-and-case",
+          "verifierId": "delegated-local"
+        },
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "repeated-space",
+          "mandatory": true,
+          "name": "repeated-space",
+          "verifierId": "delegated-local"
+        },
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "digits-and-hyphens",
+          "mandatory": true,
+          "name": "digits-and-hyphens",
+          "verifierId": "delegated-local"
+        },
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "tab-newline",
+          "mandatory": true,
+          "name": "tab-newline",
+          "verifierId": "delegated-local"
+        },
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "blank",
+          "mandatory": true,
+          "name": "blank",
+          "verifierId": "delegated-local"
+        },
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "empty",
+          "mandatory": true,
+          "name": "empty",
+          "verifierId": "delegated-local"
+        },
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "punctuation",
+          "mandatory": true,
+          "name": "punctuation",
+          "verifierId": "delegated-local"
+        },
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "unicode",
+          "mandatory": true,
+          "name": "unicode",
+          "verifierId": "delegated-local"
+        },
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "number",
+          "mandatory": true,
+          "name": "number",
+          "verifierId": "delegated-local"
+        },
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug"
+          ],
+          "category": "UNIT_TEST",
+          "evidenceCategory": "TEST_RESULT",
+          "id": "null",
+          "mandatory": true,
+          "name": "null",
+          "verifierId": "delegated-local"
+        }
+      ],
+      "enforcementMode": "ENFORCED",
+      "independence": {
+        "minimumBoundary": "SEPARATE_ATTEMPT",
+        "required": true
+      },
+      "requireHumanReview": false,
+      "requiredRisks": [
+        {
+          "description": "The published candidate may differ from the exact immutable subject independently verified for acceptance.",
+          "id": "mission:exact-candidate-integrity",
+          "requiredEvidenceIds": [
+            "trim-and-case",
+            "repeated-space",
+            "digits-and-hyphens",
+            "tab-newline",
+            "blank",
+            "empty",
+            "punctuation",
+            "unicode",
+            "number",
+            "null"
+          ],
+          "severity": "LOW",
+          "source": "HUMAN_APPROVED"
+        }
+      ],
+      "schemaVersion": 2
+    },
+    "verificationContractDigest": "sha256:5b712e37643574dac8feffc038eeae7377ddb3da197ac0b17e11e4c5d085e2da",
+    "verificationStatus": "PENDING",
+    "workflowId": "hybrid-delegated"
+  },
+  "plan": {
+    "_creationTime": 1791594617713.024,
+    "_id": "k97j4cwgpgmn5p4qetapsa7q9n8g082x",
+    "approvedAt": 1791594617742,
+    "approvedBy": "user_SyntheticHandoffQualification",
+    "assertions": [
+      {
+        "assertionId": "exact-document",
+        "outcome": "Only the approved document changes.",
+        "passCondition": "A separate verifier Attempt compares exact immutable candidate bytes.",
+        "requiredEvidence": "Candidate commit and tree, separate verifier, exact runtime response, Quality Contract.",
+        "requiresIndependentValidation": true,
+        "sourceAcceptanceExpectationIds": [
+          "AC-001"
+        ],
+        "sourceRequirementIds": [
+          "REQ-001"
+        ],
+        "sourceVerificationExpectationIds": [
+          "VERIFY-001"
+        ],
+        "title": "Exact native document",
+        "verificationMethod": "TEST",
+        "waiverAllowed": false
+      },
+      {
+        "assertionId": "delegated-slug",
+        "outcome": "Protected MyFactory slug behavior passes.",
+        "passCondition": "A separate verifier Attempt compares exact immutable candidate bytes.",
+        "requiredEvidence": "Candidate commit and tree, separate verifier, exact runtime response, Quality Contract.",
+        "requiresIndependentValidation": true,
+        "sourceAcceptanceExpectationIds": [
+          "AC-001"
+        ],
+        "sourceRequirementIds": [
+          "REQ-001"
+        ],
+        "sourceVerificationExpectationIds": [
+          "VERIFY-001"
+        ],
+        "title": "delegated-slug",
+        "verificationMethod": "TEST",
+        "waiverAllowed": false
+      },
+      {
+        "assertionId": "integration-proof",
+        "outcome": "The proof document binds both exact completed predecessor handoffs.",
+        "passCondition": "A separate verifier Attempt compares exact immutable candidate bytes.",
+        "requiredEvidence": "Candidate commit and tree, separate verifier, exact runtime response, Quality Contract.",
+        "requiresIndependentValidation": true,
+        "sourceAcceptanceExpectationIds": [
+          "AC-001"
+        ],
+        "sourceRequirementIds": [
+          "REQ-001"
+        ],
+        "sourceVerificationExpectationIds": [
+          "VERIFY-001"
+        ],
+        "title": "integration-proof",
+        "verificationMethod": "TEST",
+        "waiverAllowed": false
+      }
+    ],
+    "createdAt": 1791594617713,
+    "createdBy": "user_SyntheticPlanAuthorQualification",
+    "decidedActorSource": "AUTHENTICATED",
+    "decidedAt": 1791594617742,
+    "decidedBy": "user_SyntheticHandoffQualification",
+    "decisionReason": "Approve this exact synthetic plan and its explicit zero-charge native engineering tariff. No paid, publication or production authority.",
+    "draftVersion": 1,
+    "estimatedCostUsd": 0,
+    "idempotencyKey": "native-successor-plan",
+    "materializationVersion": 1,
+    "metadata": {
+      "nativeEngineeringTariffPolicy": {
+        "basis": "DETERMINISTIC_ENGINEERING_ZERO_CHARGE",
+        "providerCalls": 0,
+        "resourceCost": "UNMEASURED",
+        "schema": "enterprise-native-tariff-policy/v1"
+      },
+      "qualificationOnly": true,
+      "synthetic": true
+    },
+    "missionId": "ks7wrf3n1fwzbqayxzc4qcm39n8g10z8",
+    "missionSpecDigest": "sha256:3eecfef9be17d05a651c21a6167c77c422e4a161a7e937e527ef932cc409deb3",
+    "missionSpecQualityEvaluationId": "kh7rhn660n2gy8azeq7nqn3ezd8g04ww",
+    "missionSpecRevisionId": "kn7nf2f4hab02xvpmwmery5nqs8g1dfs",
+    "planningCandidateDigest": "sha256:43af5ea7f5cbd131e17317e68d8802bbc828dd042a4b088d1119595594766468",
+    "planningProvenance": {
+      "authoredBy": "user_SyntheticPlanAuthorQualification",
+      "authority": {
+        "acceptance": false,
+        "approval": false,
+        "execution": false,
+        "verification": false
+      },
+      "candidateDigest": "sha256:43af5ea7f5cbd131e17317e68d8802bbc828dd042a4b088d1119595594766468",
+      "environmentId": "qx73ccgyn9bdmzc721f1a49v098g14xg",
+      "missionId": "ks7wrf3n1fwzbqayxzc4qcm39n8g10z8",
+      "planningRepositorySha": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+      "repositoryAdmissionDigest": "sha256:f0429a85bd4777f909ed4c5e8bc546d43816ea9c9b1525e1dd73ad8097b04163",
+      "repositoryId": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+      "schema": "local-qualification-plan-binding/v1"
+    },
+    "planningRepositorySha": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+    "projectConstitutionDigest": "sha256:1d65587a34d372e0ca8697dca3f8c321ec58fca65e161cdbd9b929840dcd50fe",
+    "projectConstitutionRevisionId": "p97zg1mdyehydjckhywgh8r4358g1h8r",
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "qualityContractDigest": "sha256:404df2f22140b5960dabdcafe4faa219ab0f884786bd651901dd462d61fbacf7",
+    "qualityContractProjection": {
+      "assertions": [
+        {
+          "assertionId": "delegated-slug",
+          "outcome": "Protected MyFactory slug behavior passes.",
+          "passCondition": "A separate verifier Attempt compares exact immutable candidate bytes.",
+          "requiredEvidence": "Candidate commit and tree, separate verifier, exact runtime response, Quality Contract.",
+          "requiresIndependentValidation": true,
+          "sourceAcceptanceExpectationIds": [
+            "AC-001"
+          ],
+          "sourceRequirementIds": [
+            "REQ-001"
+          ],
+          "sourceVerificationExpectationIds": [
+            "VERIFY-001"
+          ],
+          "title": "delegated-slug",
+          "verificationMethod": "TEST",
+          "waiverAllowed": false
+        },
+        {
+          "assertionId": "exact-document",
+          "outcome": "Only the approved document changes.",
+          "passCondition": "A separate verifier Attempt compares exact immutable candidate bytes.",
+          "requiredEvidence": "Candidate commit and tree, separate verifier, exact runtime response, Quality Contract.",
+          "requiresIndependentValidation": true,
+          "sourceAcceptanceExpectationIds": [
+            "AC-001"
+          ],
+          "sourceRequirementIds": [
+            "REQ-001"
+          ],
+          "sourceVerificationExpectationIds": [
+            "VERIFY-001"
+          ],
+          "title": "Exact native document",
+          "verificationMethod": "TEST",
+          "waiverAllowed": false
+        },
+        {
+          "assertionId": "integration-proof",
+          "outcome": "The proof document binds both exact completed predecessor handoffs.",
+          "passCondition": "A separate verifier Attempt compares exact immutable candidate bytes.",
+          "requiredEvidence": "Candidate commit and tree, separate verifier, exact runtime response, Quality Contract.",
+          "requiresIndependentValidation": true,
+          "sourceAcceptanceExpectationIds": [
+            "AC-001"
+          ],
+          "sourceRequirementIds": [
+            "REQ-001"
+          ],
+          "sourceVerificationExpectationIds": [
+            "VERIFY-001"
+          ],
+          "title": "integration-proof",
+          "verificationMethod": "TEST",
+          "waiverAllowed": false
+        }
+      ],
+      "checklistLineage": {
+        "evidenceBearingVerificationItemIds": [
+          "CHECK-001"
+        ],
+        "governanceConstraintItemIds": [],
+        "requirementsQualityItemIds": []
+      },
+      "intent": {
+        "businessContext": "Isolated qualification only.",
+        "constraints": [
+          "No paid inference",
+          "No production authority",
+          "No publication"
+        ],
+        "objective": "Execute native and delegated WorkOrders and independently verify an exact downstream integration proof.",
+        "sourceOfTruthRefs": [
+          {
+            "kind": "REPO",
+            "label": "Admitted fixture",
+            "location": "docs/qualification.md"
+          }
+        ]
+      },
+      "plan": {
+        "rollbackApproach": "Discard unpublished candidate worktrees.",
+        "summary": "Render frozen Markdown through the exact admitted runtime, independently compare the candidate Git blob, and settle authenticated execution proof."
+      },
+      "repository": {
+        "branch": "main",
+        "planningRepositorySha": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+        "repository": "local-qualification/82346a57-79ca-414a-81ab-a10def97f1cd"
+      },
+      "requirementsCoverage": {
+        "complete": true,
+        "digest": "sha256:451e7db51a0f4d4affaad57c1747bf65373db9b1dc89b59a2401cb5fd5158c04",
+        "rows": [
+          {
+            "acceptanceCriterionIds": [
+              "delegated-slug",
+              "exact-document",
+              "integration-proof"
+            ],
+            "acceptanceExpectationIds": [
+              "AC-001"
+            ],
+            "complete": true,
+            "planAssertionIds": [
+              "delegated-slug",
+              "exact-document",
+              "integration-proof"
+            ],
+            "specRequirementId": "REQ-001",
+            "verificationCheckIds": [
+              "spec:VERIFY-001"
+            ],
+            "workOrderBlueprintIds": [
+              "delegated-slug",
+              "integration-proof",
+              "native-document"
+            ]
+          }
+        ],
+        "schemaVersion": 1
+      },
+      "schemaVersion": 3,
+      "source": {
+        "missionId": "ks7wrf3n1fwzbqayxzc4qcm39n8g10z8",
+        "missionPlanId": "k97j4cwgpgmn5p4qetapsa7q9n8g082x",
+        "missionPlanRevision": 1,
+        "missionSpecDigest": "sha256:3eecfef9be17d05a651c21a6167c77c422e4a161a7e937e527ef932cc409deb3",
+        "missionSpecQualityEvaluationId": "kh7rhn660n2gy8azeq7nqn3ezd8g04ww",
+        "missionSpecRevisionId": "kn7nf2f4hab02xvpmwmery5nqs8g1dfs",
+        "projectConstitutionDigest": "sha256:1d65587a34d372e0ca8697dca3f8c321ec58fca65e161cdbd9b929840dcd50fe",
+        "projectConstitutionRevisionId": "p97zg1mdyehydjckhywgh8r4358g1h8r"
+      },
+      "workOrders": [
+        {
+          "assertionIds": [
+            "exact-document"
+          ],
+          "branchStrategy": "qualification-only-unpublished",
+          "constraints": [
+            "Only docs/qualification.md may change"
+          ],
+          "dependsOnBlueprintIds": [],
+          "desiredOutcome": "Create only docs/qualification.md with the frozen content.",
+          "estimatedCostUsd": 0,
+          "id": "native-document",
+          "implementationPolicy": {
+            "allowedCommands": [
+              "node -e deterministic-byte-verification"
+            ],
+            "independentVerification": {
+              "args": [
+                "-e",
+                "process.exit(0)"
+              ],
+              "category": "CONTRACT_TEST",
+              "commandClass": "TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "executable": "node",
+              "timeoutMs": 10000
+            },
+            "maxAttempts": 3,
+            "maxCostUsd": 0.05,
+            "maxFilesChanged": 1,
+            "maxLinesChanged": 10,
+            "stopCondition": "Stop after immutable candidate capture.",
+            "timeoutMinutes": 1
+          },
+          "isMutating": true,
+          "priority": 3,
+          "requiredApprovals": [],
+          "riskLevel": "LOW",
+          "role": "WORKER",
+          "sequence": 1,
+          "title": "Render native qualification document",
+          "workflowId": "native-successor-producer",
+          "workflowVersion": 1
+        },
+        {
+          "assertionIds": [
+            "delegated-slug"
+          ],
+          "branchStrategy": "qualification-only-unpublished",
+          "constraints": [
+            "Only the approved MyFactory slug fixture path may change"
+          ],
+          "dependsOnBlueprintIds": [],
+          "desiredOutcome": "Execute the preserved deterministic MyFactory slug fixture with signed independent verification.",
+          "estimatedCostUsd": 0,
+          "id": "delegated-slug",
+          "implementationPolicy": {
+            "allowedCommands": [
+              "node -e deterministic-byte-verification"
+            ],
+            "independentVerification": {
+              "args": [
+                "-e",
+                "process.exit(0)"
+              ],
+              "category": "CONTRACT_TEST",
+              "commandClass": "TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "executable": "node",
+              "timeoutMs": 10000
+            },
+            "maxAttempts": 3,
+            "maxCostUsd": 0.05,
+            "maxFilesChanged": 1,
+            "maxLinesChanged": 100,
+            "stopCondition": "Stop after immutable candidate capture.",
+            "timeoutMinutes": 3
+          },
+          "isMutating": true,
+          "priority": 3,
+          "requiredApprovals": [],
+          "riskLevel": "LOW",
+          "role": "WORKER",
+          "sequence": 2,
+          "title": "Qualified delegated slug change",
+          "workflowId": "native-successor-producer",
+          "workflowVersion": 1
+        },
+        {
+          "assertionIds": [
+            "integration-proof"
+          ],
+          "branchStrategy": "qualification-only-unpublished",
+          "constraints": [
+            "Only docs/integration.md may change"
+          ],
+          "dependsOnBlueprintIds": [
+            "delegated-slug",
+            "native-document"
+          ],
+          "desiredOutcome": "Produce a deterministic document containing both exact predecessor candidate and handoff identities.",
+          "estimatedCostUsd": 0,
+          "id": "integration-proof",
+          "implementationPolicy": {
+            "allowedCommands": [
+              "node -e deterministic-byte-verification"
+            ],
+            "independentVerification": {
+              "args": [
+                "-e",
+                "process.exit(0)"
+              ],
+              "category": "CONTRACT_TEST",
+              "commandClass": "TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "executable": "node",
+              "timeoutMs": 10000
+            },
+            "maxAttempts": 3,
+            "maxCostUsd": 0.05,
+            "maxFilesChanged": 1,
+            "maxLinesChanged": 50,
+            "stopCondition": "Stop after immutable candidate capture.",
+            "timeoutMinutes": 1
+          },
+          "isMutating": true,
+          "priority": 3,
+          "requiredApprovals": [],
+          "riskLevel": "LOW",
+          "role": "WORKER",
+          "sequence": 3,
+          "title": "Integrate exact predecessor proofs",
+          "workflowId": "native-successor-producer",
+          "workflowVersion": 1
+        }
+      ]
+    },
+    "releaseIdempotencyKey": "mission-plan:k97j4cwgpgmn5p4qetapsa7q9n8g082x:release:v1",
+    "releasedAt": 1791594617742,
+    "releasedWorkOrderIds": [
+      "xs7rdxfkhwnkhqh67djn5x5e2d8g16cf",
+      "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y",
+      "xs7xjnj52r2pmwxvtde2b89mgh8g0rkh"
+    ],
+    "repository": "local-qualification/82346a57-79ca-414a-81ab-a10def97f1cd",
+    "repositoryBranch": "main",
+    "requirementsCoverageProjection": {
+      "complete": true,
+      "digest": "sha256:451e7db51a0f4d4affaad57c1747bf65373db9b1dc89b59a2401cb5fd5158c04",
+      "rows": [
+        {
+          "acceptanceCriterionIds": [
+            "delegated-slug",
+            "exact-document",
+            "integration-proof"
+          ],
+          "acceptanceExpectationIds": [
+            "AC-001"
+          ],
+          "complete": true,
+          "planAssertionIds": [
+            "delegated-slug",
+            "exact-document",
+            "integration-proof"
+          ],
+          "specRequirementId": "REQ-001",
+          "verificationCheckIds": [
+            "spec:VERIFY-001"
+          ],
+          "workOrderBlueprintIds": [
+            "delegated-slug",
+            "integration-proof",
+            "native-document"
+          ]
+        }
+      ],
+      "schemaVersion": 1
+    },
+    "revisionNumber": 1,
+    "rollbackApproach": "Discard unpublished candidate worktrees.",
+    "specConsistencyDigest": "sha256:ffd9ebfbe01e803af0c56ca766137358cd38d4157c18064ffbfcacf7290292b0",
+    "specConsistencyEvaluatedAt": 1791594617726,
+    "specConsistencyFindings": [],
+    "status": "APPROVED",
+    "submittedActorSource": "AUTHENTICATED",
+    "submittedAt": 1791594617726,
+    "submittedBy": "user_SyntheticPlanAuthorQualification",
+    "summary": "Render frozen Markdown through the exact admitted runtime, independently compare the candidate Git blob, and settle authenticated execution proof.",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "workOrderBlueprints": [
+      {
+        "assertionIds": [
+          "exact-document"
+        ],
+        "branchStrategy": "qualification-only-unpublished",
+        "constraints": [
+          "Only docs/qualification.md may change"
+        ],
+        "dependsOnBlueprintIds": [],
+        "desiredOutcome": "Create only docs/qualification.md with the frozen content.",
+        "estimatedCostUsd": 0,
+        "id": "native-document",
+        "implementationPolicy": {
+          "allowedCommands": [
+            "node -e deterministic-byte-verification"
+          ],
+          "independentVerification": {
+            "args": [
+              "-e",
+              "process.exit(0)"
+            ],
+            "category": "CONTRACT_TEST",
+            "commandClass": "TEST",
+            "evidenceCategory": "TEST_RESULT",
+            "executable": "node",
+            "timeoutMs": 10000
+          },
+          "maxAttempts": 3,
+          "maxCostUsd": 0.05,
+          "maxFilesChanged": 1,
+          "maxLinesChanged": 10,
+          "stopCondition": "Stop after immutable candidate capture.",
+          "timeoutMinutes": 1
+        },
+        "isMutating": true,
+        "priority": 3,
+        "requiredApprovals": [],
+        "riskLevel": "LOW",
+        "role": "WORKER",
+        "sequence": 1,
+        "title": "Render native qualification document",
+        "workflowId": "native-successor-producer",
+        "workflowVersion": 1
+      },
+      {
+        "assertionIds": [
+          "delegated-slug"
+        ],
+        "branchStrategy": "qualification-only-unpublished",
+        "constraints": [
+          "Only the approved MyFactory slug fixture path may change"
+        ],
+        "dependsOnBlueprintIds": [],
+        "desiredOutcome": "Execute the preserved deterministic MyFactory slug fixture with signed independent verification.",
+        "estimatedCostUsd": 0,
+        "id": "delegated-slug",
+        "implementationPolicy": {
+          "allowedCommands": [
+            "node -e deterministic-byte-verification"
+          ],
+          "independentVerification": {
+            "args": [
+              "-e",
+              "process.exit(0)"
+            ],
+            "category": "CONTRACT_TEST",
+            "commandClass": "TEST",
+            "evidenceCategory": "TEST_RESULT",
+            "executable": "node",
+            "timeoutMs": 10000
+          },
+          "maxAttempts": 3,
+          "maxCostUsd": 0.05,
+          "maxFilesChanged": 1,
+          "maxLinesChanged": 100,
+          "stopCondition": "Stop after immutable candidate capture.",
+          "timeoutMinutes": 3
+        },
+        "isMutating": true,
+        "priority": 3,
+        "requiredApprovals": [],
+        "riskLevel": "LOW",
+        "role": "WORKER",
+        "sequence": 2,
+        "title": "Qualified delegated slug change",
+        "workflowId": "native-successor-producer",
+        "workflowVersion": 1
+      },
+      {
+        "assertionIds": [
+          "integration-proof"
+        ],
+        "branchStrategy": "qualification-only-unpublished",
+        "constraints": [
+          "Only docs/integration.md may change"
+        ],
+        "dependsOnBlueprintIds": [
+          "native-document",
+          "delegated-slug"
+        ],
+        "desiredOutcome": "Produce a deterministic document containing both exact predecessor candidate and handoff identities.",
+        "estimatedCostUsd": 0,
+        "id": "integration-proof",
+        "implementationPolicy": {
+          "allowedCommands": [
+            "node -e deterministic-byte-verification"
+          ],
+          "independentVerification": {
+            "args": [
+              "-e",
+              "process.exit(0)"
+            ],
+            "category": "CONTRACT_TEST",
+            "commandClass": "TEST",
+            "evidenceCategory": "TEST_RESULT",
+            "executable": "node",
+            "timeoutMs": 10000
+          },
+          "maxAttempts": 3,
+          "maxCostUsd": 0.05,
+          "maxFilesChanged": 1,
+          "maxLinesChanged": 50,
+          "stopCondition": "Stop after immutable candidate capture.",
+          "timeoutMinutes": 1
+        },
+        "isMutating": true,
+        "priority": 3,
+        "requiredApprovals": [],
+        "riskLevel": "LOW",
+        "role": "WORKER",
+        "sequence": 3,
+        "title": "Integrate exact predecessor proofs",
+        "workflowId": "native-successor-producer",
+        "workflowVersion": 1
+      }
+    ]
+  },
+  "mission": {
+    "_creationTime": 1791594617661.84,
+    "_id": "ks7wrf3n1fwzbqayxzc4qcm39n8g10z8",
+    "budgetUsd": 0.1,
+    "codeScopeIds": [
+      "qs7wfer80dz4qj0gry1q3f13ws8g030q"
+    ],
+    "constraints": [
+      "No paid inference",
+      "No publication",
+      "No production authority"
+    ],
+    "context": "Isolated qualification only.",
+    "correctiveIterations": 0,
+    "createdAt": 1791594617661,
+    "currentPlanId": "k97j4cwgpgmn5p4qetapsa7q9n8g082x",
+    "currentSpecRevisionId": "kn7nf2f4hab02xvpmwmery5nqs8g1dfs",
+    "executionEnvironment": "LOCAL",
+    "executionPolicy": "SERIAL_MUTATIONS",
+    "idempotencyKey": "native-successor-mission",
+    "maxCorrectiveIterations": 1,
+    "maxReadOnlyConcurrency": 2,
+    "metadata": {
+      "enterpriseCompatibilityFixture": true,
+      "qualificationOnly": true,
+      "synthetic": true
+    },
+    "objective": "Execute native and delegated WorkOrders and independently verify an exact downstream integration proof.",
+    "owner": "Qualification owner",
+    "ownerMemberId": "nd7twe28ytw35403v0xsz93vx58g19qg",
+    "owningTeamId": "td7r1g6t4ezj1txe555cednwps8g02k2",
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "repositoryId": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+    "requestedByOperatorId": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "requiredHumanAction": "Accept the Validator WorkOrder and record its structured handoff.",
+    "sourceOfTruthRefs": [
+      {
+        "kind": "REPO",
+        "label": "Admitted fixture",
+        "location": "docs/qualification.md"
+      }
+    ],
+    "spentUsd": 0,
+    "state": "IN_PROGRESS",
+    "stopCondition": "Stop after all approved WorkOrders are independently verified, accepted and settled; no publication.",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "title": "Deterministic native and delegated hybrid Mission",
+    "updatedAt": 1791594629013
+  },
+  "version": {
+    "_creationTime": 1791594629047.384,
+    "_id": "v17bm4jj9z93gc2vpa6r7pdfed8g0djf",
+    "agentBindings": [],
+    "budget": {
+      "maxAttempts": 1,
+      "maxCostUsd": 8e-05,
+      "maxRuntimeMinutes": 3
+    },
+    "codeScopeIds": [],
+    "configurationDigest": "factory-v1-59e23be5",
+    "createdAt": 1791594629047,
+    "createdBy": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "environmentId": "qx73ccgyn9bdmzc721f1a49v098g14xg",
+    "executionProfileDigest": "sha256:a56c8020d26b59181a15f0a85b0db710c4cf3f4e509ad4d3e2a72f3c9235f5ff",
+    "executionProfileSnapshot": {
+      "configuration": {
+        "allowedPaths": [
+          "fixtures/cloud-work/project-slug/slug.mjs"
+        ],
+        "architecture": "arm64",
+        "commands": [
+          "node --test fixtures/cloud-work/project-slug/slug.test.mjs"
+        ],
+        "executor": "deterministic-qualification",
+        "executorVersion": "1",
+        "local": {
+          "evidenceClass": "DETERMINISTIC",
+          "harnessSha256": "f1e7714288cf5c091300f6b9a418a8f721a1f0562600a1ff36f7c8c54551ce66",
+          "hostQualificationSha256": "164ca2bee824f002244b16008e18d627b25ceda5d86c55f472c6abf8b278c814",
+          "image": "public.ecr.aws/docker/library/node@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0",
+          "implementationSha256": "b5f2f85d4b1830ec9a4b038247e1927e9274d135853d028bf7054a35dc3ba62d",
+          "modelProvider": "none",
+          "policySha256": "6b5419dd57095b9f639ad09d88c1183da18c7353bb45e0a8c97f3593290383b0",
+          "provider": "local-docker",
+          "providerVersion": "1",
+          "resources": {
+            "maxArtifactBytes": 256000,
+            "memoryMb": 256,
+            "pids": 64,
+            "timeoutMs": 180000,
+            "vcpus": 1
+          },
+          "runtimeSha256": "8e5dda1d476303b6094a34bc04bcc4b1e5622fc5c3fd40d75063281d45b79691",
+          "verificationPolicySha256": "8e4df86832ee72ebfc49983382359097f7ceae2a191de4511288277cf8505e4c"
+        },
+        "model": "fixture/deterministic",
+        "nodeVersion": "24",
+        "platform": "linux",
+        "skillRevision": "none",
+        "timeoutMs": 180000,
+        "verificationImage": "public.ecr.aws/docker/library/node@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0",
+        "workerProfile": "container"
+      },
+      "factoryVersion": "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95",
+      "sourceDigest": "93944614be94c6d824f8640d0bda26a7822528dd0d960c02e7db474d15e7f929",
+      "sourceSha": "e498c31db8b749fa91b0544ecd1d1a661b971c2c"
+    },
+    "executor": {
+      "adapter": "myfactory-local-delegation",
+      "version": "1"
+    },
+    "factoryDefinitionId": "v5713b4zad915rdfhx08rh3sf18g1aye",
+    "policyEnvelopeId": "nx7t84rcmx8spvg6naycdxnved8g0teh",
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "purpose": "SOFTWARE",
+    "recovery": {
+      "cancel": true,
+      "pause": false,
+      "resume": false,
+      "retry": false
+    },
+    "repositoryAdmissionDigest": "sha256:f0429a85bd4777f909ed4c5e8bc546d43816ea9c9b1525e1dd73ad8097b04163",
+    "repositoryId": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+    "repositoryMode": "LOCAL_SYNTHETIC_QUALIFICATION",
+    "riskBoundary": "GREEN",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "verifierIds": [],
+    "version": 1,
+    "workflowId": "y97qbphfazzf60mtzv1xpgepdd8g04gm"
+  },
+  "factory": {
+    "_creationTime": 1791594629038.543,
+    "_id": "v5713b4zad915rdfhx08rh3sf18g1aye",
+    "createdAt": 1791594629038,
+    "createdBy": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "enterpriseRegistration": {
+      "config": {
+        "admissionPolicy": "FIXTURE_ONLY",
+        "capabilities": [
+          "BOUNDED_DELEGATION",
+          "SIGNED_RESULT"
+        ],
+        "capacity": 1,
+        "compatibility": {
+          "myEve": "8338309582d6806829dec1ae1beef301d6b52425",
+          "myFactory": "fa48a820ba185eb9b891130c78166463b61cba74",
+          "mySkillsBehavior": "21ae05a7be2f73be1378deb896f138700c473e84",
+          "mySkillsFoundation": "d57ff77b8522f897fc6ae392cf59b3141295ba82"
+        },
+        "definitionVersionId": "v17bm4jj9z93gc2vpa6r7pdfed8g0djf",
+        "executionProvider": "LOCAL_DOCKER_QUALIFICATION",
+        "factoryId": "myfactory-local-qualification",
+        "factoryVersion": "4c6c3a7d752df18a865fc815bc52daa8b638f6344a607f86a692f24eab3f4f95",
+        "kind": "MYFACTORY",
+        "localProviderSourceSha": "e498c31db8b749fa91b0544ecd1d1a661b971c2c"
+      },
+      "digest": "sha256:6f0c5330372570d0ffec12b7f0f51e0f77dff77fc198447690a04f11a8f15d1c",
+      "evidenceDigest": "sha256:2bbe5c3c66dd5fad4c1e5a3a25e9292e569a8d46a7794d2e4767fa6dd2adbf63",
+      "health": "HEALTHY",
+      "qualification": "FIXTURE_QUALIFIED",
+      "revision": 2,
+      "validUntil": 1791594804030
+    },
+    "latestVersion": 1,
+    "name": "Preserved MyFactory local qualification",
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "purpose": "SOFTWARE",
+    "repositoryId": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+    "status": "DRAFT",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "updatedAt": 1791594629047
+  },
+  "workflow": {
+    "_creationTime": 1791594629031.948,
+    "_id": "y97qbphfazzf60mtzv1xpgepdd8g04gm",
+    "active": true,
+    "agents": [
+      {
+        "id": "delegation-boundary",
+        "persona": "Await authenticated MyFactory Result; no model execution."
+      }
+    ],
+    "contractVersion": "factory-workflow-contract/v1",
+    "createdAt": 1791594629031,
+    "createdBy": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "description": "Exact local delegated execution only.",
+    "maxConcurrency": 1,
+    "name": "Qualified MyFactory local delegation",
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "steps": [
+      {
+        "agent": "",
+        "expects": "Authenticated Factory Result",
+        "id": "delegate",
+        "input": "Await exact owner-approved delegated admission and authenticated Factory Result.",
+        "kind": "GATE",
+        "outputSchema": {
+          "properties": {
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        "retryLimit": 0,
+        "timeoutMinutes": 3
+      }
+    ],
+    "topology": "LINEAR",
+    "updatedAt": 1791594629031,
+    "version": 1,
+    "workflowId": "hybrid-delegated"
+  },
+  "policy": {
+    "_creationTime": 1791594617362.766,
+    "_id": "nx7t84rcmx8spvg6naycdxnved8g0teh",
+    "active": true,
+    "createdAt": 1791594617362,
+    "metadata": {
+      "repositoryId": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+      "synthetic": true
+    },
+    "name": "Native successor qualification",
+    "priority": 100,
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "rules": {
+      "maxProviderCalls": 0,
+      "maxResourceCostUsd": 1,
+      "productionAuthority": "NONE",
+      "publicationAuthority": "NONE"
+    },
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "updatedAt": 1791594617362
+  },
+  "repository": {
+    "_creationTime": 1791594616613.569,
+    "_id": "yh7nacntb2ysky7jhc4ynbhpx18g1dwn",
+    "createdAt": 1791594616613,
+    "createdBy": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "dataClassification": "PUBLIC",
+    "defaultBranch": "main",
+    "displayName": "Local synthetic qualification \u2014 no publication",
+    "fixtureKey": "82346a57-79ca-414a-81ab-a10def97f1cd",
+    "isDefault": false,
+    "localAdmission": {
+      "baselineCommit": "5cd13fa1f307a0c0f42f6317d966bb3179ad77c9",
+      "baselineTree": "1084844b1454165358e51248afe8676f96daf17c",
+      "engagementId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+      "environmentId": "qx73ccgyn9bdmzc721f1a49v098g14xg",
+      "expiresAt": 1791598216332,
+      "fixtureContentDigest": "sha256:78693ed7fd6fb47a4196a31f3396f584cccbf1637f3e1d84d84f5e57020eff89",
+      "fixtureId": "82346a57-79ca-414a-81ab-a10def97f1cd",
+      "hostId": "native-successor-worker",
+      "mode": "LOCAL_SYNTHETIC_QUALIFICATION",
+      "operatorId": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+      "productionAuthority": "NONE",
+      "program": "unpublished-handoff-fixture/v1",
+      "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+      "publicationAuthority": "NONE",
+      "root": "/private/tmp/mc-local-qualification-b77d6f27486bd8dbd8068bab7aa1cc85/repository",
+      "schema": "local-synthetic-repository-admission/v1",
+      "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae"
+    },
+    "localAdmissionDigest": "sha256:f0429a85bd4777f909ed4c5e8bc546d43816ea9c9b1525e1dd73ad8097b04163",
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "provider": "LOCAL",
+    "repository": "local-qualification/82346a57-79ca-414a-81ab-a10def97f1cd",
+    "repositoryMode": "LOCAL_SYNTHETIC_QUALIFICATION",
+    "status": "READY",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "updatedAt": 1791594623088,
+    "updatedBy": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "validatedAt": 1791594623088,
+    "webhookStatus": "MISSING"
+  },
+  "approval": {
+    "_creationTime": 1791594629190.73,
+    "_id": "m97bs6xcz08akjbvntwqyxbtsh8g1pj7",
+    "approvalType": "DELEGATION_EXECUTION",
+    "approver": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "createdAt": 1791594629190,
+    "decidedAt": 1791594629203,
+    "decision": "APPROVE",
+    "expiresAt": 1791594804030,
+    "idempotencyKey": "hybrid-25b9f130-baf7-4eaf-af12-91ee9f474a69:approval",
+    "metadata": {
+      "bindingDigest": "sha256:4cd70152967bf354e1d56c11b4841a81d5e82ddfabce1685cd64b58921350177",
+      "checkIdsDigest": "sha256:06e99bcbb6dd213d77d6a4b2dc665cd9891ca601771d0a757d019ac239c41f4a",
+      "leaseId": "7cfc255e-5da8-4794-984a-e17b08c1ca51",
+      "ownerActorId": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+      "planDigest": "sha256:d36c5fbc1d1ecb02cc075d637c9328a86f12e608b7a143339a5e3e7c2e0e906c",
+      "schema": "enterprise-delegation-approval/v1",
+      "tariff": {
+        "approvedAt": 1791594629187,
+        "approvedBy": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+        "baseBindingDigest": "sha256:ee6a318388252a951e87ea06add39f50bd97017b0efd315319f7a0c485780ebd",
+        "baseManifestDigest": "sha256:b3b0966cb76c2baa691233dbe4dee53dd2156fa3aad07cbe6e74845de8580ba9",
+        "basis": "DETERMINISTIC_ENGINEERING_ZERO_CHARGE",
+        "digest": "sha256:df5615f608f6cb098deb54e3ed4644a4759f348a9321ccdf5cfe4066e26b14f6",
+        "expiresAt": 1791594804030,
+        "schema": "enterprise-engineering-tariff/v1"
+      },
+      "verificationSpec": {
+        "acceptanceCriteria": [
+          {
+            "description": "A separate verifier Attempt compares exact immutable candidate bytes. Evidence: Candidate commit and tree, separate verifier, exact runtime response, Quality Contract.",
+            "id": "delegated-slug",
+            "requiredEvidence": [
+              {
+                "category": "TEST_RESULT",
+                "independent": true,
+                "minimumCount": 1
+              }
+            ],
+            "requirementIds": [
+              "REQ-001"
+            ],
+            "title": "delegated-slug",
+            "verificationMethod": "TEST"
+          }
+        ],
+        "changeBudget": {
+          "allowDependencyChanges": false,
+          "allowInfrastructureChanges": false,
+          "allowMigrations": false,
+          "allowSchemaChanges": false,
+          "allowedCommandClasses": [
+            "TEST"
+          ],
+          "allowedPaths": [
+            "fixtures/cloud-work/project-slug/slug.mjs"
+          ],
+          "deniedPaths": [
+            ".env*",
+            ".git/**",
+            ".github/workflows/**",
+            ".mission-control/**"
+          ],
+          "maxFilesChanged": 1,
+          "maxLinesChanged": 100,
+          "prohibitedCommandClasses": [
+            "DESTRUCTIVE",
+            "PRODUCTION_ACCESS",
+            "SECRETS_ACCESS",
+            "PUBLISH",
+            "INFRASTRUCTURE",
+            "MIGRATION"
+          ]
+        },
+        "id": "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y",
+        "negativeConstraints": [
+          {
+            "description": "The local Factory may not access production services or provider control planes.",
+            "id": "mission:no-production-access",
+            "type": "NO_PRODUCTION_ACCESS"
+          },
+          {
+            "description": "The candidate and evidence may not contain plaintext credentials or secrets.",
+            "id": "mission:no-plaintext-secrets",
+            "type": "NO_PLAINTEXT_SECRETS"
+          },
+          {
+            "description": "The executor may not weaken or rewrite its frozen independent verification contract.",
+            "id": "mission:verification-contract-protected",
+            "type": "NO_VERIFICATION_CONFIG_CHANGES"
+          }
+        ],
+        "requiredApprovals": [
+          "HUMAN_REVIEW"
+        ],
+        "requirements": [
+          {
+            "category": "FUNCTIONAL",
+            "description": "Execute native, delegated, and downstream integration WorkOrders with separate verification and exact accounting settlement.",
+            "id": "REQ-001",
+            "priority": "MUST",
+            "title": "Composed deterministic proof",
+            "type": "FUNCTIONAL"
+          }
+        ],
+        "revisionNumber": 2,
+        "riskLevel": "LOW",
+        "riskReasons": [
+          "Operator-selected low risk."
+        ],
+        "title": "Qualified delegated slug change",
+        "verificationContract": {
+          "checks": [
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "trim-and-case",
+              "mandatory": true,
+              "name": "trim-and-case",
+              "verifierId": "delegated-local"
+            },
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "repeated-space",
+              "mandatory": true,
+              "name": "repeated-space",
+              "verifierId": "delegated-local"
+            },
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "digits-and-hyphens",
+              "mandatory": true,
+              "name": "digits-and-hyphens",
+              "verifierId": "delegated-local"
+            },
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "tab-newline",
+              "mandatory": true,
+              "name": "tab-newline",
+              "verifierId": "delegated-local"
+            },
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "blank",
+              "mandatory": true,
+              "name": "blank",
+              "verifierId": "delegated-local"
+            },
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "empty",
+              "mandatory": true,
+              "name": "empty",
+              "verifierId": "delegated-local"
+            },
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "punctuation",
+              "mandatory": true,
+              "name": "punctuation",
+              "verifierId": "delegated-local"
+            },
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "unicode",
+              "mandatory": true,
+              "name": "unicode",
+              "verifierId": "delegated-local"
+            },
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "number",
+              "mandatory": true,
+              "name": "number",
+              "verifierId": "delegated-local"
+            },
+            {
+              "acceptanceCriterionIds": [
+                "delegated-slug"
+              ],
+              "category": "UNIT_TEST",
+              "evidenceCategory": "TEST_RESULT",
+              "id": "null",
+              "mandatory": true,
+              "name": "null",
+              "verifierId": "delegated-local"
+            }
+          ],
+          "enforcementMode": "ENFORCED",
+          "independence": {
+            "minimumBoundary": "SEPARATE_ATTEMPT",
+            "required": true
+          },
+          "requireHumanReview": false,
+          "requiredRisks": [
+            {
+              "description": "The published candidate may differ from the exact immutable subject independently verified for acceptance.",
+              "id": "mission:exact-candidate-integrity",
+              "requiredEvidenceIds": [
+                "trim-and-case",
+                "repeated-space",
+                "digits-and-hyphens",
+                "tab-newline",
+                "blank",
+                "empty",
+                "punctuation",
+                "unicode",
+                "number",
+                "null"
+              ],
+              "severity": "LOW",
+              "source": "HUMAN_APPROVED"
+            }
+          ],
+          "schemaVersion": 2
+        }
+      }
+    },
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "reason": "Approve only these exact ephemeral local delegation identities and zero-charge engineering tariff.",
+    "requestedAction": "Approve exact authenticated delegation, tariff and verifier contract.",
+    "riskLevel": "LOW",
+    "status": "APPROVED",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae",
+    "workOrderId": "xs7wqwpr5rm2rcggst4j0zdadx8g1x1y",
+    "workOrderRevisionNumber": 2,
+    "workflowRunId": "y57k6nbq5ff05rc250gdf2zjxx8g12fz"
+  },
+  "operator": {
+    "_creationTime": 1791594614329.8848,
+    "_id": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "active": true,
+    "authId": "user_SyntheticHandoffQualification",
+    "createdAt": 1791594614329,
+    "email": "user_SyntheticHandoffQualification@example.test",
+    "metadata": {
+      "productionAuthority": false,
+      "schema": "unpublished-handoff-fixture/v1",
+      "synthetic": true
+    },
+    "name": "Qualification owner",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae"
+  },
+  "member": {
+    "_creationTime": 1791594614329.8862,
+    "_id": "nd7twe28ytw35403v0xsz93vx58g19qg",
+    "active": true,
+    "level": 0,
+    "metadata": {
+      "productionAuthority": false,
+      "schema": "unpublished-handoff-fixture/v1",
+      "synthetic": true
+    },
+    "name": "Qualification owner",
+    "operatorId": "n57wveyqpnf4cnfb00gpbb4t3h8g0aeq",
+    "projectId": "pd7hvd929jrs28hrsfcd2w8vw58g046q",
+    "role": "Owner",
+    "systemRole": "OWNER",
+    "tenantId": "vn7hdgb4q53ndabqx9sap4bpz58g1dae"
+  }
+}

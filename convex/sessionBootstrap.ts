@@ -11,7 +11,7 @@
  */
 
 import { v } from "convex/values";
-import { action, query } from "./_generated/server";
+import { action, query } from "./lib/missionScopedFunctions";
 import { api } from "./_generated/api";
 
 // ============================================================================

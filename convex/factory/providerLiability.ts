@@ -1,10 +1,11 @@
+import { denyEnterprisePaidAuthority } from "../lib/enterpriseAttemptAccounting";
 import { admitBedrockAccounting, settleBedrockAccounting } from "../lib/governedInferenceAdmission";
 import { assertInferenceSpendingAllowed, fenceWorkOrderInferenceSpending } from "../inferenceGateway";
  import {
   bedrockBridgeIdentityValidator,
   assertBedrockBridgeIdentity,
 } from "../lib/bedrockBridgeIdentity"; import { v, ConvexError } from "convex/values";
-import { mutation, query, internalMutation } from "../_generated/server";
+import { mutation, query, internalMutation } from "../lib/missionScopedFunctions";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import {
@@ -90,6 +91,7 @@ export const createReservation = mutation({
       FACTORY_PERMISSIONS.MANAGE_AUTOMATION,
     );
     key(args.idempotencyKey);
+    await denyEnterprisePaidAuthority(ctx, args.projectId);
     const [wo, profile, price] = await Promise.all([
       ctx.db.get(args.workOrderId),
       ctx.db.get(args.executionProfileId),
@@ -300,6 +302,7 @@ export const reserveRequestInternal = internalMutation({
     bridgeIdentity: v.optional(bedrockBridgeIdentityValidator) },
   handler: async (ctx, args) => {
     const { row, run, price  , profile } = await currentAuthority(ctx, args);
+    await denyEnterprisePaidAuthority(ctx, row.projectId);
      if (price.snapshot.provider === "aws-bedrock" || args.bridgeIdentity) {
       const snapshot = profile.profile?.immutableSnapshot as any;
       const expectedApi = snapshot?.executionBackend === "persistent-worker"

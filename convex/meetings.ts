@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action } from "./lib/missionScopedFunctions";
 
 const meetingStatusValidator = v.union(
   v.literal("SCHEDULED"),

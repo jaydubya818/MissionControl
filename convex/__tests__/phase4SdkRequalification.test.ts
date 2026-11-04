@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";

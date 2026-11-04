@@ -7,7 +7,7 @@
  */
 
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { query } from "./lib/missionScopedFunctions";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

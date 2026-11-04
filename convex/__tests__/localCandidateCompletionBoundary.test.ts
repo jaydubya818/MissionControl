@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { describe, expect, it } from "vitest";
 import { reportInternal, scheduleVerificationInternal } from "../factory/attempts";
 import { getFunctionName } from "convex/server";

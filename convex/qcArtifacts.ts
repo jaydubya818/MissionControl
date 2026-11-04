@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { query, internalMutation } from "./_generated/server";
+import { query, internalMutation } from "./lib/missionScopedFunctions";
 import { Id } from "./_generated/dataModel";
 
 // ============================================================================

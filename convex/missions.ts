@@ -1,6 +1,7 @@
 import { requireCapabilityAdmission, capabilityPermitsValidator } from "./lib/capabilityAdmission";
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { v, type Infer } from "convex/values";
+import { contributorMutation } from "./lib/missionScopedFunctions";
+import { mutation, query, reviewerMutation } from "./lib/missionScopedFunctions";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -658,8 +659,7 @@ export const getScoped = query({
   },
 });
 
-export const createDraft = mutation({
-  args: {
+const missionDraftArgs = v.object({
     projectId: v.optional(v.id("projects")), idempotencyKey: v.optional(v.string()), title: v.string(), objective: v.string(),
     context: v.optional(v.string()), constraints: v.optional(v.array(v.string())), sourceOfTruthRefs: v.optional(v.array(sourceRef)),
     owner: v.optional(v.string()), budgetUsd: v.optional(v.number()), stopCondition: v.string(),
@@ -667,7 +667,10 @@ export const createDraft = mutation({
     repositoryId: v.optional(v.id("workspaceRepositories")), codeScopeIds: v.optional(v.array(v.id("repositoryCodeScopes"))),
     executionEnvironment: v.optional(v.union(v.literal("LOCAL"), v.literal("CLOUD"), v.literal("REMOTE"), v.literal("POLICY_SELECTED"))),
     maxReadOnlyConcurrency: v.optional(v.number()), maxCorrectiveIterations: v.optional(v.number()), metadata: v.optional(v.any()),
-  },
+  });
+
+export const createDraft = mutation({
+  args: missionDraftArgs,
   handler: async (ctx, args) => {
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, args.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
     assertAuthorizedDeliveryRecord(deliveryAccess, {
@@ -685,8 +688,8 @@ export const createDraft = mutation({
     }
     const project = args.projectId ? await ctx.db.get(args.projectId) : null;
     if (args.projectId && !project) throw new Error("Workspace not found");
-    let requestingOperatorId;
-    let ownerMember: any = null;
+    let requestingOperatorId = deliveryAccess?.membership.operatorId;
+    let ownerMember: Doc<"orgMembers"> | null = null;
     let owningTeam: any = null;
     if (args.projectId && project?.tenantId && (args.ownerMemberId || args.owningTeamId || args.repositoryId || args.codeScopeIds?.length)) {
       const access = await requireWorkspaceAccess(ctx, project.tenantId, args.projectId, { permission: COMPANY_PERMISSIONS.ASSIGN_DELIVERY });
@@ -701,7 +704,11 @@ export const createDraft = mutation({
       ]);
       const repository = args.repositoryId ? await ctx.db.get(args.repositoryId) : null;
       const scopes = await Promise.all((args.codeScopeIds ?? []).map((scopeId) => ctx.db.get(scopeId)));
-      if (ownerMember && ownerMember.projectId !== args.projectId) throw new Error("Mission owner must belong to the active workspace.");
+      if (args.ownerMemberId) {
+        const ownerOperator = ownerMember?.operatorId && await ctx.db.get(ownerMember.operatorId);
+        if (!ownerMember?.active || ownerMember.projectId !== args.projectId || ownerMember.tenantId !== project.tenantId
+          || !ownerOperator?.active || ownerOperator.tenantId !== project.tenantId) throw Error("MISSION_MEMBER_OPERATOR_REQUIRED");
+      }
       if (owningTeam && owningTeam.projectId !== args.projectId) throw new Error("Mission team must belong to the active workspace.");
       if (repository && repository.projectId !== args.projectId) throw new Error("Mission repository must belong to the active workspace.");
       if (scopes.some((scope) => !scope || scope.projectId !== args.projectId || (repository && scope.repositoryId !== repository._id))) throw new Error("Mission code scopes must belong to the active workspace and repository.");
@@ -711,49 +718,66 @@ export const createDraft = mutation({
       }
     }
     const operator = await resolveOperator(ctx);
-    const now = Date.now();
-    const missionId = await ctx.db.insert("missions", {
-      tenantId: project?.tenantId, projectId: args.projectId, idempotencyKey: args.idempotencyKey,
-      title: args.title, objective: args.objective, context: args.context, constraints: args.constraints,
-      sourceOfTruthRefs: args.sourceOfTruthRefs, owner: ownerMember?.name ?? args.owner,
-      ownerMemberId: args.ownerMemberId, owningTeamId: args.owningTeamId, repositoryId: args.repositoryId,
-      codeScopeIds: args.codeScopeIds ?? [], requestedByOperatorId: requestingOperatorId,
-      executionEnvironment: args.executionEnvironment,
-      state: "DRAFT", executionPolicy: "SERIAL_MUTATIONS",
-      maxReadOnlyConcurrency: args.maxReadOnlyConcurrency ?? 2, maxCorrectiveIterations: args.maxCorrectiveIterations ?? 2,
-      correctiveIterations: 0, stopCondition: args.stopCondition, budgetUsd: args.budgetUsd, spentUsd: 0,
-      createdAt: now, updatedAt: now, metadata: args.metadata,
-    });
-    const mission = await ctx.db.get(missionId);
-    if (!mission) throw new Error("Mission creation failed");
-    if (args.ownerMemberId && args.owningTeamId && project?.tenantId) {
-      await ctx.db.insert("missionAssignments", {
-        tenantId: project.tenantId,
-        projectId: project._id,
-        missionId: mission._id,
-        memberId: args.ownerMemberId,
-        teamId: args.owningTeamId,
-        role: "OWNER",
-        activeFrom: now,
-        active: true,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: requestingOperatorId,
-        updatedBy: requestingOperatorId,
-      });
-    }
-    await logMissionEvent(ctx, {
-      mission,
-      eventType: "MISSION_CREATED",
-      actorType: "HUMAN",
-      actorId: operator.actorId,
-      summary: `Created mission ${args.title}`,
-      idempotencyKey: args.idempotencyKey ? `${args.idempotencyKey}:created` : undefined,
-      metadata: { actorSource: operator.actorSource },
-    });
-    return { mission, created: true };
+    return createAuthorizedMissionDraft(ctx, args, { project, ownerMember, requestingOperatorId, operator });
   },
 });
+
+export async function createAuthorizedMissionDraft(
+  ctx: MutationCtx,
+  args: Infer<typeof missionDraftArgs>,
+  scope: { project: Doc<"projects"> | null; ownerMember: Doc<"orgMembers"> | null;
+    requestingOperatorId?: Id<"operators">; operator: { actorId: string; actorSource: string } },
+) {
+  validateMissionDraftInput(args);
+  const { project, ownerMember, requestingOperatorId, operator } = scope;
+  const now = Date.now();
+  const missionId = await ctx.db.insert("missions", {
+    tenantId: project?.tenantId, projectId: args.projectId, idempotencyKey: args.idempotencyKey,
+    title: args.title, objective: args.objective, context: args.context, constraints: args.constraints,
+    sourceOfTruthRefs: args.sourceOfTruthRefs, owner: ownerMember?.name ?? args.owner,
+    ownerOperatorId: requestingOperatorId,
+    ownerMemberId: args.ownerMemberId, owningTeamId: args.owningTeamId, repositoryId: args.repositoryId,
+    codeScopeIds: args.codeScopeIds ?? [], requestedByOperatorId: requestingOperatorId,
+    executionEnvironment: args.executionEnvironment,
+    state: "DRAFT", executionPolicy: "SERIAL_MUTATIONS",
+    maxReadOnlyConcurrency: args.maxReadOnlyConcurrency ?? 2, maxCorrectiveIterations: args.maxCorrectiveIterations ?? 2,
+    correctiveIterations: 0, stopCondition: args.stopCondition, budgetUsd: args.budgetUsd, spentUsd: 0,
+    createdAt: now, updatedAt: now, metadata: args.metadata,
+  });
+  const mission = await ctx.db.get(missionId);
+  if (!mission) throw new Error("Mission creation failed");
+  if (args.ownerMemberId && args.owningTeamId && project?.tenantId) {
+    await ctx.db.insert("missionAssignments", {
+      tenantId: project.tenantId,
+      projectId: project._id,
+      missionId: mission._id,
+      memberId: args.ownerMemberId,
+      operatorId: ownerMember?.operatorId,
+      teamId: args.owningTeamId,
+      role: "OWNER",
+      activeFrom: now,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: requestingOperatorId,
+      updatedBy: requestingOperatorId,
+    });
+  }
+  await logMissionEvent(ctx, {
+    mission,
+    eventType: "MISSION_CREATED",
+    actorType: "HUMAN",
+    actorId: operator.actorId,
+    summary: `Created mission ${args.title}`,
+    idempotencyKey: args.idempotencyKey ? `${args.idempotencyKey}:created` : undefined,
+    metadata: { actorSource: operator.actorSource },
+  });
+  if (ownerMember && ownerMember.operatorId !== requestingOperatorId) {
+    await ctx.db.patch(missionId, { ownerOperatorId: ownerMember.operatorId });
+    mission.ownerOperatorId = ownerMember.operatorId;
+  }
+  return { mission, created: true };
+}
 
 export const updateDraft = mutation({
   args: {
@@ -792,7 +816,7 @@ export const updateDraft = mutation({
       throw new Error(`Mission draft cannot be edited while ${mission.state}`);
     }
 
-    let ownerMember: any = null;
+    let ownerMember: Doc<"orgMembers"> | null = null;
     let assignmentAccess: any = null;
     if (args.ownerMemberId || args.owningTeamId || args.repositoryId || args.codeScopeIds?.length) {
       if (!mission.tenantId || !args.ownerMemberId || !args.owningTeamId || !args.repositoryId || !args.codeScopeIds?.length) {
@@ -814,7 +838,9 @@ export const updateDraft = mutation({
           .withIndex("by_team_member", (q) => q.eq("teamId", args.owningTeamId!).eq("memberId", args.ownerMemberId!))
           .first(),
       ]);
-      if (!member || !member.active || member.projectId !== args.projectId) throw new Error("Mission owner must be active in the selected workspace");
+      const memberOperator = member?.operatorId && await ctx.db.get(member.operatorId);
+      if (!member?.active || member.projectId !== args.projectId || member.tenantId !== mission.tenantId
+        || !memberOperator?.active || memberOperator.tenantId !== mission.tenantId) throw Error("MISSION_MEMBER_OPERATOR_REQUIRED");
       if (!team || team.status !== "ACTIVE" || team.projectId !== args.projectId) throw new Error("Mission team must be active in the selected workspace");
       if (!teamMembership?.active) throw new Error("Mission owner must be active in the selected team");
       if (!repository || repository.projectId !== args.projectId) throw new Error("Mission repository must belong to the selected workspace");
@@ -830,12 +856,11 @@ export const updateDraft = mutation({
       idempotencyKey: _idempotencyKey,
       ...draft
     } = args;
-    const normalizedDraft = ownerMember ? { ...draft, owner: ownerMember.name } : draft;
+    const normalizedDraft = ownerMember ? { ...draft, owner: ownerMember.name, ownerOperatorId: ownerMember.operatorId } : draft;
     const changedFields = changedMissionDraftFields(mission, normalizedDraft);
     if (changedFields.length === 0) return { mission, updated: false };
 
     const now = Date.now();
-    await ctx.db.patch(mission._id, { ...normalizedDraft, updatedAt: now });
     if (ownerMember && args.owningTeamId && assignmentAccess) {
       const assignments = await ctx.db.query("missionAssignments")
         .withIndex("by_mission_role", (q) => q.eq("missionId", mission._id).eq("role", "OWNER"))
@@ -851,6 +876,7 @@ export const updateDraft = mutation({
       const matching = assignments.find((item) => item.memberId === ownerMember._id && item.teamId === args.owningTeamId);
       if (matching) {
         await ctx.db.patch(matching._id, {
+          operatorId: ownerMember.operatorId,
           active: true,
           activeUntil: undefined,
           updatedAt: now,
@@ -862,6 +888,7 @@ export const updateDraft = mutation({
           projectId: args.projectId,
           missionId: mission._id,
           memberId: ownerMember._id,
+          operatorId: ownerMember.operatorId,
           teamId: args.owningTeamId,
           role: "OWNER",
           activeFrom: now,
@@ -873,8 +900,7 @@ export const updateDraft = mutation({
         });
       }
     }
-    const updated = await ctx.db.get(mission._id);
-    if (!updated) throw new Error("Mission draft update failed");
+    const updated = { ...mission, ...normalizedDraft, updatedAt: now };
     const operator = await resolveOperator(ctx);
     await logMissionEvent(ctx, {
       mission: updated,
@@ -885,11 +911,12 @@ export const updateDraft = mutation({
       idempotencyKey: args.idempotencyKey,
       metadata: { actorSource: operator.actorSource, changedFields },
     });
+    await ctx.db.patch(mission._id, { ...normalizedDraft, updatedAt: now });
     return { mission: updated, updated: true };
   },
 });
 
-export const savePlanDraft = mutation({
+export const savePlanDraft = contributorMutation({
   args: {
     projectId: v.id("projects"),
     missionId: v.id("missions"),
@@ -1041,7 +1068,7 @@ export const abandonPlanDraft = mutation({
   },
 });
 
-export const submitPlan = mutation({
+export const submitPlan = contributorMutation({
   args: { projectId: v.id("projects"), missionId: v.id("missions"), planId: v.id("missionPlans"), idempotencyKey: v.string() },
   handler: async (ctx, args) => {
     const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, args.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY);
@@ -1432,7 +1459,7 @@ export const start = mutation({
   },
 });
 
-export const recordValidationResult = mutation({
+export const recordValidationResult = reviewerMutation({
   args: {
     missionId: v.id("missions"), validationAssertionId: v.id("validationAssertions"), workflowRunId: v.id("workflowRuns"),
     status: v.union(v.literal("PASS"), v.literal("FAIL"), v.literal("WAIVED"), v.literal("STALE"), v.literal("UNKNOWN")),
@@ -1527,25 +1554,27 @@ export const requestCorrectiveWork = mutation({
   },
 });
 
+export async function acceptMission(ctx: MutationCtx, args: { missionId: Id<"missions">; acceptedBy: string; idempotencyKey: string }) {
+  const scopedMission = await ctx.db.get(args.missionId);
+  const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, scopedMission?.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
+  const mission = await ctx.db.get(args.missionId);
+  if (!mission) throw new Error("Mission not found");
+  assertAuthorizedDeliveryRecord(deliveryAccess, mission);
+  const duplicate = await ctx.db.query("missionEvents").withIndex("by_idempotency", (q) => q.eq("idempotencyKey", args.idempotencyKey)).first();
+  if (duplicate) return { mission, created: false };
+  if (mission.state !== "AWAITING_ACCEPTANCE") throw new Error(`Mission cannot be accepted while ${mission.state}`);
+  const acceptance = (await loadMissionExecutionState(ctx, mission._id)).acceptance;
+  if (!acceptance.eligible) throw new Error(`Mission cannot be accepted (${acceptance.blockingReasons.join("; ")})`);
+  const now = Date.now();
+  await ctx.db.patch(mission._id, { state: "DONE", acceptedAt: now, updatedAt: now, requiredHumanAction: undefined, blockingReason: undefined });
+  const updated = await ctx.db.get(mission._id);
+  if (updated) await logMissionEvent(ctx, { mission: updated, eventType: "MISSION_ACCEPTED", actorType: "HUMAN", actorId: args.acceptedBy, summary: "Mission accepted with complete validation coverage", idempotencyKey: args.idempotencyKey });
+  return { mission: updated, created: true };
+}
+
 export const accept = mutation({
   args: { missionId: v.id("missions"), acceptedBy: v.string(), idempotencyKey: v.string() },
-  handler: async (ctx, args) => {
-    const scopedMission = await ctx.db.get(args.missionId);
-    const deliveryAccess = await requireAuthorizedDeliveryScope(ctx, scopedMission?.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY);
-    const mission = await ctx.db.get(args.missionId);
-    if (!mission) throw new Error("Mission not found");
-    assertAuthorizedDeliveryRecord(deliveryAccess, mission);
-    const duplicate = await ctx.db.query("missionEvents").withIndex("by_idempotency", (q) => q.eq("idempotencyKey", args.idempotencyKey)).first();
-    if (duplicate) return { mission, created: false };
-    if (mission.state !== "AWAITING_ACCEPTANCE") throw new Error(`Mission cannot be accepted while ${mission.state}`);
-    const acceptance = (await loadMissionExecutionState(ctx, mission._id)).acceptance;
-    if (!acceptance.eligible) throw new Error(`Mission cannot be accepted (${acceptance.blockingReasons.join("; ")})`);
-    const now = Date.now();
-    await ctx.db.patch(mission._id, { state: "DONE", acceptedAt: now, updatedAt: now, requiredHumanAction: undefined, blockingReason: undefined });
-    const updated = await ctx.db.get(mission._id);
-    if (updated) await logMissionEvent(ctx, { mission: updated, eventType: "MISSION_ACCEPTED", actorType: "HUMAN", actorId: args.acceptedBy, summary: "Mission accepted with complete validation coverage", idempotencyKey: args.idempotencyKey });
-    return { mission: updated, created: true };
-  },
+  handler: acceptMission,
 });
 
 export const recordHandoff = mutation({

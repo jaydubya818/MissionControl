@@ -4,7 +4,7 @@ import {
   internalMutation,
   internalQuery,
   query,
-} from "./_generated/server";
+} from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import { assertRepositoryPublicationAllowed } from "./lib/localRepositoryAdmission";
 import {
@@ -404,11 +404,14 @@ export const listDeliveries = query({
       repository.projectId,
       FACTORY_PERMISSIONS.VIEW,
     );
-    return await ctx.db
+    const deliveries = await ctx.db
       .query("githubWebhookDeliveries")
       .withIndex("by_repository", (q) => q.eq("repositoryId", repository._id))
       .order("desc")
       .take(Math.min(args.limit ?? 20, 100));
+    // Shared repository health exposes transport state only. Historical free text
+    // may contain private Mission PR URLs or review evidence without lineage.
+    return deliveries.map(({ result: _result, error: _error, ...transport }) => transport);
   },
 });
 
@@ -500,6 +503,7 @@ export const beginWebhookDelivery = internalMutation({
       .first();
     const now = Date.now();
     if (existing) {
+      if (args.signatureStatus !== "VALID") return { deliveryRecordId: null, duplicate: true, accepted: false };
       await ctx.db.patch(existing._id, {
         replayState: "DUPLICATE",
         attemptCount: existing.attemptCount + 1,

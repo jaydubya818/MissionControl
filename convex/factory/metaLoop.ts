@@ -3,7 +3,7 @@
  */
 
 import { v } from "convex/values";
-import { action, internalMutation, mutation, query } from "../_generated/server";
+import { action, internalMutation, mutation, query } from "../lib/missionScopedFunctions";
 import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { buildMetaMeasurement, sanitizeMetaSignalText } from "../lib/metaLoopSignals";
@@ -450,7 +450,9 @@ export const ingestWorkflowFailure = internalMutation({
     if (!run || run.status !== "FAILED" || !run.projectId) return { created: false };
     const failedStep = run.steps.find((step) => step.status === "FAILED");
     const surface = `${run.workflowId}:${failedStep?.stepId ?? "run"}`;
-    const dedupeKey = `workflow-failure:${run.projectId}:${surface}`;
+    const workOrder = run.workOrderId && await ctx.db.get(run.workOrderId);
+    const missionId = run.missionId ?? (workOrder && workOrder.missionId) ?? undefined;
+    const dedupeKey = `workflow-failure:${run.projectId}:${missionId ?? "unscoped"}:${surface}`;
     const existing = await ctx.db.query("metaLoopSuggestions")
       .withIndex("by_dedupe", (q) => q.eq("dedupeKey", dedupeKey))
       .first();
@@ -468,6 +470,8 @@ export const ingestWorkflowFailure = internalMutation({
     }
     const id = await ctx.db.insert("metaLoopSuggestions", {
       projectId: run.projectId,
+      missionId,
+      sourceMissionIds: missionId ? [missionId] : [],
       kind: "EVAL_SCENARIO",
       title: `Prevent repeat failure in ${surface}`,
       summary: sanitizeMetaSignalText(failedStep?.error ?? run.failureReason ?? `Workflow ${run.runId} failed`),
@@ -502,7 +506,27 @@ export const ingestSignal = internalMutation({
     payload: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const dedupeKey = `signal:${args.projectId}:${args.signalClass}:${args.target}`;
+    const workOrderIds = new Set<Id<"workOrders">>();
+    if (args.payload?.workOrderId) {
+      const id = ctx.db.normalizeId("workOrders", args.payload.workOrderId);
+      if (!id) throw Error("SIGNAL_SCOPE_UNAVAILABLE");
+      workOrderIds.add(id);
+    }
+    if (typeof args.payload?.prUrl === "string") {
+      const checks = await ctx.db.query("harnessPrChecks").withIndex("by_pr_url", q => q.eq("prUrl", args.payload.prUrl)).collect();
+      for (const check of checks) if (check.projectId === args.projectId && check.workOrderId) workOrderIds.add(check.workOrderId);
+    }
+    const missions = new Set<Id<"missions">>();
+    for (const id of workOrderIds) {
+      const workOrder = await ctx.db.get(id);
+      if (!workOrder || workOrder.projectId !== args.projectId || !workOrder.missionId) throw Error("SIGNAL_SCOPE_UNAVAILABLE");
+      missions.add(workOrder.missionId);
+    }
+    // The source event remains in its canonical ledger for replay after linking.
+    // Unknown or ambiguous provenance must never create a project-visible summary.
+    if (missions.size !== 1) return { created: false, reason: "source-scope-unresolved" };
+    const missionId = [...missions][0];
+    const dedupeKey = `signal:${args.projectId}:${missionId}:${args.signalClass}:${args.target}`;
     const existing = await ctx.db.query("metaLoopSuggestions")
       .withIndex("by_dedupe", (q) => q.eq("dedupeKey", dedupeKey))
       .first();
@@ -518,6 +542,8 @@ export const ingestSignal = internalMutation({
     }
     const id = await ctx.db.insert("metaLoopSuggestions", {
       projectId: args.projectId,
+      missionId,
+      sourceMissionIds: missionId ? [missionId] : [],
       kind: args.kind,
       title: args.title,
       summary: sanitizeMetaSignalText(args.summary),

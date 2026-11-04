@@ -1,3 +1,4 @@
+import "./support/domainFunctions";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { listSandboxReconcileCandidatesInternal, reportSandboxReconcileInternal } from '../factory/attempts';
 import { capabilityLifecycleInventory } from '../lib/capabilityLifecycleInventory';

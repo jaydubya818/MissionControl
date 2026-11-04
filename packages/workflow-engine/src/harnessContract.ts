@@ -8,6 +8,7 @@ export * from "./executorAdapter.js";
 export * from "./harnessManifests.js";
 
 export * from "./isolatedInvocation.js";
+export * from "./isolatedRuntimeImage.js";
 export * from "./deterministicWorkload.js";
 export * from "./deterministicVerification.js";
 export { validateChangedFileScope } from "./repositoryScope.js";

@@ -352,7 +352,7 @@ export function AgentRegistryView({
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Assignment</th>
                 <th className="px-3 py-3">Model route</th>
-                <th className="px-3 py-3">Daily budget</th>
+                <th className="px-3 py-3">Visible cost / daily limit</th>
                 <th className="px-3 py-3">Heartbeat</th>
                 <th className="sticky right-0 bg-surface-2 px-4 py-3 text-right">Actions</th>
               </tr>

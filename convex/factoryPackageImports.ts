@@ -14,7 +14,7 @@ import {
   query,
   type MutationCtx,
   type QueryCtx,
-} from "./_generated/server";
+} from "./lib/missionScopedFunctions";
 import {
   COMPANY_PERMISSIONS,
   requireWorkspaceAccess,
@@ -175,6 +175,7 @@ interface TargetResolutionSuccess {
   repositoryId: Id<"workspaceRepositories">;
   ownerMemberId: Id<"orgMembers">;
   ownerName: string;
+  ownerOperatorId: Id<"operators">;
   owningTeamId: Id<"scrumTeams">;
   codeScopeMappings: Array<{
     requestedCodeScope: string;
@@ -747,6 +748,7 @@ export const createDraftsAtomic = internalMutation({
         (mapping) => mapping.codeScopeId,
       ),
       requestedByOperatorId: target.actorOperatorId,
+      ownerOperatorId: target.actorOperatorId,
       executionEnvironment: target.executionEnvironment,
       state: "DRAFT",
       executionPolicy: "SERIAL_MUTATIONS",
@@ -764,6 +766,7 @@ export const createDraftsAtomic = internalMutation({
       projectId: target.projectId,
       missionId,
       memberId: target.ownerMemberId,
+      operatorId: target.ownerOperatorId,
       teamId: target.owningTeamId,
       role: "OWNER",
       activeFrom: now,
@@ -883,6 +886,7 @@ export const createDraftsAtomic = internalMutation({
         args.upstreamCorrelationId,
       );
     }
+    await ctx.db.patch(missionId, { ownerOperatorId: target.ownerOperatorId });
     return successReceipt(receipt, true);
   },
 });
@@ -1011,6 +1015,8 @@ async function resolveTargetForAuthenticatedOperator(
   ) {
     return { ok: false, code: "TARGET_UNAUTHORIZED" };
   }
+  const ownerOperator = owner.operatorId && await ctx.db.get(owner.operatorId);
+  if (!ownerOperator?.active || ownerOperator.tenantId !== project.tenantId) return { ok: false, code: "TARGET_UNAUTHORIZED" };
   if (
     scopes.some(
       (scope) =>
@@ -1041,6 +1047,7 @@ async function resolveTargetForAuthenticatedOperator(
     repositoryId: repository._id,
     ownerMemberId: owner._id,
     ownerName: owner.name,
+    ownerOperatorId: ownerOperator._id,
     owningTeamId: team._id,
     codeScopeMappings: args.codeScopeMappings.map((mapping) => ({
       requestedCodeScope: mapping.requestedCodeScope.trim(),

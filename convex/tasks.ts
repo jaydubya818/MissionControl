@@ -1,3 +1,4 @@
+import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Tasks — Convex Functions
  *
@@ -7,7 +8,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import { api } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
@@ -977,7 +978,7 @@ export const simulateExecutionPlan = query({
       .first();
 
     const primaryAssigneeId = task.assigneeIds?.[0];
-    const assignee = primaryAssigneeId ? await ctx.db.get(primaryAssigneeId) : null;
+    const assignee = primaryAssigneeId ? await missionAuthorityDatabase(ctx).get(primaryAssigneeId) : null;
     const triggeredRules: string[] = [];
     const remediationHints: string[] = [];
     const requiredApprovals: Array<{ type: string; reason: string }> = [];
@@ -1005,7 +1006,7 @@ export const simulateExecutionPlan = query({
       const budgetRemaining = assignee.budgetDaily - assignee.spendToday;
       if (estimatedCost > budgetRemaining) {
         policyDecision = "NEEDS_APPROVAL";
-        policyReason = `Estimated cost ($${estimatedCost.toFixed(2)}) exceeds remaining daily budget ($${budgetRemaining.toFixed(2)})`;
+        policyReason = "Estimated cost exceeds the available daily budget";
         triggeredRules.push("budget_exceeded");
         requiredApprovals.push({
           type: "BUDGET_EXCEEDED",

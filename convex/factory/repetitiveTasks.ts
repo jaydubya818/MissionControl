@@ -1,7 +1,7 @@
 /** Governed repetitive-work detection from Work Orders and verification receipts. */
 
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "../_generated/server";
+import { internalMutation, mutation, query } from "../lib/missionScopedFunctions";
 import type { Id } from "../_generated/dataModel";
 import { loadRepetitiveTaskCandidates } from "../lib/repetitiveTaskCandidates";
 

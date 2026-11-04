@@ -3,7 +3,7 @@
  * Run: npx convex run seedSellerFi:run
  */
 
-import { mutation } from "./_generated/server";
+import { mutation } from "./lib/missionScopedFunctions";
 
 export const run = mutation({
   args: {},
