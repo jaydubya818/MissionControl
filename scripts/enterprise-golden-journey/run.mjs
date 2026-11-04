@@ -100,7 +100,8 @@ try {
     await vitest('backend-domain-regressions', ['convex/__tests__']);
     await vitest('enterprise-contracts', ['convex/__tests__/enterpriseDelegationAdmission.test.ts', 'convex/__tests__/enterpriseMissionOwner.test.ts', 'convex/__tests__/missionWorkOrderContract.test.ts', 'convex/__tests__/missionGovernance.test.ts', 'convex/__tests__/qualificationGateScope.test.ts']);
   } else if (suite === 'database-concurrency') {
-    await database(); await node('mission-isolation', 'scripts/enterprise-golden-journey/isolation.mjs', [], { MC_ISOLATION_EVIDENCE: join(output, 'isolation.json') });
+    await database(); await node('workflow-budget-isolation', 'scripts/qualification/workflow-budget-isolation.mjs', [join(output, 'workflow-budget-isolation')]);
+    await node('mission-isolation', 'scripts/enterprise-golden-journey/isolation.mjs', [], { MC_ISOLATION_EVIDENCE: join(output, 'isolation.json') });
     await node('accounting', 'scripts/enterprise-compatibility/accounting.mjs', [], { MC_ACCOUNTING_EVIDENCE: join(output, 'accounting.json') });
     const evidence = await json(join(output, 'accounting.json')); assert.ok(evidence.checks.length >= 13);
   } else if (suite === 'native-execution') {

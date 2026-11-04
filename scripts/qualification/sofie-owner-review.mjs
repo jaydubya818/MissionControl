@@ -3,10 +3,10 @@ import { randomUUID, randomBytes, createHash, createHmac } from "node:crypto";
 import { canonicalServiceCommand } from "../../packages/shared/src/serviceCommandEnvelope.ts";
 import { enterpriseDigest } from "../../packages/shared/src/sofieEnterprise.ts";
 
-export async function prepareOwnerReviewFixture(db) {
+export async function prepareOwnerReviewFixture(db, options = {}) {
   const s = db.seed,
     checks = [],
-    secret = randomBytes(32).toString("hex");
+    secret = options.applicationSecret ?? randomBytes(32).toString("hex");
   const mutate = (name, args, client = db.owner) =>
     client.mutation(name, args, { skipQueue: true });
   db.setEnvironment("MC_SOFIE_READINESS_ENVIRONMENT_ID", s.environmentId);
@@ -14,7 +14,7 @@ export async function prepareOwnerReviewFixture(db) {
   db.setEnvironment("MC_SOFIE_APPLICATION_OWNER_ID", s.operatorId);
   db.setEnvironment(
     "MC_SOFIE_APPLICATION_KEY_ID",
-    "owner-review-qualification",
+    options.applicationKeyId ?? "owner-review-qualification",
   );
   const connection = await mutate("sofieEnterprise:connect", {
     projectId: s.projectId,
@@ -23,6 +23,9 @@ export async function prepareOwnerReviewFixture(db) {
     expiresAt: Date.now() + 600000,
   });
   async function command(input) {
+    if (options.applicationCommand && ["enterprise.propose", "enterprise.submit"].includes(input.operation)) {
+      return options.applicationCommand(input, { secret, connectionId: connection.connectionId });
+    }
     const payloadJson = JSON.stringify({
         ...input,
         connectionId: connection.connectionId,

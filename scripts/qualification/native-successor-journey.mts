@@ -226,7 +226,7 @@ try {
   if (mode === 'prepare') console.log(JSON.stringify({ preparation: 'PASS', nativeExecution: 'NOT_RUN' }));
   else executionQualification: {
     const author = db.client('user_SyntheticPlanAuthorQualification');
-    if (mode === 'hybrid' && process.env.MC_OWNER_REVIEW_QUALIFICATION === '1') ownerReview = await prepareOwnerReviewFixture(db);
+    if (mode === 'hybrid' && process.env.MC_OWNER_REVIEW_QUALIFICATION === '1') ownerReview = await prepareOwnerReviewFixture(db, { applicationSecret: resultConsumer?.applicationSecret, applicationKeyId: resultConsumer?.applicationKeyId, applicationCommand: resultConsumer?.applicationCommand });
     const sofie = new SofieEnterpriseContractFixture({
       createDraft: (args: any) => ownerReview ? ownerReview.createMission(args) : mutate('missions:createDraft', args),
       get: (missionId: string) => query('missions:get', { missionId }),

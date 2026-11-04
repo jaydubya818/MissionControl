@@ -9,7 +9,7 @@ import { enterpriseProject, scopeExposure, settleUndispatchedEnterpriseAttempt }
  */
 
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./lib/missionScopedFunctions";
+import { mutation, query, internalMutation, missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import { appendOpEvent } from "./lib/armAudit";
 import { resolveAgentRef } from "./lib/agentResolver";
@@ -415,7 +415,8 @@ async function createExecutionCheckpoint(ctx: any, input: {
 async function dailyWorkflowCommitmentUsd(ctx: any, projectId: any, now: number) {
   const startOfDay = new Date(now);
   startOfDay.setUTCHours(0, 0, 0, 0);
-  const runs = await ctx.db
+  // Project limits include commitments from Missions hidden from this caller.
+  const runs = await missionAuthorityDatabase(ctx)
     .query("workflowRuns")
     .withIndex("by_project", (q: any) => q.eq("projectId", projectId))
     .collect();
@@ -794,7 +795,7 @@ export const claimExecution = mutation({
 
     const now = Date.now();
     const control = await getEffectiveOperatorControl(ctx.db, run.projectId);
-    const projectRuns = await ctx.db
+    const projectRuns = await missionAuthorityDatabase(ctx)
       .query("workflowRuns")
       .withIndex("by_project", (q) => q.eq("projectId", run.projectId))
       .collect();
