@@ -141,7 +141,10 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
     }
     assert.equal(new Set(receipts.map((r) => r.response.missionId)).size, 1);
     missionId = receipts[0].response.missionId;
-    const { metadata, executionEnvironment, ...draft } = args;
+    const matchingMissions = (await db.owner.query("missions:list", { projectId:s.projectId }))
+      .filter((mission) => mission.metadata?.proposalId === proposal.proposalId);
+    assert.equal(matchingMissions.length, 1);
+    const { metadata, ...draft } = args;
     await mutate("missions:updateDraft", {
       ...draft,
       missionId,
@@ -158,7 +161,6 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
           ...original.metadata,
           enterpriseCompatibilityFixture: true,
         },
-        executionEnvironment: "LOCAL",
       },
       unset: [],
     });
@@ -281,6 +283,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
       proposalId: proposal?.proposalId,
       missionId,
       authentication: "SYNTHETIC_API_FIXTURE",
+      setup: { deliveryScopeBudgetAndEnvironment: "CANONICAL_OWNER_UPDATE_DRAFT", workloadTag: "DISPOSABLE_FIXTURE_METADATA_PATCH_ONLY", proposalDigestScope: "INTAKE_IDENTITY;_OWNER_AMENDS_SCOPE_AND_BUDGET_BEFORE_PLAN" },
       browserOwnerJourney: "NOT_RUN",
       releaseGate: "ADVISORY",
     }),

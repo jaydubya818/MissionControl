@@ -18,6 +18,7 @@ export interface MissionDraftValues {
   owningTeamId: string;
   repositoryId: string;
   codeScopeIds: string[];
+  executionEnvironment?: "" | "LOCAL" | "CLOUD" | "REMOTE" | "POLICY_SELECTED";
   budgetUsd: string;
   stopCondition: string;
   maxReadOnlyConcurrency: string;
@@ -38,6 +39,7 @@ export function missionToDraftValues(mission: any): MissionDraftValues {
     owningTeamId: mission.owningTeamId ?? "",
     repositoryId: mission.repositoryId ?? "",
     codeScopeIds: mission.codeScopeIds ?? [],
+    executionEnvironment: mission.executionEnvironment ?? "",
     budgetUsd: mission.budgetUsd === undefined ? "" : String(mission.budgetUsd),
     stopCondition: mission.stopCondition ?? "",
     maxReadOnlyConcurrency: String(mission.maxReadOnlyConcurrency ?? 2),
@@ -94,6 +96,7 @@ export function missionDraftPayload(values: MissionDraftValues) {
     owningTeamId: values.owningTeamId,
     repositoryId: values.repositoryId,
     codeScopeIds: values.codeScopeIds,
+    executionEnvironment: values.executionEnvironment || undefined,
     budgetUsd: values.budgetUsd.trim() ? Number(values.budgetUsd) : undefined,
     stopCondition: values.stopCondition.trim(),
     maxReadOnlyConcurrency: Number(values.maxReadOnlyConcurrency),

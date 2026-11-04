@@ -63,6 +63,23 @@ describe("MissionDraftForm", () => {
     expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
   });
 
+  it("saves an explicit owner-selected execution environment", () => {
+    mocks.updateDraft.mockReturnValue(new Promise(() => undefined));
+    render(<MissionDraftForm mission={mission} projectId={"workspace-1" as any} />);
+    fireEvent.change(screen.getByLabelText("Execution environment"), { target: { value: "LOCAL" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    expect(mocks.updateDraft).toHaveBeenCalledWith(expect.objectContaining({ executionEnvironment: "LOCAL" }));
+  });
+
+  it("retains the confirmed environment while parent query props catch up", async () => {
+    mocks.updateDraft.mockResolvedValue({ mission: { ...mission, executionEnvironment: "LOCAL" } });
+    render(<MissionDraftForm mission={mission} projectId={"workspace-1" as any} />);
+    fireEvent.change(screen.getByLabelText("Execution environment"), { target: { value: "LOCAL" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await screen.findByText("Saved");
+    expect(screen.getByLabelText("Execution environment")).toHaveValue("LOCAL");
+  });
+
   it("associates invalid budget feedback with the field", () => {
     render(<MissionDraftForm mission={mission} projectId={"workspace-1" as any} />);
 

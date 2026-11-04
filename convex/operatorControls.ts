@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./lib/missionScopedFunctions";
+import { mutation, query, missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 import { getEffectiveOperatorControl } from "./lib/operatorControls";
 import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import { requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
@@ -120,7 +120,9 @@ export const setMode = mutation({
       if (canaryOnly && process.env.WORKFLOW_RECOVERY_CANARY_ENABLED !== "true") {
         throw new Error("Canary-scoped workspace kill is disabled on this deployment.");
       }
-      const runs = await ctx.db
+      // Workspace stop authority covers private Missions after permission checks.
+      const enforcementDb = missionAuthorityDatabase(ctx);
+      const runs = await enforcementDb
         .query("workflowRuns")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
@@ -128,7 +130,7 @@ export const setMode = mutation({
         if (canaryOnly && run.metadata?.recoveryCanary !== true) continue;
         if (["COMPLETED", "FAILED", "CANCELED"].includes(run.status)) continue;
         const hasActiveLease = Boolean(run.lease && run.lease.expiresAt > now);
-        await ctx.db.patch(run._id, {
+        await enforcementDb.patch(run._id, {
           cancellationRequestedAt: run.cancellationRequestedAt ?? now,
           cancellationRequestedBy: args.userId,
           checkpointAt: now,

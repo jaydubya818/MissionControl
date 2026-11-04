@@ -783,6 +783,7 @@ export const updateDraft = mutation({
   args: {
     missionId: v.id("missions"),
     projectId: v.id("projects"),
+    executionEnvironment: v.optional(v.union(v.literal("LOCAL"), v.literal("CLOUD"), v.literal("REMOTE"), v.literal("POLICY_SELECTED"))),
     idempotencyKey: v.string(),
     title: v.string(),
     objective: v.string(),

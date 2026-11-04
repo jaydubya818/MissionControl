@@ -1,7 +1,7 @@
 import { makeFunctionReference } from "convex/server";
 import { requireMissionAccess } from "./lib/missionAccess";
 import { v } from "convex/values";
-import { mutation, query } from "./lib/missionScopedFunctions";
+import { mutation, query, missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   COMPANY_PERMISSIONS,
@@ -1319,8 +1319,8 @@ export const bindExecutor = mutation({
       ctx.db.query("workspaceHostBindings").withIndex("by_project_host", (q) => q.eq("projectId", run.projectId!).eq("hostId", args.hostId)).first(),
       run.routingDecisionId ? ctx.db.get(run.routingDecisionId) : null,
       workOrder.missionId ? ctx.db.get(workOrder.missionId) : null,
-      ctx.db.query("workflowRuns").withIndex("by_project_status", (q) => q.eq("projectId", run.projectId!).eq("status", "PENDING")).collect(),
-      ctx.db.query("workflowRuns").withIndex("by_project_status", (q) => q.eq("projectId", run.projectId!).eq("status", "RUNNING")).collect(),
+      missionAuthorityDatabase(ctx).query("workflowRuns").withIndex("by_project_status", (q) => q.eq("projectId", run.projectId!).eq("status", "PENDING")).collect(),
+      missionAuthorityDatabase(ctx).query("workflowRuns").withIndex("by_project_status", (q) => q.eq("projectId", run.projectId!).eq("status", "RUNNING")).collect(),
     ]);
     const validation = validateDispatchScope({
       projectId: run.projectId,
@@ -1340,7 +1340,7 @@ export const bindExecutor = mutation({
       host,
     }));
     const activeRuns = [...pendingRuns, ...runningRuns];
-    const activeRunWorkOrders = await Promise.all(activeRuns.filter((candidate) => candidate.workOrderId).map((candidate) => ctx.db.get(candidate.workOrderId!)));
+    const activeRunWorkOrders = await Promise.all(activeRuns.filter((candidate) => candidate.workOrderId).map((candidate) => missionAuthorityDatabase(ctx).get(candidate.workOrderId!)));
     const activeTeamRuns = workOrder.owningTeamId
       ? activeRunWorkOrders.filter((candidate) => candidate?.owningTeamId === workOrder.owningTeamId).length
       : 0;

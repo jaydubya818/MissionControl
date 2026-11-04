@@ -1,3 +1,4 @@
+import { loadActiveFactoryWorkerRuns } from "../lib/factoryWorkerCapacity";
 import { assertCapabilityWorkAuthority, capabilityWorkRestriction } from '../lib/capabilityWorkControl';
 import { reconcileFabObservedCost } from "../lib/fabCostPersistence";
 import { serviceInternalMutation, serviceInternalQuery, serviceInternalAction } from "../lib/missionScopedFunctions";
@@ -709,9 +710,7 @@ export const claimInternal = serviceInternalMutation(["attempts.claim", "verific
       // Every claim for every repository reads the same RUNNING index range.
       // Convex serializable transactions therefore retry concurrent phantoms,
       // while the stable worker ID makes capacity global across sessions.
-      const runningAttempts = await ctx.db.query("workflowRuns")
-        .withIndex("by_status", (q) => q.eq("status", "RUNNING"))
-        .collect();
+      const runningAttempts = await loadActiveFactoryWorkerRuns(ctx);
       const activeWorkerLeaseCount = countActiveFactoryWorkerLeases({
         runs: runningAttempts,
         workerId: args.workerId,

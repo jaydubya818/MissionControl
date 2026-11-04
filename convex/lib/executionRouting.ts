@@ -1,3 +1,4 @@
+import { loadActiveFactoryWorkerRuns } from "./factoryWorkerCapacity";
 import {
   resolveExecutionRoute,
   workOrderRiskToExecutionTier,
@@ -337,9 +338,7 @@ export async function buildExecutionRoutingPreview(
       .withIndex("by_project", (query) => query.eq("projectId", workOrder.projectId!))
       .collect(),
     loadFactoryModelCatalogForProject(ctx, workOrder.projectId),
-    ctx.db.query("workflowRuns")
-      .withIndex("by_status", (query) => query.eq("status", "RUNNING"))
-      .collect(),
+    loadActiveFactoryWorkerRuns(ctx),
     ctx.db.query("workflowRuns")
       .withIndex("by_work_order", (query) => query.eq("workOrderId", workOrder._id))
       .collect(),

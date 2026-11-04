@@ -109,3 +109,29 @@ export const transactionCacheProbe = fixtureMutation({args:{scope:v.any(),local:
  if(await scoped.db.get(local.artifactId)!==null) throw Error('STALE_TRANSACTION_AUTHORIZATION');
  return {ancestorWriteInvalidation:true,cyclicForeignReadOrderIndependent:true};
 }});
+
+// Fresh, disposable capacity peers only. Never copied into a deployed project.
+export const capacityPeers = fixtureMutation({ args: { workflowRunId:v.id("workflowRuns"), workerId:v.string() }, handler:async(ctx,args)=>{
+ await owner(ctx);
+ const sample=await ctx.db.get(args.workflowRunId), source=sample?.missionId&&await ctx.db.get(sample.missionId);
+ const project=sample?.projectId&&await ctx.db.get(sample.projectId);
+ if(!sample||!source||project?.metadata?.synthetic!==true)throw Error("SYNTHETIC_CAPACITY_SCOPE_REQUIRED");
+ const peers=await ctx.db.query("operators").collect(),peer=peers.find(row=>row.tenantId===source.tenantId&&row.authId==="fixture-peer");
+ if(!peer)throw Error("SYNTHETIC_PEER_REQUIRED");
+ const required=(table,row)=>Object.fromEntries(Object.entries(schema.tables[table].validator.json.value).filter(([,field])=>!field.optional).map(([key])=>[key,row[key]]));
+ const metadata={workerCapacityFixture:true};
+ const missionId=await ctx.db.insert("missions",{...required("missions",source),tenantId:source.tenantId,projectId:source.projectId,ownerOperatorId:peer._id,state:"DRAFT",metadata});
+ const now=Date.now(),runIds=[],names=[];
+ for(let i=0;i<3;i++){
+  const runId="private-capacity-"+String(missionId)+"-"+i;names.push(runId);
+  runIds.push(await ctx.db.insert("workflowRuns",{...required("workflowRuns",sample),runId,tenantId:sample.tenantId,projectId:sample.projectId,missionId,status:"RUNNING",startedAt:now,spentUsd:0,reservedCostUsd:0,metadata,
+   lease:{leaseId:runId,ownerId:args.workerId,workerId:args.workerId,claimedAt:now,heartbeatAt:now,expiresAt:now+120000}}));
+ }
+ return {missionId,runIds,names};
+}});
+export const clearCapacityPeers = fixtureMutation({args:{missionId:v.id("missions"),runIds:v.array(v.id("workflowRuns"))},handler:async(ctx,args)=>{
+ await owner(ctx);const mission=await ctx.db.get(args.missionId);
+ if(mission?.metadata?.workerCapacityFixture!==true)throw Error("SYNTHETIC_CAPACITY_SCOPE_REQUIRED");
+ for(const id of args.runIds){const run=await ctx.db.get(id);if(run?.missionId!==args.missionId||run.metadata?.workerCapacityFixture!==true)throw Error("SYNTHETIC_CAPACITY_SCOPE_REQUIRED");await ctx.db.delete(id);}
+ await ctx.db.delete(args.missionId);
+}});

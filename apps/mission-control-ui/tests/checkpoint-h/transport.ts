@@ -105,6 +105,17 @@ const proposalList = {
       : [],
   truncated: scenario === "truncated-list" || scenario === "truncated-empty",
 };
-export const useQuery = () => proposalList;
+export const useQuery = (reference:any) => {
+  const name=getFunctionName(reference);
+  if(name === "softwareFactoryControlPlane:listWorkspaceStructure") return {
+    teams:[{_id:"team-ui-fixture",name:"Fixture team",status:"ACTIVE"}],
+    members:[{_id:"member-ui-fixture",name:"Fixture owner",active:true}],
+    memberships:[{teamId:"team-ui-fixture",memberId:"member-ui-fixture",active:true}],
+  };
+  if(name === "projects:listRepositories") return [{repositoryId:"repo-ui-fixture",displayName:"Fixture repository",status:"READY"}];
+  if(name === "projects:listCodeScopes") return [{_id:"scope-ui-fixture",name:"Fixture scope",active:true}];
+  return proposalList;
+};
+functions["missions:updateDraft"] = async(args) => ({mission:{...args,_id:args.missionId,state:"DRAFT"},updated:true});
 export const useMutation = (reference: any) =>
   functions[getFunctionName(reference)];

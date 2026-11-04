@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { AuthRuntimeProvider } from "../../src/auth/AuthRuntimeContext";
+import { MissionDraftForm } from "../../src/eos/views/MissionDraftForm";
 import { SofieOwnerReview } from "../../src/eos/views/SofieOwnerReview";
 import "./style.css";
 const params = new URLSearchParams(location.search);
@@ -17,7 +18,10 @@ createRoot(document.getElementById("root")!).render(
       }}
     >
       <BrowserRouter>
-        <SofieOwnerReview projectId={"project-ui-fixture" as any} />
+        {params.get("view") === "mission-draft" ? <MissionDraftForm projectId={"project-ui-fixture" as any} mission={{
+          _id:"mission-ui-fixture", state:"DRAFT", title:"Draft environment qualification", objective:"Review explicit execution setup", stopCondition:"Stop before execution",
+          owner:"Fixture owner", ownerMemberId:"member-ui-fixture", owningTeamId:"team-ui-fixture", repositoryId:"repo-ui-fixture", codeScopeIds:["scope-ui-fixture"], budgetUsd:0,
+        }} /> : <SofieOwnerReview projectId={"project-ui-fixture" as any} />}
       </BrowserRouter>
     </AuthRuntimeProvider>
   </main>,

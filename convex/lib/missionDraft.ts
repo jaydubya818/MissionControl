@@ -13,6 +13,7 @@ export interface MissionDraftInput {
   owningTeamId?: string;
   repositoryId?: string;
   codeScopeIds?: string[];
+  executionEnvironment?: "LOCAL" | "CLOUD" | "REMOTE" | "POLICY_SELECTED";
 }
 
 export function validateMissionDraftInput(input: MissionDraftInput): void {
@@ -66,6 +67,7 @@ const DRAFT_FIELDS = [
   "owningTeamId",
   "repositoryId",
   "codeScopeIds",
+  "executionEnvironment",
 ] as const;
 
 export function changedMissionDraftFields(

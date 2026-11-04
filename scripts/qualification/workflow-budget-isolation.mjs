@@ -30,6 +30,24 @@ try {
  assert.equal(heartbeat.directive,'BUDGET_STOP');
  receipt.checks.push('heartbeat-stops-at-global-project-budget');
  assert.equal(await db.owner.query('workflowRuns:get',{runId:'hidden-budget-run'}),null);
+ const failures=[];
+ const check=async(name,fn)=>{try{await fn();receipt.checks.push(name);}catch(error){failures.push({name,error:String(error)});}};
+ await check('owner-can-set-execution-environment-through-canonical-draft-edit',async()=>{
+   await mutate('missions:updateDraft',{missionId:visible.missionId,projectId:s.projectId,idempotencyKey:'canonical-environment',title:'Synthetic capacity Mission',objective:'Exercise global controls',stopCondition:'Stop after assertions',budgetUsd:0.1,executionEnvironment:'LOCAL'});
+   assert.equal((await db.owner.query('nativeFixture:inspectRecord',{id:visible.missionId})).executionEnvironment,'LOCAL');
+ });
+ await fault(s.teamId,{capacityPolicy:{maxConcurrentRuns:1,maxActiveMissionsPerMember:10,reviewReservePct:0}});
+ for(const row of [visible,hidden]) await fault(row.workOrderId,{ownerMemberId:s.memberId,owningTeamId:s.teamId,scopeEnforcementVersion:1});
+ await check('executor-binding-counts-private-team-runs',async()=>{
+   const binding=await mutate('softwareFactoryControlPlane:bindExecutor',{workflowRunId:visible.workflowRunId,hostId:'capacity-fixture',executionEnvironment:'LOCAL',checkpointSummary:'Capacity check',budgetUsd:0.1,stopCondition:'No execution',escalationOwner:'Qualification owner'});
+   assert.equal(binding.success,false);assert.ok(binding.reasonCodes.includes('TEAM_CONCURRENCY_LIMIT_REACHED'),JSON.stringify(binding));
+ });
+ await check('workspace-kill-cancels-private-unleased-runs',async()=>{
+   await mutate('operatorControls:setMode',{projectId:s.projectId,mode:'KILLED',userId:String(s.operatorId),reason:'Synthetic global stop regression'});
+   const stopped=await db.owner.query('nativeFixture:inspectRecord',{id:hidden.workflowRunId});
+   assert.equal(stopped.status,'CANCELED');assert.equal(stopped.reservedCostUsd,0);
+ });
+ receipt.failures=failures;assert.deepEqual(failures,[]);
  receipt.status='PASS';console.log(JSON.stringify(receipt));
 } catch(error){receipt.status='FAIL';receipt.error=String(error);throw error;}
 finally {await db.destroy();receipt.cleanup='VERIFIED';await writeFile(join(output,'qualification.json'),JSON.stringify(receipt,null,2)+'\n');}

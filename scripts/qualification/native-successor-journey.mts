@@ -345,6 +345,20 @@ try {
       };
       const value = target[name]; return typeof value === 'function' ? value.bind(target) : value;
     } });
+    await step('privateWorkerCapacity', async()=>{
+      const peers=await mutate('isolationFixture:capacityPeers',{workflowRunId:dispatch.run._id,workerId:hostId});
+      const failures:any[]=[];
+      try {
+        for(const runId of peers.names)assert.equal(await query('workflowRuns:get',{runId}),null);
+        try {
+          const command=createSignedServiceCommand({capability:'attempts.claim',projectId:s.projectId,repositoryId,payload:{workflowRunId:dispatch.run._id,leaseId:randomUUID(),leaseDurationMs:60000,workerId:hostId,workerSessionId:sessionId}});
+          const claim=await scopedServiceClient.action(ref('serviceCommands:claimFactoryAttempt'),command);
+          assert.equal(claim.claimed,false);assert.equal(claim.reason,'worker-capacity-exhausted');
+        } catch(error){failures.push({check:'service-claim-counts-private-worker-leases',error:String(error)});}
+      } finally {await mutate('isolationFixture:clearCapacityPeers',{missionId:peers.missionId,runIds:peers.runIds});}
+      assert.deepEqual(failures,[]);
+      return {privateRunsUnreadable:true,routingCapacity:"SHARES_ENFORCEMENT_QUERY_WITH_CLAIM",serviceClaimDenied:true,cleanupVerified:true};
+    });
     let lostExecutionAck = false, duplicateDeliveries = 0, restarted = false, recoveryInitialPollCompleted = false;
     const recoveryClient = new Proxy(scopedServiceClient, { get(target, name) {
       if (name === 'action') return async (reference: any, command: any) => {

@@ -17,7 +17,7 @@ const authorityDatabase = Symbol("missionAuthorityDatabase");
 const checkArguments = Symbol("missionArguments");
 const serviceAuthority = Symbol("serviceAuthority");
 export function missionServiceBinding(ctx: Context): ServiceAttemptAuthority | undefined { return (ctx as any)[serviceAuthority]; }
-export function missionAuthorityDatabase(ctx: Context): Context["db"] {
+export function missionAuthorityDatabase<T extends Context>(ctx: T): T["db"] {
   return (ctx as any)[authorityDatabase] ?? ctx.db;
 }
 
