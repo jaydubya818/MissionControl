@@ -45,7 +45,7 @@ export const seed = mutation({ args: {}, handler: async ctx => {
 export const deliveryScope = mutation({ args: { projectId: v.id("projects") }, handler: async (ctx, {projectId}) => {
   await owner(ctx);
   const project = await ctx.db.get(projectId);
-  if (project?.slug !== "unpublished-handoff") throw Error("SYNTHETIC_PROJECT_REQUIRED");
+  if (project?.slug !== "synthetic-unpublished-handoff" || project.metadata?.synthetic !== true) throw Error("SYNTHETIC_PROJECT_REQUIRED");
   const now = Date.now(), tenantId = project.tenantId;
   const repositoryId = await ctx.db.insert("workspaceRepositories", { tenantId, projectId, provider: "LOCAL",
     repository: "local-qualification/draft-scope", displayName: "Synthetic draft scope", defaultBranch: "main",
