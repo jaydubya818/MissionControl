@@ -1,4 +1,4 @@
-import "./support/domainFunctions";
+import "./support/domainFunctions.fixture";
 import { describe, expect, it, vi } from "vitest";
 import { buildLocalCandidateRecoveryRows } from "../lib/localCandidateRecovery";
 import { recoverLocalCandidate } from "../factory/attempts";

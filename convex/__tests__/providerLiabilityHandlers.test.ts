@@ -1,4 +1,4 @@
-import "./support/domainFunctions";
+import "./support/domainFunctions.fixture";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   registerPriceVersion,

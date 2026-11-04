@@ -1,4 +1,4 @@
-import "./support/domainFunctions";
+import "./support/domainFunctions.fixture";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { canonicalDigest } from "@mission-control/shared";
 import { appendReceiptInternal, appendReconciliationInternal, claimIntentInternal, createOutcomeProjection, freezeRouteComparison, getAttemptEconomics, persistIntentInternal } from "../inferenceGateway";

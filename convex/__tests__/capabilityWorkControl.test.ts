@@ -1,4 +1,4 @@
-import "./support/domainFunctions";
+import "./support/domainFunctions.fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { capabilityWorkRestriction } from '../lib/capabilityWorkControl';
 import { updateContext, advance } from '../workflowRuns';

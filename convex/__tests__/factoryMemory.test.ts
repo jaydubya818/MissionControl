@@ -1,4 +1,4 @@
-import "./support/domainFunctions";
+import "./support/domainFunctions.fixture";
 import { describe, expect, it } from "vitest";
 
 import type { Id } from "../_generated/dataModel";
