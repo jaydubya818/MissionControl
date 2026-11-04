@@ -93,7 +93,7 @@ function runCommand() {
     .description("Start a workflow run")
     .argument("<workflow-id>", "Workflow ID (e.g., feature-dev)")
     .argument("<task>", "Task description")
-    .option("-p, --project <id>", "Project ID")
+    .requiredOption("-p, --project <id>", "Authorized workspace ID")
     .action(async (workflowId, task, options) => {
       const spinner = ora(`Starting ${workflowId} workflow...`).start();
       

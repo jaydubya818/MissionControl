@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action, internalAction, missionAuthorityDatabase } from "./lib/missionScopedFunctions";
+import { mutation, query, internalMutation, internalAction, missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 import { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { workflowDefinitionChanged } from "./lib/workflowSnapshot";
@@ -57,7 +57,7 @@ async function visibleWorkflows(ctx: QueryCtx, workflows: Doc<"workflows">[]) {
 }
 
 async function requireWorkflowManagement(ctx: MutationCtx, workflow: Doc<"workflows">) {
-  if (!workflow.projectId) throw new Error("Legacy global workflows require authorized project registration before management.");
+  if (!workflow.projectId) throw new Error("Legacy global workflows require deployment administrator retirement before workspace registration.");
   await requireWorkspacePermission(ctx, workflow.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
   return workflow.projectId;
 }
@@ -134,7 +134,7 @@ export const auditProjectRunCompatibility = query({
 /**
  * Create or update a workflow definition
  */
-export const upsert = mutation({
+export const upsert = internalMutation({
   args: {
     workflowId: v.string(),
     name: v.string(),
@@ -250,6 +250,24 @@ export const upsert = mutation({
         updatedAt: now,
       });
     }
+  },
+});
+
+/** Deployment-administrator recovery for global definitions without an owner.
+ * Never let a workspace claim an unowned global definition through public APIs. */
+export const retireLegacy = internalMutation({
+  args: { workflowId: v.string() },
+  handler: async (ctx, args) => {
+    const workflow = await ctx.db.query("workflows")
+      .withIndex("by_workflow_id", q => q.eq("workflowId", args.workflowId)).first();
+    if (!workflow) return { removed: false };
+    if (workflow.projectId || workflow.contractVersion) throw new Error("Workspace-owned workflows require authorized workspace management.");
+    const active = await Promise.all((["PENDING", "RUNNING", "PAUSED"] as const).map(status =>
+      missionAuthorityDatabase(ctx).query("workflowRuns").withIndex("by_status", q => q.eq("status", status))
+        .filter(q => q.or(q.eq(q.field("workflowId"), args.workflowId), q.eq(q.field("workflowSnapshot.workflowId"), args.workflowId))).first()));
+    if (active.some(Boolean)) throw new Error("Cannot retire legacy workflow with active runs");
+    await ctx.db.delete(workflow._id);
+    return { removed: true };
   },
 });
 

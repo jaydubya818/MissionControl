@@ -2998,6 +2998,9 @@ async function dispatchWorkOrder(
     if (!workflow || !workflow.active) {
       throw new Error(`Workflow not available for dispatch: ${resolvedWorkflowId}`);
     }
+    if (!refreshedWorkOrder.projectId || workflow.projectId !== refreshedWorkOrder.projectId) {
+      throw new Error("Workflow is unavailable for this workspace.");
+    }
 
     const activeRepositoryMutation = await hasActiveRepositoryMutation(ctx, refreshedWorkOrder.repositoryId);
     if (refreshedWorkOrder.isMutating !== false && activeRepositoryMutation) {
@@ -3222,7 +3225,7 @@ async function dispatchWorkOrder(
       toState: "DISPATCHED",
       actorType: args.actorType,
       actorId,
-      summary: `Dispatch requested for workflow ${resolvedWorkflowId}`,
+      summary: `Dispatch requested for workflow ${workflow.workflowId}`,
       idempotencyKey: `${args.idempotencyKey}:request`,
       metadata: {
         taskId: selectedTask?._id,
@@ -3608,7 +3611,7 @@ async function dispatchWorkOrder(
       actor: actorId ?? args.actorType.toLowerCase(),
       status: "PENDING",
       startedAt: now,
-      commandSummary: `Dispatched ${resolvedWorkflowId}`,
+      commandSummary: `Dispatched ${workflow.workflowId}`,
       idempotencyKey: `${args.idempotencyKey}:run-started`,
       metadata: {
         taskId: selectedTask?._id,
@@ -3666,7 +3669,7 @@ async function dispatchWorkOrder(
       actorType: args.actorType,
       actorId,
       action: "WORK_ORDER_DISPATCHED",
-      description: `Dispatched work order ${refreshedWorkOrder.title} via ${resolvedWorkflowId}`,
+      description: `Dispatched work order ${refreshedWorkOrder.title} via ${workflow.workflowId}`,
       targetType: "WORK_ORDER",
       targetId: refreshedWorkOrder._id,
       metadata: {
@@ -3692,7 +3695,7 @@ async function dispatchWorkOrder(
       actorId,
       summary: retryOfRun
         ? `Recovery run ${runId} created for terminal run ${retryOfRun.runId}`
-        : `Execution run ${runId} created for ${resolvedWorkflowId}`,
+        : `Execution run ${runId} created for ${workflow.workflowId}`,
       idempotencyKey: `${args.idempotencyKey}:dispatched`,
       metadata: {
         runId,

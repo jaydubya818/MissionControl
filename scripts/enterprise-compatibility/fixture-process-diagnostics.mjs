@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { open } from 'node:fs/promises';
 import { join } from 'node:path';
 
-const stages = new Set(['BACKEND_START', 'KEYGEN', 'PREPARE_FUNCTIONS', 'ENABLE_FIXTURES', 'ENABLE_ACCOUNTING', 'ENABLE_NATIVE', 'SET_ENVIRONMENT']);
+const stages = new Set(['BACKEND_START', 'KEYGEN', 'PREPARE_FUNCTIONS', 'ENABLE_FIXTURES', 'ENABLE_ACCOUNTING', 'ENABLE_NATIVE', 'SET_ENVIRONMENT', 'SEED_LEGACY_WORKFLOWS']);
 const codes = new Set(['ETIMEDOUT', 'ENOENT', 'EACCES', 'ENOBUFS', 'ENOMEM', 'EAGAIN']);
 const signals = new Set(['SIGTERM', 'SIGKILL', 'SIGABRT', 'SIGSEGV', 'SIGINT']);
 function outputDiagnostic(value) {

@@ -107,6 +107,12 @@ const proposalList = {
 };
 export const useQuery = (reference:any) => {
   const name=getFunctionName(reference);
+  if(name === "workflows:list") return [
+    {_id:"workflow-own",workflowId:"scoped",name:"Scoped workflow",description:"Component fixture only",projectId:"project-ui-fixture",contractVersion:"factory-workflow-contract/v1",agents:[],steps:[]},
+    {_id:"workflow-global",workflowId:"global",name:"Global workflow",description:"Not directly startable",agents:[],steps:[]},
+    {_id:"workflow-foreign",workflowId:"foreign",name:"Foreign workflow",description:"Another workspace",projectId:"other",contractVersion:"factory-workflow-contract/v1",agents:[],steps:[]},
+    {_id:"workflow-governed",workflowId:"governed",name:"Governed workflow",description:"Requires WorkOrder admission",projectId:"project-ui-fixture",contractVersion:"factory-workflow-contract/v2",agents:[],steps:[]},
+  ];
   if(name === "softwareFactoryControlPlane:listWorkspaceStructure") return {
     teams:[{_id:"team-ui-fixture",name:"Fixture team",status:"ACTIVE"}],
     members:[{_id:"member-ui-fixture",name:"Fixture owner",active:true}],
@@ -117,5 +123,6 @@ export const useQuery = (reference:any) => {
   return proposalList;
 };
 functions["missions:updateDraft"] = async(args) => ({mission:{...args,_id:args.missionId,state:"DRAFT"},updated:true});
+functions["workflowRuns:start"] = async() => ({runId:"component-fixture-no-execution"});
 export const useMutation = (reference: any) =>
   functions[getFunctionName(reference)];

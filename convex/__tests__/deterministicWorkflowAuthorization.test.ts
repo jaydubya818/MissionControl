@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { upsert } from "../workflows";
 import { start } from "../workflowRuns";
 
+const permission = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+vi.mock("../lib/companyAccess", async importOriginal => ({
+  ...await importOriginal<typeof import("../lib/companyAccess")>(),
+  requireWorkspacePermission: permission,
+}));
+
 const handler = (registered: unknown) => (registered as { _handler: (ctx: any, args: any) => Promise<unknown> })._handler;
 
 describe("deterministic workflow entry-point authority", () => {
@@ -24,7 +30,7 @@ describe("deterministic workflow entry-point authority", () => {
       }), withIndex: () => query };
       return query;
     }, insert } };
-    await expect(handler(start)(context, { workflowId: "synthetic-render", projectId })).rejects.toThrow("canonical WorkOrder");
+    await expect(handler(start)(context, { workflowId: "synthetic-render", projectId })).rejects.toThrow(projectId ? "canonical WorkOrder" : "authorized workspace");
     expect(insert).not.toHaveBeenCalled();
   });
   it.each([undefined, "workspace-1"])("rejects generic creation for an enrolled installation with project %s", async projectId => {
@@ -32,7 +38,14 @@ describe("deterministic workflow entry-point authority", () => {
     const query = { first: async () => ({ installationId: "isolated" }), withIndex: () => query };
     const context = { db: { query: () => query, insert } };
     await expect(handler(start)(context, { workflowId: "synthetic-render", projectId }))
-      .rejects.toThrow("CAPABILITY_CANONICAL_DISPATCH_REQUIRED");
+      .rejects.toThrow(projectId ? "CAPABILITY_CANONICAL_DISPATCH_REQUIRED" : "authorized workspace");
     expect(insert).not.toHaveBeenCalled();
+  });
+  it("authorizes the workspace before reading a workflow definition", async () => {
+    permission.mockRejectedValueOnce(new Error("unavailable or unauthorized"));
+    const query = vi.fn();
+    await expect(handler(start)({ db: { query } }, { workflowId: "private", projectId: "foreign" }))
+      .rejects.toThrow("unavailable or unauthorized");
+    expect(query).not.toHaveBeenCalled();
   });
 });

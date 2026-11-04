@@ -615,13 +615,11 @@
     "workflowRuns:listEvents",
     "workflowRuns:releaseExecution",
     "workflowRuns:search",
-    "workflowRuns:start",
     "workflowRuns:updateContext",
     "workflowRuns:updateStatus",
     "workflowRuns:updateStep",
     "workflows:get",
     "workflows:getById",
-    "workflows:list",
-    "workflows:upsert"
+    "workflows:list"
   ]
 }

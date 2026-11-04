@@ -20,13 +20,15 @@ export function WorkflowSelector({ projectId, onClose, onStarted }: WorkflowSele
   const [input, setInput] = useState("");
   const [isStarting, setIsStarting] = useState(false);
   
-  const workflows = useQuery(api.workflows.list, { activeOnly: true });
+  const workflows = useQuery(api.workflows.list, projectId ? { activeOnly: true } : "skip");
   const startRun = useMutation(api.workflowRuns.start);
+  const availableWorkflows = workflows?.filter(workflow => projectId && workflow.projectId === projectId
+    && workflow.contractVersion === "factory-workflow-contract/v1");
   
-  const selectedWorkflow = workflows?.find((w) => w.workflowId === selectedWorkflowId);
+  const selectedWorkflow = availableWorkflows?.find((w) => w.workflowId === selectedWorkflowId);
   
   const handleStart = async () => {
-    if (!selectedWorkflowId || !input.trim()) return;
+    if (!projectId || !selectedWorkflow || !input.trim()) return;
     
     setIsStarting(true);
     try {
@@ -63,7 +65,7 @@ export function WorkflowSelector({ projectId, onClose, onStarted }: WorkflowSele
       zIndex: 2000,
     }}>
       <div style={{
-        width: "600px",
+        width: "min(600px, calc(100vw - 32px))",
         maxHeight: "80vh",
         backgroundColor: "#1a1a1a",
         borderRadius: "12px",
@@ -117,12 +119,18 @@ export function WorkflowSelector({ projectId, onClose, onStarted }: WorkflowSele
             </label>
             
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {workflows?.map((workflow) => (
-                <div
+              {!projectId && <p role="status">Choose a workspace before starting a workflow.</p>}
+              {projectId && !workflows && <p role="status">Loading workflows…</p>}
+              {projectId && availableWorkflows?.length === 0 && <p role="status">No directly startable workflows are available in this workspace. Start governed execution from its WorkOrder.</p>}
+              {availableWorkflows?.map((workflow) => (
+                <button
+                  type="button"
+                  aria-pressed={selectedWorkflowId === workflow.workflowId}
                   key={workflow._id}
                   onClick={() => setSelectedWorkflowId(workflow.workflowId)}
                   style={{
                     padding: "16px",
+                    textAlign: "left",
                     backgroundColor: selectedWorkflowId === workflow.workflowId ? "#3b82f620" : "#0a0a0a",
                     border: `1px solid ${selectedWorkflowId === workflow.workflowId ? "#3b82f6" : "#333"}`,
                     borderRadius: "8px",
@@ -151,7 +159,7 @@ export function WorkflowSelector({ projectId, onClose, onStarted }: WorkflowSele
                   }}>
                     {workflow.steps.length} steps • {workflow.agents.length} agents
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -229,7 +237,7 @@ export function WorkflowSelector({ projectId, onClose, onStarted }: WorkflowSele
           </button>
           <button
             onClick={handleStart}
-            disabled={!selectedWorkflowId || !input.trim() || isStarting}
+            disabled={!projectId || !selectedWorkflow || !input.trim() || isStarting}
             style={{
               padding: "10px 20px",
               borderRadius: "6px",

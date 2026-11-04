@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthRuntimeProvider } from "../../src/auth/AuthRuntimeContext";
 import { MissionDraftForm } from "../../src/eos/views/MissionDraftForm";
 import { SofieOwnerReview } from "../../src/eos/views/SofieOwnerReview";
+import { WorkflowSelector } from "../../src/WorkflowSelector";
 import "./style.css";
 const params = new URLSearchParams(location.search);
 document.documentElement.dataset.theme = params.get("theme") || "dark";
@@ -18,7 +19,7 @@ createRoot(document.getElementById("root")!).render(
       }}
     >
       <BrowserRouter>
-        {params.get("view") === "mission-draft" ? <MissionDraftForm projectId={"project-ui-fixture" as any} mission={{
+        {params.get("view") === "workflow-selector" ? <WorkflowSelector projectId={params.get("scenario") === "missing-workspace" ? undefined : "project-ui-fixture" as any} onClose={() => undefined} /> : params.get("view") === "mission-draft" ? <MissionDraftForm projectId={"project-ui-fixture" as any} mission={{
           _id:"mission-ui-fixture", state:"DRAFT", title:"Draft environment qualification", objective:"Review explicit execution setup", stopCondition:"Stop before execution",
           owner:"Fixture owner", ownerMemberId:"member-ui-fixture", owningTeamId:"team-ui-fixture", repositoryId:"repo-ui-fixture", codeScopeIds:["scope-ui-fixture"], budgetUsd:0,
         }} /> : <SofieOwnerReview projectId={"project-ui-fixture" as any} />}
