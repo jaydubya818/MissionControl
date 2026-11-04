@@ -25,6 +25,7 @@ export function missionAuthorityDatabase(ctx: Context): Context["db"] {
 export function missionScopedContext<T extends Context>(ctx: T, writeCapability: MissionCapability = "OWNER", service?: ServiceAttemptAuthority, serviceClaim?: ServiceAttemptClaim, application?: SofieApplicationAuthority): T {
   const raw = ctx.db;
   let createdMissionId: string | undefined;
+  let createdOwnerAssignment = false;
   const lineage = missionLineage(raw);
   const rowCache = new Map<string, Promise<any>>();
   const decisions = new Map<string, Promise<boolean>>();
@@ -84,6 +85,12 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
           || row.payloadDigest !== application.envelope.payloadDigest || row.capability !== op) return false;
       } else if (table === "enterpriseMissionProposals") {
         if (op !== "enterprise.propose" && !(op === "enterprise.submit" && row._id === application.proposal?._id)) return false;
+      } else if (table === "missionAssignments") {
+        if (op !== "enterprise.submit" || !createdMissionId || createdOwnerAssignment || row._id
+          || row.missionId !== createdMissionId || row.tenantId !== application.connection.tenantId
+          || row.projectId !== application.connection.projectId || row.memberId !== application.connection.ownerMemberId
+          || row.operatorId !== application.connection.ownerId || row.teamId !== application.connection.owningTeamId
+          || row.role !== "OWNER" || row.active !== true) return false;
       } else if (table === "missionEvents") {
         if (op !== "enterprise.submit" || row.missionId !== createdMissionId || row.eventType !== "MISSION_CREATED") return false;
       } else return false;
@@ -250,7 +257,8 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
             || row.ownerOperatorId !== application.connection.ownerId || row.tenantId !== application.connection.tenantId
             || row.projectId !== application.connection.projectId || row.state !== "DRAFT" || row.budgetUsd !== 0
             || row.metadata?.proposalId !== application.proposal?._id || row.metadata?.proposalDigest !== application.proposal?.digest
-            || row.ownerMemberId || row.owningTeamId) throw Error("MISSION_OWNER_REQUIRED");
+            || row.ownerMemberId !== application.connection.ownerMemberId
+            || row.owningTeamId !== application.connection.owningTeamId) throw Error("MISSION_OWNER_REQUIRED");
         } else if (!await canAccessMission(ctx, row as any, "OWNER")) throw Error("MISSION_OWNER_REQUIRED");
       } else await assertWrite(row, table, epoch);
       if (epoch !== authorizationEpoch || pendingWrites) throw Error("MISSION_UNAVAILABLE");
@@ -258,6 +266,7 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
       try {
         const result = await target.insert(table, row);
         if (application && table === "missions") createdMissionId = result;
+        if (application && table === "missionAssignments") createdOwnerAssignment = true;
         return result;
       } finally { pendingWrites--; invalidate(""); }
     });
