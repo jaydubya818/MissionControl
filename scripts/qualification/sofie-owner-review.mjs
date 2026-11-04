@@ -125,7 +125,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
       connectionId: connection.connectionId,
       decision: "AUTHORIZE_DRAFT",
     });
-    const receipts = await Promise.all(
+    const attempts = await Promise.allSettled(
       Array.from({ length: 3 }, () =>
         command({
           operation: "enterprise.submit",
@@ -134,6 +134,11 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
         }),
       ),
     );
+    const receipts = attempts.filter((attempt) => attempt.status === "fulfilled").map((attempt) => attempt.value);
+    assert.ok(receipts.length >= 1, "At least one submission must have a confirmed receipt");
+    for (const attempt of attempts.filter((attempt) => attempt.status === "rejected")) {
+      assert.ok(["denied", "result_unknown"].includes(attempt.reason.status));
+    }
     assert.equal(new Set(receipts.map((r) => r.response.missionId)).size, 1);
     missionId = receipts[0].response.missionId;
     const { metadata, executionEnvironment, ...draft } = args;
