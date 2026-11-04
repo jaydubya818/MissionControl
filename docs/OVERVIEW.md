@@ -198,7 +198,7 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v65**. This candidate combines enterprise Mission isolation and Sofie owner review with capability admission; it grants no deployment or productive Work authority. The governed
+The current public client/backend runtime contract is **v66**. Global workflow seeding is internal and requires deployment-administrator authority; direct legacy runs require an authorized workspace. Ship the backend and its version-bound UI together. This candidate combines enterprise Mission isolation and Sofie owner review with capability admission; it grants no deployment or productive Work authority. The governed
 inference work adds the disabled-by-default price-book, reservation, receipt,
 reconciliation, and accepted-outcome economics contracts. Fab adds exact candidate
 verification and publication bindings plus read-only candidate recovery. Todo 062

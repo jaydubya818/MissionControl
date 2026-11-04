@@ -498,7 +498,7 @@ The public client/backend runtime contract is versioned in
 [`convex/lib/runtimeContract.ts`](convex/lib/runtimeContract.ts). Update it only
 when deployed clients and backend functions cannot safely interoperate.
 
-Current public client/backend runtime contract: **v65**. Version 65 adds canonical owner editing of the Mission execution environment before planning. Version 64 reconciles enterprise Mission isolation, scoped service delegation and Sofie owner review with capability admission and recovery. Both sets of authorization checks remain required. Version 63 added receiver recovery quarantine. Version 63 adds receiver recovery quarantine and signed capability lifecycle acknowledgments. Version 61 on main adds
+Current public client/backend runtime contract: **v66**. Version 66 makes global workflow seeding internal and requires an authorized workspace for direct legacy execution; deploy the version-bound client and backend together. Version 65 adds canonical owner editing of the Mission execution environment before planning. Version 64 reconciles enterprise Mission isolation, scoped service delegation and Sofie owner review with capability admission and recovery. Both sets of authorization checks remain required. Version 63 added receiver recovery quarantine. Version 63 adds receiver recovery quarantine and signed capability lifecycle acknowledgments. Version 61 on main adds
 observed-cost reconciliation for terminal Fab Attempts. Version 62 combines that
 contract with authenticated capability challenges and ordered policy proofs for
 Mission and WorkOrder admission. Clients and the backend must advance together.
