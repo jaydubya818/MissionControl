@@ -4,6 +4,7 @@ import { mkdir, readFile, appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { lock, sha256 } from './evidence.mjs';
 import { prepareQualifiedDocker } from './qualified-docker.mjs';
+import { pullPinnedImage } from './pull-pinned-image.mjs';
 const suite = process.argv[2], temp = process.env.RUNNER_TEMP;
 assert.ok(temp && process.env.GITHUB_ENV, 'Hosted ephemeral runner required');
 const run = (cmd, args, options = {}) => execFileSync(cmd, args, { stdio: 'inherit', ...options });
@@ -35,7 +36,7 @@ if (['delegated-execution', 'hybrid-mission'].includes(suite)) {
   run('git', ['--git-dir=' + fixture, 'fetch', '--no-tags', 'https://github.com/jaydubya818/MyFactory.git', `${lock.myFactoryFixtureSource}:refs/heads/fixture`]);
   assert.equal(execFileSync('git', ['--git-dir=' + fixture, 'rev-parse', 'refs/heads/fixture'], { encoding: 'utf8' }).trim(), lock.myFactoryFixtureSource);
   await set('MC_LOCAL_MYFACTORY_ROOT', partner); await set('MYFACTORY_FIXTURE_GIT', fixture);
-  run('docker', ['pull', lock.providerImage]); run('docker', ['pull', lock.postgresImage]);
+  await pullPinnedImage(lock.providerImage); await pullPinnedImage(lock.postgresImage);
   run('docker', ['tag', lock.postgresImage, 'postgres:17']);
 }
 if (['native-execution', 'hybrid-mission', 'security-recovery'].includes(suite)) {
