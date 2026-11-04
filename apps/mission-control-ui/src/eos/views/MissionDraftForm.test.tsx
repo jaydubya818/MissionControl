@@ -36,7 +36,7 @@ const mission = {
   owningTeamId: "team-1",
   repositoryId: "repo-1",
   codeScopeIds: ["scope-1"],
-  budgetUsd: undefined,
+  budgetUsd: 0,
   stopCondition: "Focused tests pass",
   maxReadOnlyConcurrency: 2,
   maxCorrectiveIterations: 1,
@@ -92,5 +92,18 @@ describe("MissionDraftForm", () => {
       "Budget must be zero or greater."
     );
     expect(mocks.updateDraft).not.toHaveBeenCalled();
+  });
+
+  it("blocks a blank budget and saves cleared context", () => {
+    mocks.updateDraft.mockReturnValue(new Promise(() => undefined));
+    render(<MissionDraftForm mission={{ ...mission, context: "Old context" }} projectId={"workspace-1" as any} />);
+    fireEvent.change(screen.getByLabelText("Context"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Budget (USD)"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a budget.");
+    expect(mocks.updateDraft).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Budget (USD)"), { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    expect(mocks.updateDraft).toHaveBeenCalledWith(expect.objectContaining({ context: "", budgetUsd: 0 }));
   });
 });

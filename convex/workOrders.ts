@@ -2999,6 +2999,11 @@ async function dispatchWorkOrder(
       throw new Error(`Workflow not available for dispatch: ${resolvedWorkflowId}`);
     }
 
+    const activeRepositoryMutation = await hasActiveRepositoryMutation(ctx, refreshedWorkOrder.repositoryId);
+    if (refreshedWorkOrder.isMutating !== false && activeRepositoryMutation) {
+      throw new Error("Factory dispatch blocked (repository-mutation-already-active): Wait for the active repository mutation to finish.");
+    }
+
     const delegatedPreparation = args.isolatedLocalDelegation === true
       ? await prepareCanonicalDelegation(ctx, refreshedWorkOrder, args.factoryDefinitionVersionId) : null;
     const runId = generateRunId();
@@ -3054,6 +3059,7 @@ async function dispatchWorkOrder(
           },
           workOrder: refreshedWorkOrder,
           workflow,
+          activeRepositoryMutation,
         });
     const taskAttempts = selectedTask
       ? existingRuns.filter((run) => run.parentTaskId === selectedTask._id)
@@ -3462,7 +3468,7 @@ async function dispatchWorkOrder(
       capabilityAuthorities: capabilityAdmission?.authorities,
       tenantId: refreshedWorkOrder.tenantId,
       runId,
-      workflowId: resolvedWorkflowId,
+      workflowId: workflow.workflowId,
       workflowVersion: workflow.version,
       workflowSnapshot,
       projectId: refreshedWorkOrder.projectId,
@@ -3627,7 +3633,7 @@ async function dispatchWorkOrder(
     }
 
     await ctx.db.patch(refreshedWorkOrder._id, {
-      workflowId: resolvedWorkflowId,
+      workflowId: workflow.workflowId,
       state: "DISPATCHED",
       currentExecutionRunId: runDocId,
       updatedAt: now,
@@ -4141,9 +4147,18 @@ export const readiness = query({
   },
 });
 
+async function hasActiveRepositoryMutation(ctx: MutationCtx | QueryCtx, repositoryId?: Id<"workspaceRepositories">): Promise<boolean> {
+  if (!repositoryId) return false;
+  const activeRuns = await Promise.all((["PENDING", "RUNNING", "PAUSED"] as const).map(status =>
+    missionAuthorityDatabase(ctx).query("workflowRuns")
+      .withIndex("by_repository_status", q => q.eq("repositoryId", repositoryId).eq("status", status))
+      .filter(q => q.neq(q.field("isMutating"), false)).first()));
+  return activeRuns.some(Boolean);
+}
+
 async function resolveFactoryDispatchBinding(
   ctx: MutationCtx | QueryCtx,
-  input: { args: DispatchArgs & { attemptRunId: string }; workOrder: any; workflow: any; inspect?: boolean }
+  input: { args: DispatchArgs & { attemptRunId: string }; workOrder: any; workflow: any; inspect?: boolean; activeRepositoryMutation?: boolean }
 ): Promise<any | null> {
   const { args, workOrder, workflow } = input;
   if (!args.factoryDefinitionVersionId) {
@@ -4364,12 +4379,8 @@ async function resolveFactoryDispatchBinding(
       offlineAdmission: { profile: executionProfile!, sandboxProfile, projection: factoryVersionExecutionProfileProjection(version)!,
         workflow, repositoryDataClassification, now, projectId: String(version.projectId), tenantId: String(version.tenantId ?? ""),
         purpose: version.purpose ?? "SOFTWARE", agentBindings: version.agentBindings ?? [], deterministicOperation: version.deterministicOperation } });
-  const activeStatuses = ["PENDING", "RUNNING", "PAUSED"] as const;
-  const activeRuns = repository
-    ? (await Promise.all(activeStatuses.map((status) => missionAuthorityDatabase(ctx).query("workflowRuns")
-        .withIndex("by_repository_status", (q) => q.eq("repositoryId", repository._id).eq("status", status))
-        .collect()))).flat()
-    : [];
+  const activeRepositoryMutation = input.activeRepositoryMutation
+    ?? await hasActiveRepositoryMutation(ctx, repository?._id);
   const preflightInput = {
     factoryRequired: Boolean(workOrder.missionId || workOrder.repositoryId),
     versionProvided: true,
@@ -4429,7 +4440,7 @@ async function resolveFactoryDispatchBinding(
     })),
     worktreeProvided: Boolean(args.worktree?.trim() || host?.checkoutRoot?.trim()),
     mutating: workOrder.isMutating !== false,
-    activeRepositoryMutation: activeRuns.some((run) => run.isMutating !== false),
+    activeRepositoryMutation,
   };
   if (input.inspect) return {
     checks: [...(localRepositoryAdmission

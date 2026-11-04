@@ -8,6 +8,7 @@
 import { v } from "convex/values";
 import { mutation, query, action, internalAction, missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 import { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { workflowDefinitionChanged } from "./lib/workflowSnapshot";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 import {
@@ -43,6 +44,24 @@ const workflowSteps = v.array(v.object({
   })),
 }));
 
+async function visibleWorkflows(ctx: QueryCtx, workflows: Doc<"workflows">[]) {
+  const access = new Map<string, Promise<boolean>>();
+  const allowed = await Promise.all(workflows.map((workflow) => {
+    if (!workflow.projectId) return true; // Legacy global definitions remain read-compatible.
+    const projectId = workflow.projectId;
+    if (!access.has(projectId)) access.set(projectId,
+      requireWorkspacePermission(ctx, projectId, FACTORY_PERMISSIONS.VIEW).then(() => true, () => false));
+    return access.get(projectId)!;
+  }));
+  return workflows.filter((_, index) => allowed[index]);
+}
+
+async function requireWorkflowManagement(ctx: MutationCtx, workflow: Doc<"workflows">) {
+  if (!workflow.projectId) throw new Error("Legacy global workflows require authorized project registration before management.");
+  await requireWorkspacePermission(ctx, workflow.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+  return workflow.projectId;
+}
+
 // ============================================================================
 // QUERIES
 // ============================================================================
@@ -56,13 +75,13 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     if (args.activeOnly) {
-      return await ctx.db
+      return await visibleWorkflows(ctx, await ctx.db
         .query("workflows")
         .withIndex("by_active", (q) => q.eq("active", true))
-        .collect();
+        .collect());
     }
     
-    return await ctx.db.query("workflows").collect();
+    return await visibleWorkflows(ctx, await ctx.db.query("workflows").collect());
   },
 });
 
@@ -72,10 +91,11 @@ export const list = query({
 export const get = query({
   args: { workflowId: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const workflow = await ctx.db
       .query("workflows")
       .withIndex("by_workflow_id", (q) => q.eq("workflowId", args.workflowId))
       .first();
+    return workflow ? (await visibleWorkflows(ctx, [workflow]))[0] ?? null : null;
   },
 });
 
@@ -85,7 +105,8 @@ export const get = query({
 export const getById = query({
   args: { id: v.id("workflows") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
+    const workflow = await ctx.db.get(args.id);
+    return workflow ? (await visibleWorkflows(ctx, [workflow]))[0] ?? null : null;
   },
 });
 
@@ -310,6 +331,7 @@ export const setActive = mutation({
     if (!workflow) {
       throw new Error(`Workflow not found: ${args.workflowId}`);
     }
+    await requireWorkflowManagement(ctx, workflow);
     
     await ctx.db.patch(workflow._id, {
       active: args.active,
@@ -334,6 +356,7 @@ export const remove = mutation({
     if (!workflow) {
       throw new Error(`Workflow not found: ${args.workflowId}`);
     }
+    const projectId = await requireWorkflowManagement(ctx, workflow);
     
     // Check if there are any active runs
     const activeRun = await missionAuthorityDatabase(ctx)
@@ -346,7 +369,13 @@ export const remove = mutation({
       ))
       .first();
     
-    if (activeRun) {
+    // Older dispatches could store the requested alias rather than the actual
+    // executable definition. Their frozen snapshot still pins that definition.
+    const snapshotRuns = activeRun ? [] : await Promise.all((["PENDING", "RUNNING", "PAUSED"] as const).map(status =>
+      missionAuthorityDatabase(ctx).query("workflowRuns")
+        .withIndex("by_project_status", q => q.eq("projectId", projectId).eq("status", status))
+        .filter(q => q.eq(q.field("workflowSnapshot.workflowId"), args.workflowId)).first()));
+    if (activeRun || snapshotRuns.some(Boolean)) {
       throw new Error("Cannot delete workflow with active runs");
     }
     

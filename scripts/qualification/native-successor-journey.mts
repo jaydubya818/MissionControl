@@ -293,7 +293,7 @@ try {
       if (!result.success) throw Error('Canonical task transition failed: ' + JSON.stringify(result)); return result;
     });
     await reportHost();
-    const dispatchArgs = { workOrderId: workOrder._id, taskId, workflowId: 'native-successor-producer', actorType: 'HUMAN', idempotencyKey: 'native-successor-dispatch',
+    const dispatchArgs = { workOrderId: workOrder._id, taskId, workflowId: 'ignored-request-workflow-alias', actorType: 'HUMAN', idempotencyKey: 'native-successor-dispatch',
       repositoryId, codeScopeIds: [scope.scopeId], owningTeamId: s.teamId, ownerMemberId: s.memberId, executionEnvironment: 'LOCAL', executorHostId: hostId,
       factoryDefinitionVersionId: factories.producer.versionId };
     await step('privateRepositoryMutationLock', async () => {
@@ -307,6 +307,8 @@ try {
     });
     const dispatch = await step('dispatch', () => mutate('workOrders:dispatch', dispatchArgs));
     if (!dispatch.created || !dispatch.run) throw Error('Native dispatch did not create the canonical Attempt: ' + JSON.stringify(dispatch));
+    assert.equal(dispatch.run.workflowId,'native-successor-producer','Store the workflow actually selected by the immutable Factory version');
+    await assert.rejects(mutate('workflows:remove',{workflowId:dispatch.run.workflowId}),/Cannot delete workflow with active runs/);
     state.producerAttemptId = dispatch.run._id;
     await step('reservedBeforeExecution', () => query('factory/nativeAccounting:readback', { workflowRunId: dispatch.run._id }));
     const duplicate = await step('duplicateDispatch', () => mutate('workOrders:dispatch', dispatchArgs));

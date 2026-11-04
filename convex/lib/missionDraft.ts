@@ -16,6 +16,14 @@ export interface MissionDraftInput {
   executionEnvironment?: "LOCAL" | "CLOUD" | "REMOTE" | "POLICY_SELECTED";
 }
 
+export function missionDraftNextAction(mission: Pick<MissionDraftInput,
+  "ownerMemberId" | "owningTeamId" | "repositoryId" | "codeScopeIds" | "budgetUsd" | "executionEnvironment">): string {
+  return mission.ownerMemberId && mission.owningTeamId && mission.repositoryId && mission.codeScopeIds?.length
+    && (mission.budgetUsd ?? 0) > 0 && mission.executionEnvironment
+    ? "Prepare and review the canonical Plan."
+    : "Assign owner, team, repository, code scope, positive budget and execution environment before preparing a Plan.";
+}
+
 export function validateMissionDraftInput(input: MissionDraftInput): void {
   if (!input.title.trim()) throw new Error("Mission title is required");
   if (!input.objective.trim()) throw new Error("Mission objective is required");

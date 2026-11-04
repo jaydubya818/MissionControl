@@ -34,8 +34,9 @@ export const seed = fixtureMutation({ args: { scope: v.any(), sourceMissionId: v
   const taskId = await insert("tasks", { tenantId, projectId, workOrderId });
   const agentId = await insert("agents", {projectId});
   await ctx.db.patch(taskId,{assigneeIds:[agentId]});
-  const workflowId = await insert("workflows", {});
-  const workflowRunId = await insert("workflowRuns", { tenantId, projectId, missionId, workOrderId, parentTaskId: taskId, workflowId, runId:"isolation-"+missionId });
+  const workflowKey = "isolation-"+Date.now()+"-"+Math.random().toString(36).slice(2,12);
+  const workflowId = await insert("workflows", { projectId, workflowId:workflowKey });
+  const workflowRunId = await insert("workflowRuns", { tenantId, projectId, missionId, workOrderId, parentTaskId: taskId, workflowId:workflowKey, runId:"isolation-"+missionId });
   const runId = await insert("runs", {tenantId,projectId,agentId,taskId,workflowRunId,costUsd:7,startedAt:Date.now(),status:"COMPLETED"});
   await ctx.db.patch(agentId,{currentTaskId:taskId,spendToday:19,budgetDaily:10,status:"ACTIVE",lastError:"Private Mission error",errorStreak:3});
   const qcRunId = await insert("qcRuns", {tenantId,projectId,scopeSpec:{workOrderId}});

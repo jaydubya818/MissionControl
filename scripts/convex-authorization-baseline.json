@@ -613,7 +613,6 @@
     "workflowRuns:list",
     "workflowRuns:listArtifacts",
     "workflowRuns:listEvents",
-    "workflowRuns:recordEvent",
     "workflowRuns:releaseExecution",
     "workflowRuns:search",
     "workflowRuns:start",
@@ -623,8 +622,6 @@
     "workflows:get",
     "workflows:getById",
     "workflows:list",
-    "workflows:remove",
-    "workflows:setActive",
     "workflows:upsert"
   ]
 }

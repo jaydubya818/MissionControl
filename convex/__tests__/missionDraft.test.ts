@@ -3,6 +3,7 @@ import {
   assertMissionDraftWorkspace,
   changedMissionDraftFields,
   missionScopeStatus,
+  missionDraftNextAction,
   validateMissionDraftInput,
 } from "../lib/missionDraft";
 
@@ -55,5 +56,12 @@ describe("Mission draft mutation contract", () => {
     expect(changedMissionDraftFields({ ...validDraft, executionEnvironment: "LOCAL" }, {
       ...validDraft, title: "Changed title",
     })).toEqual(["title"]);
+  });
+
+  it("keeps zero-budget intake blocked and guides a fully assigned draft to Plan review", () => {
+    const mission = { ownerMemberId: "owner", owningTeamId: "team", repositoryId: "repo", codeScopeIds: ["scope"], executionEnvironment: "LOCAL" as const };
+    expect(missionDraftNextAction({ ...mission, budgetUsd: 0 })).toContain("positive budget");
+    expect(missionDraftNextAction({ ...mission, budgetUsd: 1 })).toBe("Prepare and review the canonical Plan.");
+    expect(missionDraftNextAction({ ...mission, budgetUsd: 1, executionEnvironment: undefined })).toContain("execution environment");
   });
 });

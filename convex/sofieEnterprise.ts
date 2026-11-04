@@ -9,6 +9,7 @@ import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from './lib/companyAccess
 import { enterpriseMissionOwner } from './lib/enterpriseMissionOwner';
 import { getCurrentVerificationResult } from './lib/currentVerification';
 import { createAuthorizedMissionDraft } from './missions';
+import { missionDraftNextAction } from './lib/missionDraft';
 import { enterpriseDigest, SOFIE_APPLICATION, validateEnterpriseRequest } from '../packages/shared/src/sofieEnterprise';
 
 const envelope = v.object({ serviceId: v.string(), capability: v.string(), projectId: v.string(), repositoryId: v.string(),
@@ -161,9 +162,7 @@ export async function projectMission(ctx: MutationCtx, mission: Doc<'missions'>,
     plans: plans.slice(0,20).map(p => ({ id:p._id, revision:p.revisionNumber, status:p.status, digest:enterpriseDigest(p), isCurrent:mission.currentPlanId===p._id })),
     workOrders, blockers: [mission.blockingReason, ...workOrders.map(w => w.blockingIssue)].filter(Boolean),
     needsYou: mission.requiredHumanAction ?? (mission.state === 'DRAFT'
-      ? mission.ownerMemberId && mission.owningTeamId && mission.repositoryId && mission.codeScopeIds?.length && mission.budgetUsd !== undefined && mission.executionEnvironment
-        ? 'Prepare and review the canonical Plan.'
-        : 'Assign owner, team, repository, code scope, budget and execution environment before preparing a Plan.'
+      ? missionDraftNextAction(mission)
       : ['PLANNING','AWAITING_PLAN_APPROVAL'].includes(mission.state) ? 'Review and approve the canonical Plan before execution.' : null),
     resultProof: { status: 'NOT_AVAILABLE', reason: 'COMPLETED_RESULT_REQUIRES_SCOPED_READ', references: proof },
     truncated: rows.length > 100 || proofRows.length > 100 || plans.length > 20, executionAuthority: 'NONE',

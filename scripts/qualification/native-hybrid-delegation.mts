@@ -91,6 +91,15 @@ export async function executeHybridDelegation({ provider, db, workOrderId, repos
   }
   const dispatchArgs = { ...dispatchScope, workOrderId, taskId: task.task._id, workflowId: 'hybrid-delegated',
     factoryDefinitionVersionId: versionId, isolatedLocalDelegation: true, idempotencyKey: 'hybrid-delegated-dispatch' };
+  await step('privateRepositoryMutationLocksDelegatedDispatch', async () => {
+    const peer = await mutate('isolationFixture:repositoryMutationPeer', { workOrderId });
+    try {
+      assert.equal(await query('workflowRuns:get', { runId: peer.runId }), null);
+      await assert.rejects(mutate('workOrders:dispatch', { ...dispatchArgs, idempotencyKey: 'private-delegated-repository-lock' }),
+        /repository-mutation-already-active/);
+    } finally { const { runId: _runId, ...ids } = peer; await mutate('isolationFixture:clearRepositoryMutationPeer', ids); }
+    return { privateRunUnreadable: true, delegatedDispatchDenied: true, cleanupVerified: true };
+  });
   const dispatch = await step('delegatedCanonicalDispatch', () => mutate('workOrders:dispatch', dispatchArgs));
   assert.equal(dispatch.created, true); assert.equal(dispatch.run.executionCostAuthorization, undefined);
   const run = dispatch.run; wo = await inspect(workOrderId);

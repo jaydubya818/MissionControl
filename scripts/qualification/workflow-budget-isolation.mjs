@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { startFixtureDatabase } from '../enterprise-compatibility/database.mjs';
+import { RENDER_MARKDOWN_OPERATION, RENDER_MARKDOWN_OPERATION_DIGEST } from '@mission-control/workflow-engine/harness-contract';
 const output=resolve(process.argv[2]);await mkdir(output,{recursive:true});
 const receipt={recordedAt:new Date().toISOString(),runId:randomUUID(),source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),checks:[],status:'IN_PROGRESS',scope:'DISPOSABLE_TWO_MISSION_BACKEND'};
 const db=await startFixtureDatabase(process.cwd(),{nativeExecution:true});
@@ -33,6 +34,34 @@ try {
  assert.equal(await db.owner.query('workflowRuns:get',{runId:'hidden-budget-run'}),null);
  const failures=[];
  const check=async(name,fn)=>{try{await fn();receipt.checks.push(name);}catch(error){failures.push({name,error:String(error)});}};
+ const permissionDenied=/Authenticated operator|unavailable or unauthorized|role does not permit/i;
+ const workflowArgs=workflowId=>({projectId:s.projectId,workflowId,name:'Synthetic workflow authorization',description:'Disposable permission regression; no execution',topology:'LINEAR',maxConcurrency:1,agents:[],active:true,
+   steps:[{id:'execute',kind:'DETERMINISTIC',agent:'',retryLimit:0,timeoutMinutes:1,input:JSON.stringify({reference:RENDER_MARKDOWN_OPERATION,digest:RENDER_MARKDOWN_OPERATION_DIGEST,input:{title:'Synthetic',paragraphs:['No execution'],outputPath:'docs/access.md'}}),expects:'Validated deterministic result',outputSchema:{type:'object',required:['status'],properties:{status:{type:'string'}}}}]});
+ for(const [actor,client] of [['anonymous',db.anonymous],['foreign-tenant',db.other]])for(const operation of ['setActive','remove']){
+   await check(`${actor}-workflow-${operation}-denied`,async()=>{
+     const workflowId=`auth-${actor}-${operation.toLowerCase()}`;
+     await mutate('workflows:registerProduction',workflowArgs(workflowId));
+     try {await assert.rejects(client.mutation(`workflows:${operation}`,{workflowId,...(operation==='setActive'?{active:false}:{})}),permissionDenied);}
+     finally {if(await db.owner.query('workflows:get',{workflowId}))await mutate('workflows:remove',{workflowId});}
+   });
+ }
+ await check('project-workflow-reads-deny-anonymous-and-foreign-tenant',async()=>{
+   const workflowId='auth-read-scope',id=await mutate('workflows:registerProduction',workflowArgs(workflowId));
+   try {
+     for(const client of [db.anonymous,db.other]){
+       assert.equal(await client.query('workflows:get',{workflowId}),null);
+       assert.equal(await client.query('workflows:getById',{id}),null);
+       assert.ok(!(await client.query('workflows:list',{})).some(row=>row._id===id));
+     }
+     await mutate('workflows:setActive',{workflowId,active:false});
+     assert.equal((await db.owner.query('workflows:get',{workflowId})).active,false);
+     await mutate('workflows:setActive',{workflowId,active:true});
+   }finally{await mutate('workflows:remove',{workflowId});}
+ });
+ await check('legacy-workflow-management-requires-project-registration',async()=>{
+   const workflowId='legacy-auth-control';await mutate('workflows:upsert',{workflowId,name:'Legacy fixture',description:'Read compatibility only',agents:[],steps:[]});
+   for(const operation of ['setActive','remove'])await assert.rejects(mutate(`workflows:${operation}`,{workflowId,...(operation==='setActive'?{active:false}:{})}),/Legacy global workflows/);
+ });
  await check('owner-can-set-execution-environment-through-canonical-draft-edit',async()=>{
    await mutate('missions:updateDraft',{missionId:visible.missionId,projectId:s.projectId,idempotencyKey:'canonical-environment',title:'Synthetic capacity Mission',objective:'Exercise global controls',stopCondition:'Stop after assertions',budgetUsd:0.1,executionEnvironment:'LOCAL'});
    assert.equal((await db.owner.query('nativeFixture:inspectRecord',{id:visible.missionId})).executionEnvironment,'LOCAL');
@@ -45,9 +74,10 @@ try {
  });
  await check('workflow-deletion-denied-with-private-active-run',async()=>{
    const workflow=await db.owner.query('nativeFixture:inspectRecord',{id:hidden.workflowId});
-   await fault(hidden.workflowRunId,{workflowId:workflow.workflowId});
    await assert.rejects(mutate('workflows:remove',{workflowId:workflow.workflowId}),/Cannot delete workflow with.*active runs/);
    await fault(hidden.workflowRunId,{status:'PAUSED'});
+   await assert.rejects(mutate('workflows:remove',{workflowId:workflow.workflowId}),/Cannot delete workflow with.*active runs/);
+   await fault(hidden.workflowRunId,{workflowId:'historical-request-alias',workflowSnapshot:{...workflow,workflowId:workflow.workflowId}});
    await assert.rejects(mutate('workflows:remove',{workflowId:workflow.workflowId}),/Cannot delete workflow with.*active runs/);
    await fault(hidden.workflowRunId,{status:'RUNNING'});
    assert.equal(await db.owner.query('workflowRuns:get',{runId:'hidden-budget-run'}),null);

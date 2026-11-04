@@ -62,7 +62,9 @@ export function validateMissionDraft(values: MissionDraftValues): MissionDraftEr
   if (!values.ownerMemberId) errors.ownerMemberId = "Accountable owner is required.";
   if (!values.repositoryId) errors.repositoryId = "Repository is required.";
   if (values.codeScopeIds.length === 0) errors.codeScopeIds = "Code scope is required.";
-  if (values.budgetUsd.trim() && (!Number.isFinite(Number(values.budgetUsd)) || Number(values.budgetUsd) < 0)) {
+  if (!values.budgetUsd.trim()) {
+    errors.budgetUsd = "Enter a budget. Use zero to keep execution blocked.";
+  } else if (!Number.isFinite(Number(values.budgetUsd)) || Number(values.budgetUsd) < 0) {
     errors.budgetUsd = "Budget must be zero or greater.";
   }
   if (!isWholeNumber(values.maxReadOnlyConcurrency, 1)) {
@@ -84,14 +86,13 @@ export function missionDraftPayload(values: MissionDraftValues) {
   return {
     title: values.title.trim(),
     objective: values.objective.trim(),
-    context: values.context.trim() || undefined,
+    context: values.context.trim(),
     constraints: values.constraints.map((value) => value.trim()),
     sourceOfTruthRefs: values.sourceOfTruthRefs.map((ref) => ({
       kind: ref.kind,
       label: ref.label.trim(),
       location: ref.location.trim(),
     })),
-    owner: values.owner.trim() || undefined,
     ownerMemberId: values.ownerMemberId,
     owningTeamId: values.owningTeamId,
     repositoryId: values.repositoryId,
