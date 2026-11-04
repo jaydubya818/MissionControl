@@ -99,7 +99,11 @@ jobs:
           pnpm run lint
 
       - name: Guard public Convex runtime contracts
-        run: pnpm run ci:runtime-contract
+        run: |
+          if [[ -z "$RUNTIME_CONTRACT_BASE_SHA" || "$RUNTIME_CONTRACT_BASE_SHA" =~ ^0{40}$ ]]; then
+            export RUNTIME_CONTRACT_BASE_SHA="$(git rev-parse origin/main)"
+          fi
+          pnpm run ci:runtime-contract
         env:
           RUNTIME_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
@@ -260,7 +264,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Enforce dependency and credential policy
-        run: pnpm run release:security
+        run: |
+          if [[ -z "$AUTHORIZATION_BASE_SHA" || "$AUTHORIZATION_BASE_SHA" =~ ^0{40}$ ]]; then
+            export AUTHORIZATION_BASE_SHA="$(git rev-parse origin/main)"
+          fi
+          pnpm run release:security
         env:
           AUTHORIZATION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
