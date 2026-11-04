@@ -40,6 +40,21 @@ export const seed = mutation({ args: {}, handler: async ctx => {
   await ctx.db.insert("roleAssignments", { operatorId: otherOperatorId, roleId: otherRoleId, assignedAt: now });
   return { tenantId, projectId, operatorId, authorId, peerId, authorMemberId, memberId, teamId, environmentId, otherProjectId };
 } });
+// Synthetic delivery records only; the canonical owner update still validates
+// assignment, team membership and repository scope before changing a Mission.
+export const deliveryScope = mutation({ args: { projectId: v.id("projects") }, handler: async (ctx, {projectId}) => {
+  await owner(ctx);
+  const project = await ctx.db.get(projectId);
+  if (project?.slug !== "unpublished-handoff") throw Error("SYNTHETIC_PROJECT_REQUIRED");
+  const now = Date.now(), tenantId = project.tenantId;
+  const repositoryId = await ctx.db.insert("workspaceRepositories", { tenantId, projectId, provider: "LOCAL",
+    repository: "local-qualification/draft-scope", displayName: "Synthetic draft scope", defaultBranch: "main",
+    isDefault: false, status: "CONFIGURED", webhookStatus: "MISSING", dataClassification: "PUBLIC", createdAt: now, updatedAt: now });
+  const codeScopeId = await ctx.db.insert("repositoryCodeScopes", { tenantId, projectId, repositoryId,
+    name: "Synthetic draft scope", slug: "draft", includePaths: ["README.md"], excludePaths: [],
+    requiredReviewers: [], allowedEnvironments: ["LOCAL"], active: true, createdAt: now, updatedAt: now });
+  return { repositoryId, codeScopeId };
+} });
 export const inspect = query({ args: { table: v.string() }, handler: async (ctx, { table }) => {
   await owner(ctx);
   if (!["workflowRuns", "workOrders", "runArtifacts", "runEvents", "factoryWorkers", "verificationReceipts", "verificationRuns", "qualityGateDecisions", "evidenceEnvelopes", "serviceCommandReceipts", "missionHandoffs", "validationAssertions", "roleAssignments", "teamMemberships", "inferenceReservations", "factoryProviderReservations", "factoryDelegationTrials"].includes(table)) throw Error("FIXTURE_TABLE_DENIED");
