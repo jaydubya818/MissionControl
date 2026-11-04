@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID, randomBytes, createHash, createHmac } from "node:crypto";
 import { canonicalServiceCommand } from "../../packages/shared/src/serviceCommandEnvelope.ts";
 import { enterpriseDigest } from "../../packages/shared/src/sofieEnterprise.ts";
+const ownerDenied = /ENTERPRISE_ACCESS_DENIED|MISSION_UNAVAILABLE|AUTHENTICATED_PRINCIPAL_REQUIRED|AUTH_REQUIRED|FORBIDDEN|PERMISSION/;
 
 export async function prepareOwnerReviewFixture(db, options = {}) {
   const s = db.seed,
@@ -78,6 +79,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
     for (const client of [db.anonymous, db.peer, db.other]) {
       await assert.rejects(() =>
         mutate("sofieOwnerReview:inspect", binding, client),
+        ownerDenied,
       );
       await assert.rejects(() =>
         mutate(
@@ -89,6 +91,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
           },
           client,
         ),
+        ownerDenied,
       );
     }
     await assert.rejects(() =>
@@ -96,6 +99,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
         ...binding,
         expectedDigest: "sha256:" + "0".repeat(64),
       }),
+      /ENTERPRISE_ACCESS_DENIED/,
     );
     await assert.rejects(() =>
       command({
@@ -103,6 +107,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
         proposalId: proposal.proposalId,
         proposalDigest: proposal.digest,
       }),
+      error => error.status === 'denied' || /ENTERPRISE_ACCESS_DENIED|ENTERPRISE_COMMAND_DENIED/.test(error.message),
     );
     assert.equal(
       (await mutate("sofieOwnerReview:inspect", binding)).status,
@@ -194,6 +199,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
     for (const client of [db.anonymous, db.peer, db.other])
       await assert.rejects(() =>
         mutate("sofieOwnerReview:decideResult", args, client),
+        ownerDenied,
       );
     for (const patch of [
       { expectedPlanDigest: "sha256:" + "0".repeat(64) },
@@ -202,6 +208,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
     ])
       await assert.rejects(() =>
         mutate("sofieOwnerReview:decideResult", { ...args, ...patch }),
+        /ENTERPRISE_ACCESS_DENIED|ENTERPRISE_PLAN_STALE|ENTERPRISE_RESULT_STALE|ArgumentValidationError/,
       );
     await mutate("sofieOwnerReview:authorizeResultRead", {
       ...binding,
@@ -220,6 +227,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
         decision: "REJECT",
         reason: "",
       }),
+      /A rejection reason is required/,
     );
     await mutate("sofieOwnerReview:authorizeResultRead", { ...binding, missionId, expectedPlanDigest: args.expectedPlanDigest });
     const readAudits = (await db.owner.query("missions:get", { missionId })).events.filter(e => e.eventType === "SOFIE_RESULT_READ_AUTHORIZED");
@@ -235,6 +243,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
         decision: "REJECT",
         reason: "Changed replay",
       }),
+      /ENTERPRISE_ACCESS_DENIED/,
     );
     const after = await mutate("sofieOwnerReview:inspect", binding);
     assert.equal(after.result.ownerAcceptance, reject ? "PENDING" : "ACCEPTED");
@@ -283,6 +292,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
       proposalId: proposal?.proposalId,
       missionId,
       authentication: "SYNTHETIC_API_FIXTURE",
+      intakeTransport: options.applicationCommand ? "MYEVE_ACTION_GATEWAY" : "SIGNED_FIXTURE_ONLY",
       setup: { deliveryScopeBudgetAndEnvironment: "CANONICAL_OWNER_UPDATE_DRAFT", workloadTag: "DISPOSABLE_FIXTURE_METADATA_PATCH_ONLY", proposalDigestScope: "INTAKE_IDENTITY;_OWNER_AMENDS_SCOPE_AND_BUDGET_BEFORE_PLAN" },
       browserOwnerJourney: "NOT_RUN",
       releaseGate: "ADVISORY",

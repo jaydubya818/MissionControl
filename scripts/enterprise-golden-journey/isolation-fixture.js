@@ -135,3 +135,28 @@ export const clearCapacityPeers = fixtureMutation({args:{missionId:v.id("mission
  for(const id of args.runIds){const run=await ctx.db.get(id);if(run?.missionId!==args.missionId||run.metadata?.workerCapacityFixture!==true)throw Error("SYNTHETIC_CAPACITY_SCOPE_REQUIRED");await ctx.db.delete(id);}
  await ctx.db.delete(args.missionId);
 }});
+
+export const repositoryMutationPeer = fixtureMutation({args:{workOrderId:v.id("workOrders")},handler:async(ctx,args)=>{
+ await owner(ctx);
+ const source=await ctx.db.get(args.workOrderId),mission=source?.missionId&&await ctx.db.get(source.missionId);
+ const project=source?.projectId&&await ctx.db.get(source.projectId);
+ if(!source?.repositoryId||!mission||project?.metadata?.synthetic!==true)throw Error("SYNTHETIC_REPOSITORY_SCOPE_REQUIRED");
+ const peer=(await ctx.db.query("operators").collect()).find(row=>row.tenantId===source.tenantId&&row.authId==="fixture-peer");
+ if(!peer)throw Error("SYNTHETIC_PEER_REQUIRED");
+ const required=(table,row)=>Object.fromEntries(Object.entries(schema.tables[table].validator.json.value).filter(([,field])=>!field.optional).map(([key])=>[key,row[key]]));
+ const metadata={repositoryMutationFixture:true};
+ const missionId=await ctx.db.insert("missions",{...required("missions",mission),tenantId:source.tenantId,projectId:source.projectId,ownerOperatorId:peer._id,state:"DRAFT",metadata});
+ const workOrderId=await ctx.db.insert("workOrders",{...required("workOrders",source),tenantId:source.tenantId,projectId:source.projectId,missionId,repositoryId:source.repositoryId,isMutating:true,metadata});
+ // A pending, unclaimed zero-exposure run is valid without an execution grant.
+ const runId="private-repository-mutation-"+missionId;
+ const workflowRunId=await ctx.db.insert("workflowRuns",{runId,workflowId:source.workflowId,tenantId:source.tenantId,projectId:source.projectId,missionId,workOrderId,repositoryId:source.repositoryId,
+  status:"PENDING",isMutating:true,currentStepIndex:0,totalSteps:0,steps:[],context:{},initialInput:"Synthetic repository lock regression",startedAt:Date.now(),spentUsd:0,reservedCostUsd:0,metadata});
+ return {missionId,workOrderId,workflowRunId,runId};
+}});
+export const clearRepositoryMutationPeer = fixtureMutation({args:{missionId:v.id("missions"),workOrderId:v.id("workOrders"),workflowRunId:v.id("workflowRuns")},handler:async(ctx,args)=>{
+ await owner(ctx);
+ const mission=await ctx.db.get(args.missionId),wo=await ctx.db.get(args.workOrderId),run=await ctx.db.get(args.workflowRunId);
+ if(mission?.metadata?.repositoryMutationFixture!==true||wo?.missionId!==mission._id||run?.missionId!==mission._id||run.workOrderId!==wo._id
+  ||wo.metadata?.repositoryMutationFixture!==true||run.metadata?.repositoryMutationFixture!==true)throw Error("SYNTHETIC_REPOSITORY_SCOPE_REQUIRED");
+ await ctx.db.delete(run._id);await ctx.db.delete(wo._id);await ctx.db.delete(mission._id);
+}});

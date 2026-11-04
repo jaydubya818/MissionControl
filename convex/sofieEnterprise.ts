@@ -160,7 +160,11 @@ export async function projectMission(ctx: MutationCtx, mission: Doc<'missions'>,
       milestones: plan.workOrderBlueprints.map(b => ({ id: b.id, title: b.title, dependsOn: b.dependsOnBlueprintIds })) } : null,
     plans: plans.slice(0,20).map(p => ({ id:p._id, revision:p.revisionNumber, status:p.status, digest:enterpriseDigest(p), isCurrent:mission.currentPlanId===p._id })),
     workOrders, blockers: [mission.blockingReason, ...workOrders.map(w => w.blockingIssue)].filter(Boolean),
-    needsYou: mission.requiredHumanAction ?? (mission.state === 'DRAFT' ? 'Assign owner, team, repository, code scope and budget before preparing a Plan.' : ['PLANNING','AWAITING_PLAN_APPROVAL'].includes(mission.state) ? 'Review and approve the canonical Plan before execution.' : null),
+    needsYou: mission.requiredHumanAction ?? (mission.state === 'DRAFT'
+      ? mission.ownerMemberId && mission.owningTeamId && mission.repositoryId && mission.codeScopeIds?.length && mission.budgetUsd !== undefined && mission.executionEnvironment
+        ? 'Prepare and review the canonical Plan.'
+        : 'Assign owner, team, repository, code scope, budget and execution environment before preparing a Plan.'
+      : ['PLANNING','AWAITING_PLAN_APPROVAL'].includes(mission.state) ? 'Review and approve the canonical Plan before execution.' : null),
     resultProof: { status: 'NOT_AVAILABLE', reason: 'COMPLETED_RESULT_REQUIRES_SCOPED_READ', references: proof },
     truncated: rows.length > 100 || proofRows.length > 100 || plans.length > 20, executionAuthority: 'NONE',
     explanation: 'Factory success is evidence. Enterprise acceptance requires the current canonical Quality Contract and independent verification. This response grants no execution or spending authority.' };

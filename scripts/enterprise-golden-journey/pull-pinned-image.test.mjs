@@ -31,3 +31,18 @@ it('rejects a mutable image tag before invoking Docker', async () => {
   await expect(pullPinnedImage('node:24', { pull })).rejects.toThrow('Immutable image digest required');
   expect(pull).not.toHaveBeenCalled();
 });
+
+it('does not mistake digest text for a transient HTTP status', async () => {
+  const digestImage = image.replace('a'.repeat(64), '429' + 'a'.repeat(61));
+  const pull = vi.fn(() => { throw new Error(`Command failed: docker pull ${digestImage}\nunauthorized`); });
+  const wait = vi.fn();
+  await expect(pullPinnedImage(digestImage, { pull, wait })).rejects.toThrow('unauthorized');
+  expect(pull).toHaveBeenCalledTimes(1);
+  expect(wait).not.toHaveBeenCalled();
+});
+
+it.each(['HTTP 429 Too Many Requests', 'status code: 429'])('retries an explicit rate-limit status: %s', async stderr => {
+  const pull = vi.fn().mockImplementationOnce(() => { throw Object.assign(new Error('pull failed'), { stderr }); }).mockReturnValue('pulled');
+  await expect(pullPinnedImage(image, { pull, wait: vi.fn(), warn: vi.fn() })).resolves.toBe('pulled');
+  expect(pull.mock.calls).toEqual([[image], [image]]);
+});

@@ -12,7 +12,7 @@ import { NO_INFERENCE_CONSTRAINT } from "./lib/offlineExecutionPolicy";
 import { deterministicFactoryVersionIssues } from "./lib/factoryWorkflowContract";
 import { factoryVersionExecutionProfileProjection } from "./lib/executionProfileAdmission";
 import { v } from "convex/values";
-import { internalMutation, mutation, query, reviewerMutation } from "./lib/missionScopedFunctions";
+import { internalMutation, mutation, query, reviewerMutation, missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -4366,7 +4366,7 @@ async function resolveFactoryDispatchBinding(
         purpose: version.purpose ?? "SOFTWARE", agentBindings: version.agentBindings ?? [], deterministicOperation: version.deterministicOperation } });
   const activeStatuses = ["PENDING", "RUNNING", "PAUSED"] as const;
   const activeRuns = repository
-    ? (await Promise.all(activeStatuses.map((status) => ctx.db.query("workflowRuns")
+    ? (await Promise.all(activeStatuses.map((status) => missionAuthorityDatabase(ctx).query("workflowRuns")
         .withIndex("by_repository_status", (q) => q.eq("repositoryId", repository._id).eq("status", status))
         .collect()))).flat()
     : [];

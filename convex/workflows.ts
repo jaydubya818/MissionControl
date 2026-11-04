@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action, internalAction } from "./lib/missionScopedFunctions";
+import { mutation, query, action, internalAction, missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 import { Doc, Id } from "./_generated/dataModel";
 import { workflowDefinitionChanged } from "./lib/workflowSnapshot";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
@@ -336,17 +336,18 @@ export const remove = mutation({
     }
     
     // Check if there are any active runs
-    const activeRuns = await ctx.db
+    const activeRun = await missionAuthorityDatabase(ctx)
       .query("workflowRuns")
       .withIndex("by_workflow_id", (q) => q.eq("workflowId", args.workflowId))
       .filter((q) => q.or(
         q.eq(q.field("status"), "RUNNING"),
-        q.eq(q.field("status"), "PENDING")
+        q.eq(q.field("status"), "PENDING"),
+        q.eq(q.field("status"), "PAUSED")
       ))
-      .collect();
+      .first();
     
-    if (activeRuns.length > 0) {
-      throw new Error(`Cannot delete workflow with ${activeRuns.length} active runs`);
+    if (activeRun) {
+      throw new Error("Cannot delete workflow with active runs");
     }
     
     await ctx.db.delete(workflow._id);

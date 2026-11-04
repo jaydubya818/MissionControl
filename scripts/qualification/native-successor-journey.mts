@@ -296,6 +296,15 @@ try {
     const dispatchArgs = { workOrderId: workOrder._id, taskId, workflowId: 'native-successor-producer', actorType: 'HUMAN', idempotencyKey: 'native-successor-dispatch',
       repositoryId, codeScopeIds: [scope.scopeId], owningTeamId: s.teamId, ownerMemberId: s.memberId, executionEnvironment: 'LOCAL', executorHostId: hostId,
       factoryDefinitionVersionId: factories.producer.versionId };
+    await step('privateRepositoryMutationLock', async () => {
+      const peer = await mutate('isolationFixture:repositoryMutationPeer', { workOrderId: workOrder._id });
+      try {
+        assert.equal(await query('workflowRuns:get', { runId: peer.runId }), null);
+        await assert.rejects(mutate('workOrders:dispatch', { ...dispatchArgs, idempotencyKey: 'private-repository-lock' }),
+          /repository-mutation-already-active/);
+      } finally { const { runId: _runId, ...ids } = peer; await mutate('isolationFixture:clearRepositoryMutationPeer', ids); }
+      return { privateRunUnreadable: true, publicDispatchDenied: true, cleanupVerified: true };
+    });
     const dispatch = await step('dispatch', () => mutate('workOrders:dispatch', dispatchArgs));
     if (!dispatch.created || !dispatch.run) throw Error('Native dispatch did not create the canonical Attempt: ' + JSON.stringify(dispatch));
     state.producerAttemptId = dispatch.run._id;

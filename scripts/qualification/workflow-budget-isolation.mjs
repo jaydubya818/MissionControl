@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { startFixtureDatabase } from '../enterprise-compatibility/database.mjs';
 const output=resolve(process.argv[2]);await mkdir(output,{recursive:true});
-const receipt={source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),checks:[],status:'IN_PROGRESS',scope:'DISPOSABLE_TWO_MISSION_BACKEND'};
+const receipt={recordedAt:new Date().toISOString(),runId:randomUUID(),source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),checks:[],status:'IN_PROGRESS',scope:'DISPOSABLE_TWO_MISSION_BACKEND'};
 const db=await startFixtureDatabase(process.cwd(),{nativeExecution:true});
 try {
  const s=db.seed,mutate=(name,args)=>db.owner.mutation(name,args);
@@ -41,6 +42,15 @@ try {
  await check('executor-binding-counts-private-team-runs',async()=>{
    const binding=await mutate('softwareFactoryControlPlane:bindExecutor',{workflowRunId:visible.workflowRunId,hostId:'capacity-fixture',executionEnvironment:'LOCAL',checkpointSummary:'Capacity check',budgetUsd:0.1,stopCondition:'No execution',escalationOwner:'Qualification owner'});
    assert.equal(binding.success,false);assert.ok(binding.reasonCodes.includes('TEAM_CONCURRENCY_LIMIT_REACHED'),JSON.stringify(binding));
+ });
+ await check('workflow-deletion-denied-with-private-active-run',async()=>{
+   const workflow=await db.owner.query('nativeFixture:inspectRecord',{id:hidden.workflowId});
+   await fault(hidden.workflowRunId,{workflowId:workflow.workflowId});
+   await assert.rejects(mutate('workflows:remove',{workflowId:workflow.workflowId}),/Cannot delete workflow with.*active runs/);
+   await fault(hidden.workflowRunId,{status:'PAUSED'});
+   await assert.rejects(mutate('workflows:remove',{workflowId:workflow.workflowId}),/Cannot delete workflow with.*active runs/);
+   await fault(hidden.workflowRunId,{status:'RUNNING'});
+   assert.equal(await db.owner.query('workflowRuns:get',{runId:'hidden-budget-run'}),null);
  });
  await check('workspace-kill-cancels-private-unleased-runs',async()=>{
    await mutate('operatorControls:setMode',{projectId:s.projectId,mode:'KILLED',userId:String(s.operatorId),reason:'Synthetic global stop regression'});

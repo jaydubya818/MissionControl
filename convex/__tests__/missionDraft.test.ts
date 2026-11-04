@@ -50,4 +50,10 @@ describe("Mission draft mutation contract", () => {
     expect(() => assertMissionDraftWorkspace(mission, "workspace-2"))
       .toThrow("Mission does not belong to the active workspace");
   });
+
+  it("does not audit an omitted environment as a change", () => {
+    expect(changedMissionDraftFields({ ...validDraft, executionEnvironment: "LOCAL" }, {
+      ...validDraft, title: "Changed title",
+    })).toEqual(["title"]);
+  });
 });

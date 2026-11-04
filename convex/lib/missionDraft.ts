@@ -75,6 +75,7 @@ export function changedMissionDraftFields(
   next: MissionDraftInput
 ): string[] {
   return DRAFT_FIELDS.filter((field) => {
+    if (!Object.prototype.hasOwnProperty.call(next, field)) return false;
     const before = mission[field];
     const after = next[field];
     return JSON.stringify(before ?? null) !== JSON.stringify(after ?? null);

@@ -13,7 +13,7 @@ export async function pullPinnedImage(image, {
     try { return pull(image); }
     catch (error) {
       const diagnostic = `${error.message ?? ''}\n${error.stderr ?? ''}`;
-      if (attempt === 2 || !/toomanyrequests|rate exceeded|429|connection reset|TLS handshake timeout|i\/o timeout|temporary failure in name resolution/i.test(diagnostic)) throw error;
+      if (attempt === 2 || !/toomanyrequests|rate exceeded|\b(?:HTTP(?:\/\d(?:\.\d)?)?\s+|status(?:\s+code)?[:=]?\s*)429\b|connection reset|TLS handshake timeout|i\/o timeout|temporary failure in name resolution/i.test(diagnostic)) throw error;
       const milliseconds = (attempt + 1) * 10000;
       warn(`Transient registry failure; retrying the same pinned image in ${milliseconds / 1000}s (attempt ${attempt + 2}/3).`);
       await wait(milliseconds);

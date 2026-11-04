@@ -163,7 +163,7 @@ export function MissionDraftForm({
             onChange={(event) => setField("executionEnvironment", event.target.value as MissionDraftValues["executionEnvironment"])}
             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
           >
-            <option value="">Choose execution environment</option>
+            <option value="" disabled>Choose execution environment</option>
             <option value="LOCAL">Local</option>
             <option value="CLOUD">Cloud</option>
             <option value="REMOTE">Remote</option>
