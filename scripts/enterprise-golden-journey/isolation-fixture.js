@@ -73,7 +73,7 @@ export const seed = fixtureMutation({ args: { scope: v.any(), sourceMissionId: v
   const repositoryId=await insert("workspaceRepositories",{tenantId,projectId});
   const codeScopeId=await insert("repositoryCodeScopes",{tenantId,projectId,repositoryId,active:true});
   const webhookId=await insert("githubWebhookDeliveries",{tenantId,projectId,repositoryId,deliveryId:"private-delivery-"+String(missionId).slice(-8),event:"pull_request_review",signatureStatus:"VALID",result:"Private Mission review "+prUrl,error:"Private Mission error "+prUrl,attemptCount:1});
-  return { legacyMonitoringAlertId,legacyPerformanceAlertId,legacyBudgetAlertId,runId,qcRunId,qcArtifactId,costAlertId,legacyCostAlertId,agentId,codeScopeId,repositoryId,webhookId,privateEntity,sharedEntity,privateEdge,privateNode,sharedNode,logicalEdge,prUrl,missionId, workOrderId, taskId, workflowId, workflowRunId, artifactId, eventId, auditId, memberId, authorMemberId,relationId,packageId,documentId,chunkId };
+  return { legacyMonitoringAlertId,legacyPerformanceAlertId,legacyBudgetAlertId,runId,qcRunId,qcArtifactId,costAlertId,legacyCostAlertId,agentId,codeScopeId,repositoryId,webhookId,privateEntity,sharedEntity,privateEdge,privateNode,sharedNode,logicalEdge,prUrl,missionId, workOrderId, taskId, workflowId, workflowKey, workflowRunId, artifactId, eventId, auditId, memberId, authorMemberId,relationId,packageId,documentId,chunkId };
 } });
 export const read = query({ args: { id:v.string() }, handler: (ctx,{id}) => ctx.db.get(id) });
 export const contribute = contributorMutation({ args: { id:v.id("missions"), title:v.string() }, handler: (ctx,{id,title}) => ctx.db.patch(id,{title}) });

@@ -71,7 +71,7 @@ try {
  const peerFixture=await db.owner.mutation('isolationFixture:seed',{scope:{...s,operatorId:s.peerId},sourceMissionId:f.missionId});
  await check('failure projections do not aggregate different owners',async()=>{
   await db.owner.mutation('isolationFixture:fault',{id:f.workflowRunId,patch:{status:'FAILED'}});
-  await db.owner.mutation('isolationFixture:fault',{id:peerFixture.workflowRunId,patch:{status:'FAILED',workflowId:f.workflowId}});
+  await db.owner.mutation('isolationFixture:fault',{id:peerFixture.workflowRunId,patch:{status:'FAILED',workflowId:f.workflowKey}});
   const a=await db.owner.mutation('factory/metaLoop:ingestWorkflowFailure',{workflowRunId:f.workflowRunId});
   const b=await db.peer.mutation('factory/metaLoop:ingestWorkflowFailure',{workflowRunId:peerFixture.workflowRunId});
   assert.notEqual(a.suggestionId,b.suggestionId);
@@ -108,10 +108,10 @@ try {
   assert.equal(unresolved.reason,'source-scope-unresolved');
  });
  await db.owner.mutation('isolationFixture:fault',{id:f.workflowRunId,patch:{startedAt:Date.now()-1000}});
- await db.owner.mutation('workflowMetrics:updateMetrics',{workflowId:f.workflowId,projectId:s.projectId});
+ await db.owner.mutation('workflowMetrics:updateMetrics',{workflowId:f.workflowKey,projectId:s.projectId});
  await db.owner.mutation('agentLearning:recordTaskCompletion',{taskId:f.taskId,success:true,costUsd:1});
  const metricsVisible=async(client,visible)=>{
-  assert.equal(Boolean(await client.query('workflowMetrics:getWorkflowMetrics',{workflowId:f.workflowId,projectId:s.projectId})),visible);
+  assert.equal(Boolean(await client.query('workflowMetrics:getWorkflowMetrics',{workflowId:f.workflowKey,projectId:s.projectId})),visible);
   assert.equal((await client.query('agentLearning:getAgentPerformance',{agentId:f.agentId})).totalCompleted,visible?1:0);
  };
  await check('workflow and agent metric caches retain private source lineage',async()=>{
