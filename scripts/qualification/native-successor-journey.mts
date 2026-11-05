@@ -574,22 +574,27 @@ try {
         isolatedEnterpriseQualification: true, idempotencyKey: 'hybrid-integration-accept' }));
       assert.equal(accepted.accepted, true);
       await handoff(integrationWO._id, integrationDispatch.run._id, 'integration-proof', integrationArtifacts.filter((a: any) => a.workflowRunId === integrationDispatch.run._id).map((a: any) => a._id));
+      const ownerRejected = Boolean(ownerReview && process.env.MC_OWNER_REVIEW_DECISION === 'REJECT');
+      const acceptOwnerResult = async () => {
+        const ownerReadback = await step('sofieNeedsYou', () => sofie.readback(missionId));
+        assert.equal(ownerReadback.state, 'AWAITING_ACCEPTANCE');
+        assert.equal(ownerReadback.acceptanceEligible, true);
+        assert.ok(ownerReadback.needsYou);
+        for (const client of [db.other, db.anonymous, db.peer]) assert.equal(await query('missions:get', { missionId }, client), null);
+        await step('missionReadIsolation', async () => ({ crossTenant: 'DENIED', anonymous: 'DENIED',
+          sameTenantOtherOwner: 'DENIED', strictOwnerIsolation: 'PASS' }));
+        const missionAcceptance = await step('hybridMissionAcceptance', () => sofie.accept(missionId, s.operatorId));
+        assert.equal(missionAcceptance.mission.state, ownerRejected ? 'BLOCKED' : 'DONE');
+        if (ownerRejected) await assert.rejects(() => mutate('missions:accept', { missionId, acceptedBy:s.operatorId, idempotencyKey:'reject-cannot-accept' }));
+      };
+      const acceptBeforeSecurity = Boolean(resultConsumer && process.env.MYEVE_RESULT_SECURITY_COHORT
+        && process.env.MYEVE_CHECKPOINT_H_BROWSER !== '1' && !ownerRejected);
       if (resultConsumer) await step('completedEnterpriseResultConsumer', () => process.env.MYEVE_CHECKPOINT_H_BROWSER === '1'
         ? db.captureCompletedResultTiming(() => resultConsumer.qualify(missionId), async (evidence: any) => {
           state.completedResultFunctionTiming = evidence;
           await writeFile(join(output, 'completed-result-function-timing.json'), JSON.stringify(evidence, null, 2) + '\n');
-        }) : resultConsumer.qualify(missionId));
-      const ownerReadback = await step('sofieNeedsYou', () => sofie.readback(missionId));
-      assert.equal(ownerReadback.state, 'AWAITING_ACCEPTANCE');
-      assert.equal(ownerReadback.acceptanceEligible, true);
-      assert.ok(ownerReadback.needsYou);
-      for (const client of [db.other, db.anonymous, db.peer]) assert.equal(await query('missions:get', { missionId }, client), null);
-      await step('missionReadIsolation', async () => ({ crossTenant: 'DENIED', anonymous: 'DENIED',
-        sameTenantOtherOwner: 'DENIED', strictOwnerIsolation: 'PASS' }));
-      const missionAcceptance = await step('hybridMissionAcceptance', () => sofie.accept(missionId, s.operatorId));
-      const ownerRejected = Boolean(ownerReview && process.env.MC_OWNER_REVIEW_DECISION === 'REJECT');
-      assert.equal(missionAcceptance.mission.state, ownerRejected ? 'BLOCKED' : 'DONE');
-      if (ownerRejected) await assert.rejects(() => mutate('missions:accept', { missionId, acceptedBy:s.operatorId, idempotencyKey:'reject-cannot-accept' }));
+        }) : resultConsumer.qualify(missionId, acceptBeforeSecurity ? {beforeSecurity: acceptOwnerResult} : undefined));
+      if (!acceptBeforeSecurity) await acceptOwnerResult();
       if (ownerReview) await step('linkedOwnerReview', async () => ownerReview.report());
       await db.restart();
       const finalAccounting = await step('hybridDurableAccounting', () => query('factory/nativeAccounting:readback', { workflowRunId: integrationDispatch.run._id }));
