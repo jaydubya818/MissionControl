@@ -101,6 +101,7 @@ try {
     await vitest('enterprise-contracts', ['convex/__tests__/enterpriseDelegationAdmission.test.ts', 'convex/__tests__/enterpriseMissionOwner.test.ts', 'convex/__tests__/missionWorkOrderContract.test.ts', 'convex/__tests__/missionGovernance.test.ts', 'convex/__tests__/qualificationGateScope.test.ts']);
   } else if (suite === 'database-concurrency') {
     await database(); await node('policy-completion-authority', 'scripts/qualification/policy-completion-authority.mjs', [join(output, 'policy-completion-authority')]);
+    await node('policy-principal-compatibility', 'scripts/qualification/policy-principal-compatibility.mjs', [join(output, 'policy-principal-compatibility')]);
     await node('approval-authority', 'scripts/qualification/approval-authority.mjs', [join(output, 'approval-authority')]);
     await node('workflow-entry-authorization', 'scripts/qualification/workflow-entry-authorization.mjs', [join(output, 'workflow-entry-authorization')]);
     await node('legacy-workspace-authorization', 'scripts/qualification/legacy-workspace-authorization.mjs', [join(output, 'legacy-workspace-authorization')]);

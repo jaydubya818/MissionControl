@@ -4,8 +4,9 @@ vi.mock('../lib/companyAccess', () => ({
   FACTORY_PERMISSIONS:{VIEW:'factory.read',MANAGE_AUTOMATION:'factory.automation.manage'},
   requireWorkspaceAccess:vi.fn(async()=>undefined),
   requireWorkspacePermission:vi.fn(async()=>undefined),
+  requireCompanyAccess:vi.fn(async()=>undefined),
 }));
-import { requireWorkspacePermission, requireWorkspaceAccess } from '../lib/companyAccess';
+import { requireWorkspacePermission, requireWorkspaceAccess, requireCompanyAccess } from '../lib/companyAccess';
 import { legacyWorkspaceAccess } from '../lib/legacyWorkspaceAccess';
 const row=(id:string)=>({_id:id,projectId:'workspace'});
 const create=()=>legacyWorkspaceAccess({auth:{getUserIdentity:async()=>({subject:'owner'})}} as any,async()=>({tenantId:'tenant'}),{tableOf:()=>null,references:()=>[]});
@@ -30,5 +31,13 @@ describe('request-scoped legacy workspace permission cache',()=>{
   vi.mocked(requireWorkspacePermission).mockRejectedValueOnce(new Error('revoked'));
   (access as typeof access & {invalidate():void}).invalidate();
   expect(await access(row('after'),'tasks',false)).toBe(false);
+ });
+ it('reads defaults for an authenticated subject with multiple company operators',async()=>{
+  const operators=[{active:false,tenantId:'inactive'},{active:true,tenantId:'denied'},{active:true,tenantId:'allowed'}];
+  vi.mocked(requireCompanyAccess).mockImplementation(async(_ctx,tenant)=>{if(tenant==='denied')throw Error('no membership');return undefined as any;});
+  const ctx:any={auth:{getUserIdentity:async()=>({subject:'multi-company'})},db:{query:()=>({withIndex:()=>({collect:async()=>operators})})}};
+  const access=legacyWorkspaceAccess(ctx,async()=>null,{tableOf:()=>null,references:()=>[]});
+  expect(await access({_id:'platform-default'},'policies',false)).toBe(true);
+  expect(requireCompanyAccess).toHaveBeenCalledTimes(2);
  });
 });

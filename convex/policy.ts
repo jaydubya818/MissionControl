@@ -669,7 +669,7 @@ export const evaluateWithARM = mutation({
 
     const envelopeDecision = await evaluatePolicyEnvelopes(ctx.db as any, {
       tenantId: effectiveTenantId,
-      projectId: legacyAgent?.projectId,
+      projectId,
       versionId: resolved?.versionId,
       toolName: args.toolName,
       riskLevel: risk,

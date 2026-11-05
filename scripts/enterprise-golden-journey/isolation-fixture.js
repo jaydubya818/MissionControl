@@ -1,9 +1,10 @@
 import { requireServiceAttemptAuthority } from "./lib/missionServiceAuthority";
 // Deployed only to the disposable qualification database.
 import { makeFunctionReference, mutationGeneric as fixtureMutation, internalMutationGeneric as fixtureInternalMutation } from "convex/server";
-import { query, contributorMutation, missionScopedContext } from "./lib/missionScopedFunctions";
+import { query, mutation, contributorMutation, missionScopedContext } from "./lib/missionScopedFunctions";
 import { v } from "convex/values";
 import schema from "./schema";
+import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS } from "./lib/companyAccess";
 async function owner(ctx) {
   if (process.env.MC_NATIVE_SUCCESSOR_QUALIFICATION !== "1" || (await ctx.auth.getUserIdentity())?.subject !== "user_SyntheticHandoffQualification") throw Error("FIXTURE_DENIED");
 }
@@ -76,6 +77,21 @@ export const seed = fixtureMutation({ args: { scope: v.any(), sourceMissionId: v
   return { legacyMonitoringAlertId,legacyPerformanceAlertId,legacyBudgetAlertId,runId,qcRunId,qcArtifactId,costAlertId,legacyCostAlertId,agentId,codeScopeId,repositoryId,webhookId,privateEntity,sharedEntity,privateEdge,privateNode,sharedNode,logicalEdge,prUrl,missionId, workOrderId, taskId, workflowId, workflowKey, workflowRunId, artifactId, eventId, auditId, memberId, authorMemberId,relationId,packageId,documentId,chunkId };
 } });
 export const read = query({ args: { id:v.string() }, handler: (ctx,{id}) => ctx.db.get(id) });
+export const policyReferenceProbe = mutation({ args: { policyEnvelopeId:v.id('policyEnvelopes') }, handler: (ctx,args) => ctx.db.get(args.policyEnvelopeId) });
+export const nonAdminMissionPrincipal = fixtureInternalMutation({args:{scope:v.any()},handler:async(ctx,{scope:s})=>{
+ await owner(ctx);const operator=await ctx.db.get(s.operatorId),project=await ctx.db.get(s.projectId);
+ if(operator?.authId!==(await ctx.auth.getUserIdentity())?.subject||operator.tenantId!==s.tenantId||project?.tenantId!==s.tenantId)throw Error('Fixture identity mismatch');
+ for(const assignment of await ctx.db.query('roleAssignments').withIndex('by_operator',q=>q.eq('operatorId',operator._id)).collect())await ctx.db.delete(assignment._id);
+ const permissions=[...Object.values(COMPANY_PERMISSIONS),...Object.values(FACTORY_PERMISSIONS)].filter(permission=>permission!==COMPANY_PERMISSIONS.MANAGE_COMPANY);
+ const roleId=await ctx.db.insert('roles',{tenantId:s.tenantId,name:'Non-admin Mission principal',permissions});
+ await ctx.db.insert('roleAssignments',{operatorId:operator._id,roleId,assignedAt:Date.now(),scope:{type:'project',id:s.projectId}});
+ return {operatorId:operator._id,roleId,permissions,companyAdministration:false};
+}});
+export const policyWorkspaceProbe = fixtureInternalMutation({args:{},handler:async ctx=>{
+ if(process.env.MC_NATIVE_SUCCESSOR_QUALIFICATION!=='1'||(await ctx.auth.getUserIdentity())?.subject!=='fixture-peer')throw Error('FIXTURE_DENIED');
+ const operators=await ctx.db.query('operators').withIndex('by_auth_id',q=>q.eq('authId','fixture-peer')).collect();
+ return Promise.all(operators.map(async operator=>({operator,assignments:await ctx.db.query('roleAssignments').withIndex('by_operator',q=>q.eq('operatorId',operator._id)).collect(),members:await ctx.db.query('orgMembers').withIndex('by_operator',q=>q.eq('operatorId',operator._id)).collect(),teams:await ctx.db.query('teamMemberships').withIndex('by_operator',q=>q.eq('operatorId',operator._id)).collect()})));
+}});
 export const contribute = contributorMutation({ args: { id:v.id("missions"), title:v.string() }, handler: (ctx,{id,title}) => ctx.db.patch(id,{title}) });
 export const fault = fixtureMutation({ args: { id:v.string(), patch:v.any(), unset:v.optional(v.array(v.string())) }, handler: async (ctx,{id,patch,unset}) => { await owner(ctx); for(const key of unset??[]) patch[key]=undefined; await ctx.db.patch(id,patch); } });
 
@@ -164,13 +180,18 @@ export const clearRepositoryMutationPeer = fixtureMutation({args:{missionId:v.id
 
 // Disposable qualification only; this module is copied into the temporary backend.
 export const legacyDeliveryRole = fixtureInternalMutation({
- args: { operatorId:v.id('operators'), projectId:v.id('projects'), tenantId:v.id('tenants') },
+ args: { operatorId:v.id('operators'), projectId:v.id('projects'), tenantId:v.id('tenants'), detachWorkspaceMemberships:v.optional(v.boolean()) },
  handler: async(ctx,args)=>{
   const operator=await ctx.db.get(args.operatorId),project=await ctx.db.get(args.projectId);
   if(operator?.authId!=='fixture-peer'||operator.tenantId!==args.tenantId||project?.tenantId!==args.tenantId)throw Error('Fixture identity mismatch');
+  if(args.detachWorkspaceMemberships){
+   for(const row of await ctx.db.query('teamMemberships').withIndex('by_operator',q=>q.eq('operatorId',args.operatorId)).collect())if(row.projectId===args.projectId)await ctx.db.patch(row._id,{active:false});
+   for(const row of await ctx.db.query('orgMembers').withIndex('by_operator',q=>q.eq('operatorId',args.operatorId)).collect())await ctx.db.patch(row._id,{projectAccess:(row.projectAccess??[]).filter(entry=>entry.projectId!==args.projectId)});
+  }
   for(const row of await ctx.db.query('roleAssignments').withIndex('by_operator',q=>q.eq('operatorId',args.operatorId)).collect())await ctx.db.delete(row._id);
   const roleId=await ctx.db.insert('roles',{tenantId:args.tenantId,name:'Delivery-only fixture',permissions:['factory.read','delivery.write']});
-  await ctx.db.insert('roleAssignments',{operatorId:args.operatorId,roleId,assignedAt:Date.now(),scope:{type:'project',id:args.projectId}});
+  const assignmentId=await ctx.db.insert('roleAssignments',{operatorId:args.operatorId,roleId,assignedAt:Date.now(),scope:{type:'project',id:args.projectId}});
+  return {roleId,assignmentId};
  }
 });
 

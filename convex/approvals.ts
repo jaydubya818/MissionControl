@@ -1,4 +1,4 @@
-import { APPROVAL_IDENTITY_VERSION, requireApprovalActor } from "./lib/approvalIdentity";
+import { APPROVAL_IDENTITY_VERSION, hasAuthenticatedApproval, requireApprovalActor } from "./lib/approvalIdentity";
 import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
 import { internalMutation as maintenanceMutation } from "./_generated/server";
 /**
@@ -257,12 +257,14 @@ export const request = mutation({
     if (riskLevel !== "YELLOW" && riskLevel !== "RED") throw new Error("Manual approval risk must be YELLOW or RED.");
     // Check idempotency
     if (args.idempotencyKey) {
-      const existing = await ctx.db
+      const candidates = await ctx.db
         .query("approvals")
         .filter((q) => q.eq(q.field("idempotencyKey"), args.idempotencyKey))
         .filter(q => q.eq(q.field("projectId"), projectId))
         .filter(q => q.eq(q.field("requestorOperatorId"), actor.operatorId))
-        .first();
+        .collect();
+      const existing = candidates.find(row => row.actionType === args.actionType && row.expiresAt > Date.now()
+        && (["PENDING", "ESCALATED"].includes(row.status) || row.status === "APPROVED" && hasAuthenticatedApproval(row)));
       if (existing) {
         return { approval: existing, created: false };
       }

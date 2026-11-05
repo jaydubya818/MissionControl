@@ -33,6 +33,7 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
   const completedReads = new Map<string, readonly string[]>();
   let authorizationEpoch = 0;
   let pendingWrites = 0;
+  let applicationBindings: Promise<{versionId: string; policyId: string}[]> | undefined;
   let writeQueue: Promise<unknown> = Promise.resolve();
   // Existing handlers issue Promise.all writes. Serialize at this boundary so
   // each sibling validates current authority after the previous write finishes.
@@ -51,7 +52,23 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     const value = Reflect.get(target, key); return typeof value === "function" ? value.bind(target) : value;
   } }) };
   const legacyAllowed = legacyWorkspaceAccess(policyCtx as Context, read, lineage);
-  const invalidate = (id: string) => { legacyAllowed.invalidate(); rowCache.clear(); decisions.clear(); resourceDecisions.clear(); completedReads.clear(); authorizationEpoch++; };
+  const invalidate = (id: string) => { applicationBindings = undefined; legacyAllowed.invalidate(); rowCache.clear(); decisions.clear(); resourceDecisions.clear(); completedReads.clear(); authorizationEpoch++; };
+  function applicationFactoryBindings() {
+    return applicationBindings ??= (async () => {
+      if (!application?.missionId || !["enterprise.read", "enterprise.result"].includes(application.request.operation)) return [];
+      const runs = await raw.query("workflowRuns").withIndex("by_mission", q => q.eq("missionId", application.missionId as any)).take(1001);
+      if (runs.length > 1000) return [];
+      const result: {versionId: string; policyId: string}[] = [];
+      for (const run of runs) {
+        if (run.projectId !== application.connection.projectId || run.tenantId !== application.connection.tenantId
+          || !run.factoryDefinitionVersionId || !run.policyEnvelopeId) continue;
+        const version = await read(run.factoryDefinitionVersionId);
+        if (version?.policyEnvelopeId === run.policyEnvelopeId && version.projectId === run.projectId && version.tenantId === run.tenantId)
+          result.push({versionId: version._id, policyId: run.policyEnvelopeId});
+      }
+      return result;
+    })();
+  }
   function allowed(row: Row | null, capability: MissionCapability, seen = new Set<string>(), table?: string, epoch = authorizationEpoch): Promise<boolean> {
     if (epoch !== authorizationEpoch || pendingWrites) return Promise.resolve(false);
     if (capability !== "READ" || !row?._id) return evaluateAllowed(row, capability, seen, table, epoch);
@@ -80,6 +97,8 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     if (epoch !== authorizationEpoch) return false;
     if (!row) return true;
     table ??= row._id ? lineage.tableOf(row._id) ?? undefined : undefined;
+    if (application && table === "factoryDefinitionVersions"
+      && !(await applicationFactoryBindings()).some(binding => binding.versionId === row._id)) return false;
     if (application && capability !== "READ") {
       const op = application.request.operation;
       if (table === "serviceCommandReceipts") {
@@ -178,18 +197,23 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
         && row.projectId === service.projectId && row.tenantId === service.tenantId;
     }
     if (application && table === "policyEnvelopes") {
-      if (capability !== "READ" || !hasAncestor
+      if (capability !== "READ"
         || !["enterprise.read", "enterprise.result"].includes(application.request.operation)
         || row.projectId !== application.connection.projectId || row.tenantId !== application.connection.tenantId) return false;
-      // A status/Result projection can traverse an exact Mission run's policy.
-      // This grants neither direct policy reads nor access to workspace peers.
+      // The fixed status/Result projection loads verifier configuration directly.
+      // Only exact run-and-version bindings in its authenticated Mission qualify.
+      return (await applicationFactoryBindings()).some(binding => binding.policyId === row._id);
+    }
+    if (!service && !application && hasAncestor && ["policies", "policyEnvelopes"].includes(table ?? "")) {
+      if (await legacyAllowed(row, table, false)) return true;
+      // A Mission grant authorizes its dependency closure, without granting
+      // direct access to shared policy resources or their administration.
       for (const id of seen) {
-        if (lineage.tableOf(id) !== "workflowRuns") continue;
-        const run = await read(id);
-        if (run?.missionId !== application.missionId || run.policyEnvelopeId !== row._id
-          || run.projectId !== application.connection.projectId || run.tenantId !== application.connection.tenantId) continue;
-        const version = run.factoryDefinitionVersionId ? await read(run.factoryDefinitionVersionId) : null;
-        if (version?.policyEnvelopeId === row._id && version.projectId === run.projectId && version.tenantId === run.tenantId) return true;
+        const ancestor = await read(id);
+        const mission = lineage.tableOf(id) === "missions" ? ancestor
+          : ancestor?.missionId ? await read(ancestor.missionId) : null;
+        if (mission && mission.projectId === row.projectId && mission.tenantId === row.tenantId
+          && await allowed(mission, "READ", seen, "missions", epoch)) return true;
       }
       return false;
     }
@@ -324,7 +348,8 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
       if (typeof value === "string" && (key === "id" || /Ids?$/.test(key))) {
         let record;
         try { record = await read(value); } catch { continue; }
-        if (record && !await allowed(record, service ? "READ" : writeCapability, new Set(), undefined, epoch)) throw Error("MISSION_UNAVAILABLE");
+        const policyReference = ["policies", "policyEnvelopes"].includes(lineage.tableOf(value) ?? "");
+        if (record && !await allowed(record, service || policyReference ? "READ" : writeCapability, new Set(), undefined, epoch)) throw Error("MISSION_UNAVAILABLE");
       } else if (value && typeof value === "object") {
         if (Array.isArray(value)) {
           for (const item of value) await assertArguments(typeof item === "object" ? item : { id: item }, epoch);

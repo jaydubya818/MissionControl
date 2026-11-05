@@ -23,7 +23,8 @@ export function legacyWorkspaceAccess(ctx: QueryCtx | MutationCtx, read: (id: st
   }
   const permissions = new Map<string, Promise<boolean>>();
   const allows = async (row: Row, table: string | undefined, write: boolean): Promise<boolean> => {
-    if (!protectedTables.has(table ?? '') || await hasMission(row, table)) return true;
+    const policy = ['policies','policyEnvelopes'].includes(table ?? '');
+    if (!protectedTables.has(table ?? '') || !policy && await hasMission(row, table)) return true;
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return false;
     let projectId = row.projectId as Id<'projects'> | undefined;
@@ -37,9 +38,12 @@ export function legacyWorkspaceAccess(ctx: QueryCtx | MutationCtx, read: (id: st
     if (!projectId && ['policies','policyEnvelopes'].includes(table!)) {
       if (write) return false; // Only raw internal administration can alter defaults.
       if (row.tenantId) { try { await requireCompanyAccess(ctx, row.tenantId); return true; } catch { return false; } }
-      const operator = await ctx.db.query('operators').withIndex('by_auth_id', q => q.eq('authId', identity.subject)).unique();
-      if (!operator?.active || !operator.tenantId) return false;
-      try { await requireCompanyAccess(ctx, operator.tenantId); return true; } catch { return false; }
+      const operators = await ctx.db.query('operators').withIndex('by_auth_id', q => q.eq('authId', identity.subject)).collect();
+      for (const operator of operators) {
+        if (!operator.active || !operator.tenantId) continue;
+        try { await requireCompanyAccess(ctx, operator.tenantId); return true; } catch { /* Try the other authenticated company identities. */ }
+      }
+      return false;
     }
     if (!projectId) return false;
     const permission = !write ? 'read' : ['policies','policyEnvelopes'].includes(table!) ? 'policy' : ['approvals', 'approvalRecords'].includes(table!) && ['APPROVED', 'DENIED'].includes(row.status) ? 'approval' : ['workflowRuns', 'runEvents', 'runArtifacts', 'workflowMetrics'].includes(table!) ? 'automation' : 'delivery';

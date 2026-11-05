@@ -283,6 +283,7 @@ try {
     const release = await step('approvedPlan', () => mutate('missions:approvePlan', { projectId: s.projectId, missionId, planId,
       decisionReason: 'Approve this exact synthetic plan and its explicit zero-charge native engineering tariff. No paid, publication or production authority.', idempotencyKey: 'native-successor-approve' }));
     const workOrder = release.workOrders[0]; state.workOrderId = workOrder._id;
+    await step('nonAdminMissionPrincipal', () => mutate('isolationFixture:nonAdminMissionPrincipal', { scope:s }));
     await step('startedMission', () => mutate('missions:start', { missionId, idempotencyKey: 'native-successor-start' }));
     const taskResult = await step('task', () => mutate('tasks:create', { projectId: s.projectId, workOrderId: workOrder._id, title: 'Render exact native document', type: 'DOCS', priority: 3,
       idempotencyKey: 'native-successor-task', source: 'DASHBOARD', createdBy: 'HUMAN', createdByRef: 'user_SyntheticHandoffQualification', metadata: { synthetic: true, qualificationOnly: true } }));

@@ -447,7 +447,6 @@
     "runs:listByAgent",
     "runs:listByTask",
     "runs:listRecent",
-    "runs:start",
     "runtimeCompatibility:get",
     "savedViews:create",
     "savedViews:list",

@@ -21,7 +21,7 @@ function fixture() {
     query(table: string) {
       const filters: [string,any][]=[];
       const query={withIndex(_name: string,fn: any){const q={eq(key: string,value: any){filters.push([key,value]);return q;}};fn(q);return query;},
-        async collect(){return [...rows.values()].filter(e=>e.table===table&&filters.every(([k,v])=>e.row[k]===v)).map(e=>e.row);}};
+        async collect(){return [...rows.values()].filter(e=>e.table===table&&filters.every(([k,v])=>e.row[k]===v)).map(e=>e.row);},async take(count:number){return (await query.collect()).slice(0,count);}};
       return query;
     },
   };
@@ -94,7 +94,9 @@ describe('application policy dependency reads',()=>{
   return {...f,policy,other,version,run,scope};
  }
  it.each(['enterprise.result','enterprise.read'])('allows only the bound run policy dependency for %s',async operation=>{const f=applicationFixture(operation);expect((await f.scope.db.get(f.run as any))?._id).toBe(f.run);});
- it('does not expose policy resources directly',async()=>{const f=applicationFixture();expect(await f.scope.db.get(f.policy as any)).toBeNull();expect(await f.scope.db.get(f.other as any)).toBeNull();});
+ it('lets the verifier inspect the exact Mission-bound Factory version',async()=>{const f=applicationFixture();expect((await f.scope.db.get(f.version as any))?._id).toBe(f.version);});
+ it('does not allow another Factory version that shares the policy',async()=>{const f=applicationFixture(),otherVersion=f.add('factoryDefinitionVersions',{tenantId:f.tenant,projectId:f.project,policyEnvelopeId:f.policy});expect(await f.scope.db.get(otherVersion as any)).toBeNull();});
+ it('lets the fixed Result projector load only its exact bound policy',async()=>{const f=applicationFixture();expect((await f.scope.db.get(f.policy as any))?._id).toBe(f.policy);expect(await f.scope.db.get(f.other as any)).toBeNull();});
  it('does not allow application policy writes',async()=>{const f=applicationFixture();await expect(f.scope.db.patch(f.policy as any,{active:false} as any)).rejects.toThrow('MISSION_UNAVAILABLE');});
  it('does not allow another operation to read the dependency',async()=>{const f=applicationFixture('enterprise.inspect');expect(await f.scope.db.get(f.run as any)).toBeNull();});
  it('requires the immutable version and run to select the same policy',async()=>{const f=applicationFixture();f.rows.get(f.run).row.policyEnvelopeId=f.other;expect(await f.scope.db.get(f.run as any)).toBeNull();});
@@ -115,4 +117,17 @@ describe('service policy dependency reads',()=>{
  it('does not allow the service to change its policy',async()=>{const f=serviceFixture();await expect(f.scope.db.patch(f.policy as any,{active:false} as any)).rejects.toThrow('MISSION_UNAVAILABLE');});
  it('requires the run and immutable version to select the same policy',async()=>{const f=serviceFixture();f.rows.get(f.run).row.policyEnvelopeId=f.other;expect(await f.scope.db.get(f.policy as any)).toBeNull();expect(await f.scope.db.get(f.other as any)).toBeNull();});
  it('retains foreign Mission provenance checks inside the bound policy',async()=>{const f=serviceFixture();f.rows.get(f.policy).row.metadata={sourceMissionId:f.foreign};expect(await f.scope.db.get(f.policy as any)).toBeNull();});
+});
+
+describe('human Mission policy dependency reads',()=>{
+ function humanFixture(){
+  const f=fixture(),policy=f.add('policyEnvelopes',{tenantId:f.tenant,projectId:f.project,name:'Bound policy'});
+  const run=f.add('workflowRuns',{tenantId:f.tenant,projectId:f.project,missionId:f.mission,policyEnvelopeId:policy});
+  return {...f,policy,run,scope:f.scope()};
+ }
+ it('lets a Mission owner read a policy-bound run without workspace administration',async()=>{const f=humanFixture();expect((await f.scope.db.get(f.run as any))?._id).toBe(f.run);});
+ it('lets a Mission owner update the run without policy write authority',async()=>{const f=humanFixture();await f.scope.db.patch(f.run as any,{status:'PAUSED'} as any);expect(f.rows.get(f.run).row.status).toBe('PAUSED');});
+ it('keeps direct policy resources hidden without workspace read authority',async()=>{const f=humanFixture();expect(await f.scope.db.get(f.policy as any)).toBeNull();});
+ it('denies direct policy writes even with owned Mission metadata',async()=>{const f=humanFixture();f.rows.get(f.policy).row.metadata={sourceMissionId:f.mission};await expect(f.scope.db.patch(f.policy as any,{active:false} as any)).rejects.toThrow('MISSION_UNAVAILABLE');});
+ it('retains foreign Mission and workspace denials',async()=>{const f=humanFixture();f.rows.get(f.run).row.missionId=f.foreign;expect(await f.scope.db.get(f.run as any)).toBeNull();await expect(f.scope.db.patch(f.run as any,{status:'PAUSED'} as any)).rejects.toThrow('MISSION_UNAVAILABLE');});
 });
