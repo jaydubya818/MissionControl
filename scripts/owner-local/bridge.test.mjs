@@ -111,3 +111,59 @@ test('step B refuses before step A completed and refuses limits beyond the confi
   const over = request(c, 1, { admission: { factoryVersion: FV, maxCostMicrousd: 650001, maxDurationSeconds: 600 } });
   await assert.rejects(approvePermitsStep({ ...c, tuples: tuples(c), requestIds: [over.requestId] }, { setup: SETUP, owner: owner([over]) }), /PERMIT_REQUEST_NOT_CONFIRMED/);
 });
+
+// ---- Plan approval is bound to the confirmed specification (review round 2, P1) ----
+const { getFunctionName } = await import('convex/server');
+function fakeMissionControl(tamper = p => p, tamperApproved = p => p) {
+  const calls = [], plans = new Map(), name = r => getFunctionName(r);
+  const api = {
+    'sofieEnterprise:connect': () => ({ connectionId: 'conn', executionAuthority: 'NONE' }),
+    'ownerLocalOperator:installEnrollment': () => ({}),
+    'sofieEnterprise:decide': () => ({ status: 'AUTHORIZED' }),
+    'missions:updateDraft': () => ({ updated: true }),
+    'softwareFactoryControlPlane:assignMissionMember': () => ({ assignmentId: 'as' }),
+    'missions:savePlanDraft': a => { const { projectId, missionId, idempotencyKey, ...spec } = a; plans.set('plan1', { _id: 'plan1', missionId, status: 'DRAFT', ...spec }); return { plan: { _id: 'plan1' } }; },
+    // The delegated planner edits the draft before submitting (the reviewed exploit), then MissionControl stamps workflow versions.
+    'missions:submitPlan': () => { const p = tamper(structuredClone(plans.get('plan1'))); p.status = 'PROPOSED'; p.repository = 'local/dashboard';
+      p.workOrderBlueprints = p.workOrderBlueprints.map(b => ({ ...b, workflowVersion: 1 })); plans.set('plan1', p); return { plan: p }; },
+    'missions:get': () => ({ plans: [...plans.values()] }),
+    'missions:approvePlan': () => { const p = tamperApproved({ ...plans.get('plan1'), status: 'APPROVED' });
+      return { plan: p, workOrders: p.workOrderBlueprints.map(b => ({ _id: 'wo-' + b.id, currentRevisionId: 'rev-' + b.id, metadata: { missionBlueprintId: b.id } })) }; },
+    'sofieEnterprise:command': a => { const op = JSON.parse(a.payloadJson).operation;
+      return { response: op === 'enterprise.propose' ? { proposalId: 'prop', digest: 'pd0' } : op === 'enterprise.submit' ? { missionId: 'm1' } : { plan: { digest: 'plandigest' } } }; },
+  };
+  const call = kind => async (r, a) => { const n = name(r); calls.push(n); if (!api[n]) throw Error('unexpected ' + n); return api[n](a); };
+  const client = { mutation: call('mutation'), action: call('action'), query: call('query') };
+  return { calls, deps: { setup: { ...SETUP, workflowId: 'wf', teamId: 't', ownerMemberId: 'om', plannerMemberId: 'pm', tenantId: 'ten', installationId: 'i', ownerOperatorId: 'oo',
+    permitKey: { keyId: 'pk', publicKeyPem: 'x' } }, owner: client, planner: client, admin: client, envSet: () => undefined } };
+}
+const PINS = { factoryVersion: FV, revision: 1, maxCostMicrousd: 650000, maxDurationSeconds: 600, executionContractSha256: 'c'.repeat(64), capabilityPolicySha256: 'd'.repeat(64),
+  relayLeaseEnrollmentSha256: '0'.repeat(64), ownerFactoryAdapter: {} };
+
+test('step A approves the Plan only when the submitted Plan is exactly the confirmed three-stage specification', async () => {
+  const mc = fakeMissionControl();
+  const out = await confirmStep(confirmation({ enrollmentPins: PINS }), mc.deps);
+  assert.equal(mc.calls.filter(n => n === 'missions:approvePlan').length, 1);
+  assert.equal(out.workOrders.length, 3);
+});
+
+test('a fourth blueprint, a changed blueprint or changed assertions added by the planner are never approved', async () => {
+  const tampers = [
+    p => ({ ...p, workOrderBlueprints: [...p.workOrderBlueprints, { ...p.workOrderBlueprints[2], id: 'stage-4', sequence: 4, dependsOnBlueprintIds: ['stage-3'] }] }),
+    p => { p.workOrderBlueprints[1].implementationPolicy.timeoutMinutes = 60; return p; },
+    p => { p.workOrderBlueprints[0].constraints = ['Any repository']; return p; },
+    p => ({ ...p, workOrderBlueprints: [p.workOrderBlueprints[1], p.workOrderBlueprints[0], p.workOrderBlueprints[2]] }),
+    p => ({ ...p, assertions: [{ ...p.assertions[0], waiverAllowed: true }] }),
+    p => ({ ...p, estimatedCostUsd: 99 }),
+  ];
+  for (const tamper of tampers) {
+    const mc = fakeMissionControl(tamper);
+    await assert.rejects(confirmStep(confirmation({ enrollmentPins: PINS }), mc.deps), /PLAN_DIFFERS_FROM_CONFIRMATION/);
+    assert.equal(mc.calls.includes('missions:approvePlan'), false);
+  }
+});
+
+test('an approval whose approved Plan differs from the verified digest is refused before any permit step', async () => {
+  const mc = fakeMissionControl(p => p, p => ({ ...p, summary: 'other' }));
+  await assert.rejects(confirmStep(confirmation({ enrollmentPins: PINS }), mc.deps), /PLAN_APPROVED_MISMATCH/);
+});

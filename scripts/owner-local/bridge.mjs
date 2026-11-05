@@ -74,6 +74,21 @@ function serviceCommand(s, connectionId, secret, payload) {
   return { envelope: { ...envelope, signature: 'sha256=' + createHmac('sha256', secret).update(canonicalCommand).digest('hex') }, payloadJson };
 }
 
+/** Returns the digest of a submitted Plan that is EXACTLY the expected specification (MissionControl may only add each blueprint's
+ *  workflowVersion at submission); throws on any added, removed, reordered or changed blueprint, assertion, summary, rollback or metadata. */
+export function verifySubmittedPlan(plan, expected, at) {
+  if (!plan || plan._id !== at.planId || plan.missionId !== at.missionId || plan.status !== (at.status ?? 'PROPOSED')) throw Error('PLAN_NOT_SUBMITTED_AS_CONFIRMED');
+  if (typeof at.repository !== 'string' || plan.repository !== at.repository) throw Error('PLAN_REPOSITORY_MISMATCH');
+  const blueprints = Array.isArray(plan.workOrderBlueprints) ? plan.workOrderBlueprints : [];
+  if (blueprints.length !== expected.workOrderBlueprints.length) throw Error('PLAN_DIFFERS_FROM_CONFIRMATION');
+  const stripped = blueprints.map(b => { const { workflowVersion, ...rest } = b ?? {}; if (!Number.isSafeInteger(workflowVersion)) throw Error('PLAN_DIFFERS_FROM_CONFIRMATION'); return rest; });
+  const submitted = { summary: plan.summary, rollbackApproach: plan.rollbackApproach, workOrderBlueprints: stripped, assertions: plan.assertions, metadata: plan.metadata,
+    estimatedCostUsd: plan.estimatedCostUsd ?? null };
+  const want = { ...expected, estimatedCostUsd: expected.estimatedCostUsd ?? null };
+  if (canonical(submitted) !== canonical(want)) throw Error('PLAN_DIFFERS_FROM_CONFIRMATION');
+  return sha256(canonical({ schema: 'mc-owner-local-verified-plan/v1', planId: at.planId, missionId: at.missionId, repository: at.repository, ...want }));
+}
+
 /** Step A: connect, enrollment install (operator), proposal authorize, Mission draft, Plan authored by the planner, Plan approved by the owner. */
 export async function confirmStep(body, deps = {}) {
   const s = deps.setup ?? setup(), { binding, digest } = verifyConfirmation(body, 'A', s);
@@ -138,15 +153,24 @@ export async function confirmStep(body, deps = {}) {
   const assertion = { assertionId: 'build-and-tests', title: 'Factory build and Playwright tests pass', outcome: binding.request, verificationMethod: 'TEST',
     passCondition: 'npm run build && npx playwright test exits 0 in MyFactory', requiredEvidence: 'Signed MyFactory Result and local verifier verdict',
     requiresIndependentValidation: true, waiverAllowed: false };
-  const draft = await planner.mutation(ref('missions:savePlanDraft'), { projectId: s.projectId, missionId, idempotencyKey: `plan:${binding.planSha256}`,
-    summary: `Owner-confirmed plan ${binding.planSha256}`, rollbackApproach: 'Candidate commits only; the baseline is unchanged until the owner publishes.',
-    workOrderBlueprints: [1, 2, 3].map(blueprintFor), assertions: [assertion], metadata: { myevePlanSha256: binding.planSha256, works: binding.works.map(w => w.id) } });
+  // The exact Plan the owner's confirmation specifies. Whatever the planner submits is compared with this before the owner approves it.
+  const expectedPlan = { summary: `Owner-confirmed plan ${binding.planSha256}`, rollbackApproach: 'Candidate commits only; the baseline is unchanged until the owner publishes.',
+    workOrderBlueprints: [1, 2, 3].map(blueprintFor), assertions: [assertion], metadata: { myevePlanSha256: binding.planSha256, works: binding.works.map(w => w.id) } };
+  const draft = await planner.mutation(ref('missions:savePlanDraft'), { projectId: s.projectId, missionId, idempotencyKey: `plan:${binding.planSha256}`, ...expectedPlan });
   const planId = draft.plan._id;
   await planner.mutation(ref('missions:submitPlan'), { projectId: s.projectId, missionId, planId, idempotencyKey: `submit:${binding.planSha256}` });
   record('PLANNER_AUTHORED', { missionId, planId });
+  // Re-read the SUBMITTED Plan (a PROPOSED Plan is immutable in MissionControl) and approve it only if it is exactly the confirmed specification.
+  const detail = await owner.query(ref('missions:get'), { missionId });
+  const verifiedPlanDigest = verifySubmittedPlan(detail?.plans?.find(x => x._id === planId), expectedPlan, { planId, missionId, repository: s.repository });
+  record('PLAN_VERIFIED', { missionId, planId, verifiedPlanDigest });
   // 3 Owner decision: approve the exact Plan; this releases its WorkOrder with an APPLIED revision.
   const approved = await owner.mutation(ref('missions:approvePlan'), { projectId: s.projectId, missionId, planId,
-    decisionReason: `Owner confirmed Sofie plan ${binding.confirmCode} (${binding.planSha256})`, idempotencyKey: `approve:${binding.planSha256}` });
+    decisionReason: `Owner confirmed Sofie plan ${binding.confirmCode} (${binding.planSha256}); verified MissionControl Plan ${verifiedPlanDigest}`, idempotencyKey: `approve:${binding.planSha256}` });
+  // The approval is bound to the verified digest: the approved Plan and its released WorkOrders must be exactly the verified ones.
+  let approvedDigest = null;
+  try { approvedDigest = verifySubmittedPlan(approved.plan, expectedPlan, { planId, missionId, repository: s.repository, status: 'APPROVED' }); } catch { /* mismatch below */ }
+  if (approvedDigest !== verifiedPlanDigest || approved.workOrders?.length !== 3) { record('PLAN_APPROVAL_MISMATCH', { missionId, planId }); throw Error('PLAN_APPROVED_MISMATCH'); }
   const byStage = [1, 2, 3].map(stage => approved.workOrders.find(w => (w.metadata?.missionBlueprintId ?? w.missionBlueprintId) === `stage-${stage}`));
   if (byStage.some(w => !w?.currentRevisionId)) throw Error('PLAN_WORKORDERS_INCOMPLETE');
   const workOrder = byStage[0];
