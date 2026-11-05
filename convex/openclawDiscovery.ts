@@ -8,7 +8,7 @@
  */
 
 import { v } from "convex/values";
-import { action, mutation } from "./_generated/server";
+import { action, mutation } from "./lib/missionScopedFunctions";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 

@@ -1,0 +1,14 @@
+step	observation	decision	verification
+source-reconciliation	Dependency contracts remain on open integration branches	Retain exact pins; no automatic merges	DEPENDENCY_ADOPTION_MANIFEST.json
+registry-read	Package enumeration returned 403 requiring read:packages	Prepare private publication request; do not broaden credentials	RUNTIME_DISTRIBUTION_REQUEST.md
+intake-design	Canonical createDraft owns Mission creation	Extract existing persistence helper; keep canonical validation	Mission draft/governance tests and real database
+security-review	Initial connection role lookup lacked project and membership expiry scope	Require exact project role, active tenant and current membership	Real database denial cases
+architecture-review	Partial owner/team fields would bypass full scoped-draft contract	Use canonical unscoped DRAFT with exact operator owner	Shared draft validator and real database readback
+fixture-build	New relative shared imports were outside disposable fixture copy closure	Copy the new module dependency closure	Real database module build
+fixture-build	Shared validation dependency was unavailable in isolated Convex fixture	Use bounded strict dependency-free request validation	Shared contract tests and real database
+plan-projection	Latest draft Plan has no currentPlanId before approval	Expose latest draft with explicit DRAFT status	Real database Plan/milestone/stale-digest checks
+auth-scanner	Scanner did not recognize the dedicated application guard	Recognize actual HMAC guard; preserve baseline ceiling	Nine scanner tests and repository scan
+test-runner	Scanner tests import Vitest and failed under node --test	Run using repository Vitest runner locally and in CI	Nine tests passing
+typecheck	Object.hasOwn exceeds Convex target library	Use hasOwnProperty.call with identical own-key semantics	Shared tests and Convex typecheck
+proof-scope	Synthetic draft journey has no completed Result	Report NOT_AVAILABLE; retain later consumer qualification boundary	Conversation and contract documentation
+architecture-final-review	Gate eligibility alone cannot authenticate complete Result handoff coverage	Keep Result availability explicitly unqualified; references informational	Real database response reason and independent re-review

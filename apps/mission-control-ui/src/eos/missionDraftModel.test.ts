@@ -64,4 +64,17 @@ describe("Mission draft model", () => {
       codeScopeIds: "Code scope is required.",
     });
   });
+
+  it("clears context explicitly and derives the owner from membership", () => {
+    const payload = missionDraftPayload({ ...validDraft, context: "  ", owner: "Old display name" });
+    expect(payload.context).toBe("");
+    expect(payload).not.toHaveProperty("owner");
+    expect(payload.ownerMemberId).toBe("member-1");
+  });
+
+  it("requires an explicit budget while allowing zero to block execution", () => {
+    expect(validateMissionDraft({ ...validDraft, budgetUsd: " " }).budgetUsd)
+      .toBe("Enter a budget. Use zero to keep execution blocked.");
+    expect(validateMissionDraft({ ...validDraft, budgetUsd: "0" })).toEqual({});
+  });
 });

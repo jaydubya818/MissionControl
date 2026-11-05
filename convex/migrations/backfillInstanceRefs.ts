@@ -1,9 +1,16 @@
 import { v } from "convex/values";
-import { action, internalMutation, mutation, query } from "../_generated/server";
-import { api } from "../_generated/api";
+import { internalAction as action, internalMutation, internalMutation as mutation, internalQuery as query } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { resolveAgentRef } from "../lib/agentResolver";
 import { preferInstanceRefs } from "../lib/armCompat";
-import { resolveActiveTenantId } from "../lib/getActiveTenant";
+// Existing project ownership is authoritative; never choose a default tenant.
+async function resolveBoundMigrationTenant(ctx: {db:any}, args: {projectId?:any;tenantId?:any;createDefaultIfMissing?:boolean}) {
+  if (!args.projectId) return null;
+  const project = await ctx.db.get(args.projectId);
+  if (!project?.tenantId) return null;
+  if (args.tenantId && args.tenantId !== project.tenantId) throw new Error("Migration tenant conflicts with the bound workspace.");
+  return (await ctx.db.get(project.tenantId))?.active ? project.tenantId : null;
+}
 
 async function collectMigrationHealthSnapshot(ctx: { db: any }) {
   const [tasks, runs, toolCalls, messages, projects, agents, approvals] = await Promise.all([
@@ -142,10 +149,9 @@ export const guardMigrationHealth = internalMutation({
       return { healthy: true, totalDrift, resolvedAlertId: existing?._id };
     }
 
-    const tenantId = await resolveActiveTenantId(
-      { db: ctx.db as any },
-      { createDefaultIfMissing: true }
-    );
+    // Platform-wide counts are operational telemetry, not a tenant adoption.
+    // Never create or choose a company merely to attribute this scheduled alert.
+    const tenantId = undefined;
     const description =
       `ARM migration drift detected. Missing refs: ` +
       `${snapshot.missingInstanceRefs.tasks}/${snapshot.missingInstanceRefs.runs}/${snapshot.missingInstanceRefs.toolCalls}/${snapshot.missingInstanceRefs.messages}. ` +
@@ -239,19 +245,14 @@ export const listApprovalsNeedingTenantBackfill = query({
 });
 
 export const backfillProjectTenant = mutation({
-  args: { projectId: v.id("projects") },
+  args: { projectId: v.id("projects"), tenantId: v.id("tenants") },
   handler: async (ctx, args) => {
-    const project = await ctx.db.get(args.projectId);
-    if (!project || project.tenantId) return { updated: false };
-
-    const tenantId = await resolveActiveTenantId(
-      { db: ctx.db as any },
-      { createDefaultIfMissing: true }
-    );
-    if (!tenantId) return { updated: false };
-
-    await ctx.db.patch(project._id, { tenantId });
-    return { updated: true };
+    const project = await ctx.db.get(args.projectId), tenant = await ctx.db.get(args.tenantId);
+    if (!project || !tenant?.active) throw new Error("Explicit migration binding is unavailable.");
+    if (project.tenantId && project.tenantId !== args.tenantId) throw new Error("An existing project company binding is immutable in this migration.");
+    if (project.tenantId) return { updated:false };
+    await ctx.db.patch(project._id, { tenantId: args.tenantId });
+    return { updated:true };
   },
 });
 
@@ -262,7 +263,7 @@ export const backfillAgentTenant = mutation({
     if (!agent || agent.tenantId) return { updated: false };
 
     const project = agent.projectId ? await ctx.db.get(agent.projectId) : null;
-    const tenantId = await resolveActiveTenantId(
+    const tenantId = await resolveBoundMigrationTenant(
       { db: ctx.db as any },
       { projectId: project?._id, createDefaultIfMissing: true }
     );
@@ -281,7 +282,7 @@ export const backfillTaskTenant = mutation({
 
     const primaryAssigneeId = task.assigneeIds?.[0];
     const primaryAssignee = primaryAssigneeId ? await ctx.db.get(primaryAssigneeId) : null;
-    const tenantId = await resolveActiveTenantId(
+    const tenantId = await resolveBoundMigrationTenant(
       { db: ctx.db as any },
       {
         projectId: task.projectId,
@@ -304,7 +305,7 @@ export const backfillRunTenant = mutation({
 
     const agent = await ctx.db.get(run.agentId);
     const task = run.taskId ? await ctx.db.get(run.taskId) : null;
-    const tenantId = await resolveActiveTenantId(
+    const tenantId = await resolveBoundMigrationTenant(
       { db: ctx.db as any },
       {
         projectId: run.projectId ?? task?.projectId,
@@ -328,7 +329,7 @@ export const backfillToolCallTenant = mutation({
     const agent = await ctx.db.get(toolCall.agentId);
     const run = await ctx.db.get(toolCall.runId);
     const task = toolCall.taskId ? await ctx.db.get(toolCall.taskId) : null;
-    const tenantId = await resolveActiveTenantId(
+    const tenantId = await resolveBoundMigrationTenant(
       { db: ctx.db as any },
       {
         projectId: toolCall.projectId ?? run?.projectId ?? task?.projectId,
@@ -351,7 +352,7 @@ export const backfillMessageTenant = mutation({
 
     const task = await ctx.db.get(message.taskId);
     const author = message.authorAgentId ? await ctx.db.get(message.authorAgentId) : null;
-    const tenantId = await resolveActiveTenantId(
+    const tenantId = await resolveBoundMigrationTenant(
       { db: ctx.db as any },
       {
         projectId: message.projectId ?? task?.projectId,
@@ -377,7 +378,7 @@ export const backfillApprovalTenant = mutation({
     const toolCall = approval.toolCallId ? await ctx.db.get(approval.toolCallId) : null;
     const run = toolCall?.runId ? await ctx.db.get(toolCall.runId) : null;
 
-    const tenantId = await resolveActiveTenantId(
+    const tenantId = await resolveBoundMigrationTenant(
       { db: ctx.db as any },
       {
         projectId: approval.projectId ?? task?.projectId ?? toolCall?.projectId ?? run?.projectId,
@@ -475,6 +476,7 @@ export const backfillMessage = mutation({
 
 export const runBackfill = action({
   args: {
+    apply: v.optional(v.boolean()),
     tasksOffset: v.optional(v.number()),
     runsOffset: v.optional(v.number()),
     toolCallsOffset: v.optional(v.number()),
@@ -482,7 +484,8 @@ export const runBackfill = action({
     batchSize: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const anyApi = api as any;
+    const anyApi = internal as any;
+    if (args.apply !== true) return { dryRun:true, health:await ctx.runQuery(anyApi.migrations.backfillInstanceRefs.getMigrationHealth,{}) };
     const batchSize = args.batchSize ?? 100;
 
     const [taskIds, runIds, toolCallIds, messageIds] = await Promise.all([
@@ -557,6 +560,8 @@ export const runBackfill = action({
 
 export const runTenantBackfill = action({
   args: {
+    apply: v.optional(v.boolean()),
+    projectBindings: v.optional(v.array(v.object({projectId:v.id("projects"),tenantId:v.id("tenants")}))),
     projectsOffset: v.optional(v.number()),
     agentsOffset: v.optional(v.number()),
     tasksOffset: v.optional(v.number()),
@@ -567,7 +572,8 @@ export const runTenantBackfill = action({
     batchSize: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const anyApi = api as any;
+    const anyApi = internal as any;
+    if (args.apply !== true) return { dryRun:true, health:await ctx.runQuery(anyApi.migrations.backfillInstanceRefs.getMigrationHealth,{}) };
     const batchSize = args.batchSize ?? 100;
 
     const [projectIds, agentIds, taskIds, runIds, toolCallIds, messageIds, approvalIds] = await Promise.all([
@@ -596,8 +602,11 @@ export const runTenantBackfill = action({
     let messagesUpdated = 0;
     let approvalsUpdated = 0;
 
+    const unresolvedProjectIds = [];
     for (const projectId of projectIds.slice(projectsOffset, projectsOffset + batchSize)) {
-      const result = await ctx.runMutation(anyApi.migrations.backfillInstanceRefs.backfillProjectTenant, { projectId });
+      const binding = args.projectBindings?.find(item => item.projectId === projectId);
+      if (!binding) { unresolvedProjectIds.push(projectId); continue; }
+      const result = await ctx.runMutation(anyApi.migrations.backfillInstanceRefs.backfillProjectTenant, binding);
       if (result.updated) projectsUpdated++;
     }
     for (const agentId of agentIds.slice(agentsOffset, agentsOffset + batchSize)) {
@@ -658,6 +667,7 @@ export const runTenantBackfill = action({
       },
       updated: {
         projects: projectsUpdated,
+        unresolvedProjectIds,
         agents: agentsUpdated,
         tasks: tasksUpdated,
         runs: runsUpdated,

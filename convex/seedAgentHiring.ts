@@ -5,10 +5,10 @@
  * Requires at least one project to exist (e.g. run seedMissionControlDemo first or create a project).
  */
 
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
-export const run = mutation({
+export const run = internalMutation({
   args: {},
   handler: async (ctx) => {
     const project = await ctx.db.query("projects").first();

@@ -1,17 +1,14 @@
+import { internalMutation as maintenanceMutation } from "./_generated/server";
 /**
  * Daily Standup Report — aggregates tasks, agents, approvals for human review.
  */
 
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { query, mutation } from "./lib/missionScopedFunctions";
 
-/** Generate standup report (query — no side effects). */
-export const generate = query({
-  args: { 
-    projectId: v.optional(v.id("projects")),
-    at: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
+async function buildStandupReport(ctx: QueryCtx | MutationCtx, args: {projectId?: Id<"projects">; at?: number}) {
     const now = args.at ?? Date.now();
     
     // Get data scoped by project if provided
@@ -63,10 +60,14 @@ export const generate = query({
     const activeAgents = agents.filter((a) => a.status === "ACTIVE");
     const pausedAgents = agents.filter((a) => a.status === "PAUSED");
     
+    const visibleRuns = await ctx.db.query("runs").collect();
     // Calculate burn rate (sum of today's spend across agents)
     const burnRateToday = agents.reduce((sum, a) => sum + a.spendToday, 0);
 
     const report = {
+      sourceRunIds: visibleRuns.filter(run => run.taskId || run.workflowRunId).map(run => run._id),
+      sourceTaskIds: tasks.map(task => task._id),
+      sourceApprovalIds: pendingApprovals.map(approval => approval._id),
       projectId: args.projectId,
       generatedAt: now,
       date: new Date(now).toISOString().slice(0, 10),
@@ -106,11 +107,14 @@ export const generate = query({
       },
       burnRate: {
         today: burnRateToday,
+        scope: "AUTHORIZED_RUNS_UTC_DAY",
       },
     };
     return report;
-  },
-});
+}
+
+/** Generate standup report from currently authorized canonical sources. */
+export const generate = query({args:{projectId:v.optional(v.id("projects")),at:v.optional(v.number())},handler:buildStandupReport});
 
 /** Store standup report (mutation — for cron to save daily). */
 export const save = mutation({
@@ -119,19 +123,21 @@ export const save = mutation({
     savedAt: v.number(),
   },
   handler: async (ctx, args) => {
+    const report = await buildStandupReport(ctx, {projectId:args.report?.projectId});
     await ctx.db.insert("activities", {
+      projectId: report.projectId,
       actorType: "SYSTEM",
       action: "STANDUP_REPORT",
-      description: `Daily standup: ${args.report.agents.active} active agents, ${args.report.tasks.total} tasks, ${args.report.approvals.pending} pending approvals`,
+      description: `Daily standup: ${report.agents.active} active agents, ${report.tasks.total} tasks, ${report.approvals.pending} pending approvals`,
       targetType: "REPORT",
-      metadata: { report: args.report, savedAt: args.savedAt },
+      metadata: { report, sourceRunIds: report.sourceRunIds, sourceTaskIds: report.sourceTaskIds, sourceApprovalIds: report.sourceApprovalIds, savedAt: args.savedAt },
     });
     return { success: true };
   },
 });
 
 /** Run daily standup (mutation — for cron). Builds report and saves to activities. */
-export const runDaily = mutation({
+export const runDaily = maintenanceMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
@@ -171,7 +177,7 @@ export const runDaily = mutation({
       action: "STANDUP_REPORT",
       description: `Daily standup: ${report.agents.active} active agents, ${report.tasks.total} tasks, ${report.approvals.pending} pending approvals`,
       targetType: "REPORT",
-      metadata: { report, savedAt: now },
+      metadata: { report, sourceRunIds: [], sourceTaskIds: tasks.map(task => task._id), sourceApprovalIds: pendingLikeApprovals.map(approval => approval._id), savedAt: now },
     });
     return { success: true, report };
   },

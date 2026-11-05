@@ -1,0 +1,60 @@
+name: Enterprise Golden Journey suite
+on:
+  workflow_call:
+    inputs:
+      suite:
+        required: true
+        type: string
+permissions:
+  contents: read
+  packages: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      MC_GOLDEN_RUNTIME_FROM_REGISTRY: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run ci:prepare
+      - name: Resolve exact dependencies and fixtures
+        env:
+          GOLDEN_SUITE: ${{ inputs.suite }}
+        run: node scripts/enterprise-golden-journey/prepare-hosted.mjs "$GOLDEN_SUITE"
+      - name: Read pinned private runtime
+        if: inputs.suite == 'native-execution' || inputs.suite == 'hybrid-mission' || inputs.suite == 'security-recovery'
+        env:
+          GHCR_READ_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          sudo install -d -m 1777 /private/tmp
+      - if: inputs.suite == 'browser-journey'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run qualification
+        env:
+          GOLDEN_SUITE: ${{ inputs.suite }}
+        run: node scripts/enterprise-golden-journey/run.mjs "$GOLDEN_SUITE" "golden-evidence/$GOLDEN_SUITE"
+      - name: Record setup failure or interruption
+        if: always()
+        env:
+          GOLDEN_SUITE: ${{ inputs.suite }}
+        run: node scripts/enterprise-golden-journey/setup-failure.mjs "$GOLDEN_SUITE" "golden-evidence/$GOLDEN_SUITE"
+      - name: Preserve evidence including failed runs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ${{ inputs.suite }}
+          path: golden-evidence/${{ inputs.suite }}
+          if-no-files-found: error
+          # The sealed Playwright evidence includes traces/.last-run.json.
+          include-hidden-files: true
+          retention-days: 90

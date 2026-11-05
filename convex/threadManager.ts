@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation } from "./lib/missionScopedFunctions";
 
 export const updateThreadRef = mutation({
   args: {

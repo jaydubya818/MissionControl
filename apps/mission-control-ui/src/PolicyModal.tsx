@@ -15,9 +15,9 @@ import { cn } from "@/lib/utils";
 
 export function PolicyModal({ onClose }: { onClose: () => void }) {
   const policies = useQuery(api.policy.listAll);
-  const activePolicy = useQuery(api.policy.getActive);
+  const activePolicy = useQuery(api.policy.getActive, {});
 
-  const active = activePolicy ?? policies?.find((p: Doc<"policies">) => p.active);
+  const active = activePolicy ?? policies?.find((p: Doc<"policies">) => p.active && !p.projectId && !p.tenantId);
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>

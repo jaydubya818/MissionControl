@@ -27,7 +27,6 @@ import {
   Pause,
   Play,
   Plus,
-  RotateCcw,
   Pencil,
   Eye,
 } from "lucide-react";
@@ -104,7 +103,6 @@ export function AgentRegistryView({
   const updateStatus = useMutation(api.agents.updateStatus);
   const pauseAll = useMutation(api.agents.pauseAll);
   const resumeAll = useMutation(api.agents.resumeAll);
-  const resetAll = useMutation(api.agents.resetAll);
   const { toast } = useToast();
 
   const taskCountByAgent = useMemo(() => {
@@ -312,23 +310,7 @@ export function AgentRegistryView({
               <Play className="mr-1 h-3 w-3" />
               Resume paused
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs"
-              onClick={async () => {
-                try {
-                  if (!projectId) throw new Error("Select a workspace before resetting agents.");
-                  const result = await resetAll({ projectId });
-                  toast(`Reset ${(result as { resetCount: number }).resetCount} agent(s)`);
-                } catch (cause) {
-                  toast(cause instanceof Error ? cause.message : "Failed", true);
-                }
-              }}
-            >
-              <RotateCcw className="mr-1 h-3 w-3" />
-              Reset unavailable
-            </Button>
+
           </div>
         </div>
 
@@ -352,7 +334,7 @@ export function AgentRegistryView({
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Assignment</th>
                 <th className="px-3 py-3">Model route</th>
-                <th className="px-3 py-3">Daily budget</th>
+                <th className="px-3 py-3">Visible cost / daily limit</th>
                 <th className="px-3 py-3">Heartbeat</th>
                 <th className="sticky right-0 bg-surface-2 px-4 py-3 text-right">Actions</th>
               </tr>

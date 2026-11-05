@@ -7,7 +7,7 @@
  */
 
 import { v } from "convex/values";
-import { internalMutation, internalQuery, mutation, query } from "../_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "../lib/missionScopedFunctions";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   FACTORY_PERMISSIONS,

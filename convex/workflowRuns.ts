@@ -1,6 +1,7 @@
 import type { Id } from './_generated/dataModel';
 import type { MutationCtx } from './_generated/server';
 import { assertCapabilityWorkAuthority } from './lib/capabilityWorkControl';
+import { enterpriseProject, scopeExposure, settleUndispatchedEnterpriseAttempt } from "./lib/enterpriseAttemptAccounting";
 /**
  * Workflow Runs — Convex Functions
  * 
@@ -8,7 +9,7 @@ import { assertCapabilityWorkAuthority } from './lib/capabilityWorkControl';
  */
 
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import { appendOpEvent } from "./lib/armAudit";
 import { resolveAgentRef } from "./lib/agentResolver";
@@ -18,7 +19,8 @@ import { reconcileTerminalWorkflowSteps } from "./lib/workflowRunState";
 import { snapshotWorkflowDefinition } from "./lib/workflowSnapshot";
 import { factoryWorkflowContractIssues } from "./lib/factoryWorkflowContract";
 import { assertAuthorizedDeliveryRecord, requireAuthorizedDeliveryScope } from "./lib/deliveryAuthorization";
-import { COMPANY_PERMISSIONS } from "./lib/companyAccess";
+import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
+import { visibleWorkflowRuns, requireLegacyWorkflowRunWrite } from "./lib/workflowRunAccess";
 import { buildExecutionRecoverySummary } from "./lib/executionRecovery";
 import { buildFactoryAttemptReviewReadModel, loadFactoryAttemptReviewReadModel } from "./lib/factoryReviewReadModel";
 import { getEffectiveOperatorControl } from "./lib/operatorControls";
@@ -327,12 +329,13 @@ async function appendReceiptArtifactLink(ctx: any, verificationReceiptId: any, a
 }
 
 async function assertWorkflowExecutionFence(
-  ctx: Pick<MutationCtx, 'db'>,
-  run: { lease?: { leaseId: string; ownerId: string; expiresAt: number }; capabilityAuthorities?: import('./lib/capabilityWorkControl').CapabilityWorkAuthority[]; workOrderId?: Id<'workOrders'>; missionId?: Id<'missions'> },
+  ctx: MutationCtx,
+  run: { lease?: { leaseId: string; ownerId: string; expiresAt: number }; capabilityAuthorities?: import('./lib/capabilityWorkControl').CapabilityWorkAuthority[]; workOrderId?: Id<'workOrders'>; missionId?: Id<'missions'>; projectId?: Id<'projects'> },
   leaseId?: string,
   ownerId?: string,
 ) {
   await assertCapabilityWorkAuthority(ctx, run);
+  await requireLegacyWorkflowRunWrite(ctx, run);
   if (!run.lease) return;
   if (!workflowLeaseMatches({ lease: run.lease as any, leaseId, ownerId, now: Date.now() })) {
     throw new Error("Workflow execution lease is missing, mismatched, or expired.");
@@ -414,10 +417,12 @@ async function createExecutionCheckpoint(ctx: any, input: {
 async function dailyWorkflowCommitmentUsd(ctx: any, projectId: any, now: number) {
   const startOfDay = new Date(now);
   startOfDay.setUTCHours(0, 0, 0, 0);
-  const runs = await ctx.db
+  // Project limits include commitments from Missions hidden from this caller.
+  const runs = await missionAuthorityDatabase(ctx)
     .query("workflowRuns")
     .withIndex("by_project", (q: any) => q.eq("projectId", projectId))
     .collect();
+  if (await enterpriseProject(ctx, projectId)) return scopeExposure(runs, now) / 1_000_000;
   return runs
     .filter((run: any) => run.startedAt >= startOfDay.getTime())
     .reduce(
@@ -453,9 +458,11 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const visible = async (runs: import("./_generated/dataModel").Doc<"workflowRuns">[]) =>
+      (await visibleWorkflowRuns(ctx, runs)).map(redactExecutionPrompt);
     // Build query based on filters
     if (args.repositoryId && args.status) {
-      return (await ctx.db
+      return await visible((await ctx.db
         .query("workflowRuns")
         .withIndex("by_repository_status", (q) =>
           q.eq("repositoryId", args.repositoryId).eq("status", args.status as any)
@@ -463,47 +470,47 @@ export const list = query({
         .order("desc")
         .take(args.limit ?? 100))
         .filter((run) => !args.projectId || run.projectId === args.projectId)
-        .map(redactExecutionPrompt);
+      );
     }
 
     if (args.projectId && args.status) {
-      return (await ctx.db
+      return await visible(await ctx.db
         .query("workflowRuns")
         .withIndex("by_project_status", (q) => 
           q.eq("projectId", args.projectId).eq("status", args.status as any)
         )
         .order("desc")
-        .take(args.limit ?? 100)).map(redactExecutionPrompt);
+        .take(args.limit ?? 100));
     }
     
     if (args.projectId) {
-      return (await ctx.db
+      return await visible(await ctx.db
         .query("workflowRuns")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .order("desc")
-        .take(args.limit ?? 100)).map(redactExecutionPrompt);
+        .take(args.limit ?? 100));
     }
     
     if (args.workflowId) {
-      return (await ctx.db
+      return await visible(await ctx.db
         .query("workflowRuns")
         .withIndex("by_workflow_id", (q) => q.eq("workflowId", args.workflowId!))
         .order("desc")
-        .take(args.limit ?? 100)).map(redactExecutionPrompt);
+        .take(args.limit ?? 100));
     }
     
     if (args.status) {
-      return (await ctx.db
+      return await visible(await ctx.db
         .query("workflowRuns")
         .withIndex("by_status", (q) => q.eq("status", args.status as any))
         .order("desc")
-        .take(args.limit ?? 100)).map(redactExecutionPrompt);
+        .take(args.limit ?? 100));
     }
     
-    return (await ctx.db
+    return await visible(await ctx.db
       .query("workflowRuns")
       .order("desc")
-      .take(args.limit ?? 100)).map(redactExecutionPrompt);
+      .take(args.limit ?? 100));
   },
 });
 
@@ -513,10 +520,11 @@ export const list = query({
 export const get = query({
   args: { runId: v.string() },
   handler: async (ctx, args) => {
-    return redactExecutionPrompt(await ctx.db
+    const run = await ctx.db
       .query("workflowRuns")
       .withIndex("by_run_id", (q) => q.eq("runId", args.runId))
-      .first());
+      .first();
+    return redactExecutionPrompt(run ? (await visibleWorkflowRuns(ctx, [run]))[0] ?? null : null);
   },
 });
 
@@ -526,13 +534,16 @@ export const get = query({
 export const getById = query({
   args: { id: v.id("workflowRuns") },
   handler: async (ctx, args) => {
-    return redactExecutionPrompt(await ctx.db.get(args.id));
+    const run = await ctx.db.get(args.id);
+    return redactExecutionPrompt(run ? (await visibleWorkflowRuns(ctx, [run]))[0] ?? null : null);
   },
 });
 
 export const listEvents = query({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.workflowRunId);
+    if (!run || !(await visibleWorkflowRuns(ctx, [run])).length) return [];
     const events = await ctx.db
       .query("runEvents")
       .withIndex("by_run_sequence", (q) => q.eq("workflowRunId", args.workflowRunId))
@@ -544,6 +555,8 @@ export const listEvents = query({
 export const listArtifacts = query({
   args: { workflowRunId: v.id("workflowRuns") },
   handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.workflowRunId);
+    if (!run || !(await visibleWorkflowRuns(ctx, [run])).length) return [];
     return await ctx.db
       .query("runArtifacts")
       .withIndex("by_run", (q) => q.eq("workflowRunId", args.workflowRunId))
@@ -560,7 +573,7 @@ export const getInspector = query({
   },
   handler: async (ctx, args) => {
     const run = await ctx.db.get(args.workflowRunId);
-    if (!run) return null;
+    if (!run || !(await visibleWorkflowRuns(ctx, [run])).length) return null;
 
     const workOrder = run.workOrderId ? await ctx.db.get(run.workOrderId) : null;
     const access = await requireAuthorizedDeliveryScope(ctx, workOrder?.projectId ?? run.projectId);
@@ -753,12 +766,13 @@ export const search = query({
     if (args.projectId) {
       runs = runs.filter((r) => r.projectId === args.projectId);
     }
+    runs = await visibleWorkflowRuns(ctx, runs);
     
     const lowerQuery = args.query.toLowerCase();
     return runs.filter((r) =>
       r.runId.toLowerCase().includes(lowerQuery) ||
       r.initialInput.toLowerCase().includes(lowerQuery)
-    );
+    ).map(redactExecutionPrompt);
   },
 });
 
@@ -781,7 +795,9 @@ export const claimExecution = mutation({
       .first();
     if (!run) throw new Error(`Workflow run not found: ${args.runId}`);
     await assertCapabilityWorkAuthority(ctx, run);
+    await requireLegacyWorkflowRunWrite(ctx, run);
     if (!run.projectId) return { claimed: false as const, reason: "workspace-required" };
+    if (await enterpriseProject(ctx, run.projectId)) return { claimed: false as const, reason: "enterprise-factory-authority-required" };
     if (run.factoryDefinitionVersionId || run.executionManifestDigest) {
       return { claimed: false as const, reason: "factory-worker-owned" };
     }
@@ -791,7 +807,7 @@ export const claimExecution = mutation({
 
     const now = Date.now();
     const control = await getEffectiveOperatorControl(ctx.db, run.projectId);
-    const projectRuns = await ctx.db
+    const projectRuns = await missionAuthorityDatabase(ctx)
       .query("workflowRuns")
       .withIndex("by_project", (q) => q.eq("projectId", run.projectId))
       .collect();
@@ -1076,7 +1092,14 @@ export const start = mutation({
     worktree: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    if (args.workOrderId) throw new Error("WorkOrder runs require canonical WorkOrder dispatch.");
+    if (args.workOrderId || args.workOrderRevisionId || args.workOrderRevisionNumber !== undefined) throw new Error("WorkOrder runs require canonical WorkOrder dispatch.");
+    if (!args.projectId) throw new Error("An authorized workspace is required to start a workflow.");
+    await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    if (args.parentTaskId) {
+      const task = await ctx.db.get(args.parentTaskId);
+      if (!task || task.projectId !== args.projectId) throw new Error("Task is unavailable for this workspace.");
+      if (task.workOrderId) throw new Error("WorkOrder runs require canonical WorkOrder dispatch.");
+    }
     const enrolled = args.projectId
       ? await ctx.db.query('capabilityEnrolledOwners').withIndex('by_project', q => q.eq('projectId', args.projectId!)).first()
       : await ctx.db.query('capabilityEnrolledOwners').first();
@@ -1180,7 +1203,6 @@ export const start = mutation({
       metadata: {
         workflowId: args.workflowId,
         runId,
-        initialInput: args.initialInput,
       },
     });
 
@@ -1194,7 +1216,7 @@ export const start = mutation({
       status: "PENDING",
       startedAt: now,
       commandSummary: `Workflow ${args.workflowId} created`,
-      metadata: { runId, workflowId: args.workflowId, initialInput: args.initialInput },
+      metadata: { runId, workflowId: args.workflowId },
       idempotencyKey: `run-start:${runId}`,
     });
     
@@ -1596,6 +1618,7 @@ export const advance = mutation({
     }
     
     await assertCapabilityWorkAuthority(ctx, run);
+    await requireLegacyWorkflowRunWrite(ctx, run);
     const nextIndex = run.currentStepIndex + 1;
     
     if (nextIndex >= run.totalSteps) {
@@ -1669,6 +1692,12 @@ export const requestCancellation = mutation({
         status: run.status,
         reason: "Publication is already authorized and must reconcile the exact provider write before cancellation can be evaluated.",
       };
+    }
+    const enterprise = run.executionCostAuthorization?.schema === "work-order-offline-cost-authorization/v1"
+      ? run.executionCostAuthorization.enterprise : undefined;
+    if (enterprise?.provider === "isolated-container" && run.status === "PENDING" && !run.lease
+      && run.executionClaimedAt === undefined && !run.executionClaimId) {
+      await settleUndispatchedEnterpriseAttempt(ctx, run, now);
     }
     await ctx.db.patch(run._id, {
       cancellationRequestedAt: run.cancellationRequestedAt ?? now,

@@ -4,7 +4,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 
 const documentType = v.union(
   v.literal("WORKING_MD"),

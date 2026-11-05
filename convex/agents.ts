@@ -1,9 +1,11 @@
+import { internalMutation as administrativeMutation } from "./_generated/server";
+import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Agents — Convex Functions
  */
 
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation } from "./lib/missionScopedFunctions";
 import { ensureInstanceForLegacyAgent, resolveAgentRef } from "./lib/agentResolver";
 import { appendChangeRecord } from "./lib/armAudit";
 
@@ -273,7 +275,7 @@ export const heartbeat = mutation({
     errorMessage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const agent = await ctx.db.get(args.agentId);
+    const agent = await missionAuthorityDatabase(ctx).get(args.agentId);
     if (!agent) {
       return { success: false, error: "Agent not found" };
     }
@@ -373,7 +375,6 @@ export const heartbeat = mutation({
     return {
       success: true,
       agent: await ctx.db.get(args.agentId),
-      budgetRemaining,
       budgetExceeded,
       pendingTasks: myPendingTasks,
       claimableTasks,
@@ -624,7 +625,7 @@ export const recordSpend = mutation({
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const agent = await ctx.db.get(args.agentId);
+    const agent = await missionAuthorityDatabase(ctx).get(args.agentId);
     if (!agent) {
       return { success: false, error: "Agent not found" };
     }
@@ -638,8 +639,6 @@ export const recordSpend = mutation({
     
     return {
       success: true,
-      spendToday: newSpend,
-      budgetRemaining: agent.budgetDaily - newSpend,
       budgetExceeded,
     };
   },
@@ -858,7 +857,7 @@ export const detectStaleAgents = internalMutation({
  * Reset all quarantined/offline agents back to ACTIVE with a fresh heartbeat.
  * Useful during development when no agent runtime is sending heartbeats.
  */
-export const resetAll = mutation({
+export const resetAll = administrativeMutation({
   args: {
     projectId: v.optional(v.id("projects")),
   },

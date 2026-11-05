@@ -1,11 +1,12 @@
+import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Runs — Convex Functions
  * 
  * Agent execution turn tracking and cost accounting.
  */
 
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { convexToJson, v } from "convex/values";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
@@ -16,6 +17,9 @@ import { preferInstanceRefs } from "./lib/armCompat";
 import { classifyRisk } from "./lib/riskClassifier";
 import { evaluatePolicyEnvelopes } from "./lib/armPolicy";
 import { evaluateLegacyToolPolicy } from "./lib/legacyToolPolicy";
+import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
+import { loadActiveLegacyPolicy } from "./lib/policyAuthority";
+import { canonicalDigest } from "@mission-control/shared";
 
 function toPreview(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
@@ -237,6 +241,18 @@ export const start = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    if (!await ctx.auth.getUserIdentity()) throw new Error("Authenticated run operator required.");
+    const authorityDb = missionAuthorityDatabase(ctx);
+    const agent = await authorityDb.get(args.agentId);
+    if (!agent?.projectId) throw new Error("Run workspace is unavailable or unauthorized.");
+    const access = await requireWorkspacePermission({ ...ctx, db: authorityDb }, agent.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    if (agent.tenantId && agent.tenantId !== access.project.tenantId) throw new Error("Run workspace is unavailable or unauthorized.");
+    // Preserve bytes, int64 values and special floats before canonical hashing.
+    const requestDigest = `convex-json/v1:${canonicalDigest("legacy-run-request/v2", convexToJson({
+      agentId: args.agentId, taskId: args.taskId ?? null, workflowRunId: args.workflowRunId ?? null,
+      sessionKey: args.sessionKey, model: args.model, estimatedCost: args.estimatedCost ?? 0,
+      toolName: args.toolName ?? null, toolArgs: args.toolArgs ?? null,
+    }))}`;
     // Check idempotency
     const existing = await ctx.db
       .query("runs")
@@ -244,13 +260,10 @@ export const start = mutation({
       .first();
     
     if (existing) {
+      if (existing.agentId !== args.agentId || existing.projectId !== agent.projectId
+        || existing.taskId !== args.taskId || existing.workflowRunId !== args.workflowRunId) throw new Error("Run receipt is unavailable or unauthorized.");
+      if (!existing.requestDigest || existing.requestDigest !== requestDigest) throw new Error("Run receipt does not match this request; historical unbound or older-encoding receipts require explicit migration.");
       return { run: existing, created: false };
-    }
-    
-    // Get agent and task
-    const agent = await ctx.db.get(args.agentId);
-    if (!agent) {
-      throw new Error("Agent not found");
     }
     
     const task = args.taskId ? await ctx.db.get(args.taskId) : null;
@@ -305,7 +318,7 @@ export const start = mutation({
         severity: "WARNING",
         type: "BUDGET_EXCEEDED",
         title: "Agent daily budget exceeded",
-        description: `Agent ${agent.name} exceeded daily budget: $${agent.spendToday.toFixed(2)} / $${agent.budgetDaily.toFixed(2)}`,
+        description: `Agent ${agent.name} reached its daily budget limit`,
         agentId: args.agentId,
         taskId: args.taskId,
         status: "OPEN",
@@ -357,11 +370,13 @@ export const start = mutation({
       args.agentId
     );
     const instance = await ctx.db.get(resolved.instanceId);
-    const effectiveTenantId = agent.tenantId ?? instance?.tenantId;
+    const effectiveTenantId = access.project.tenantId;
+    if (!instance || instance.projectId && instance.projectId !== agent.projectId
+      || instance.tenantId && instance.tenantId !== effectiveTenantId) throw new Error("Run instance is unavailable or unauthorized.");
     const riskLevel = args.toolName
       ? classifyRisk(args.toolName, args.toolArgs as Record<string, unknown> | undefined)
       : "GREEN";
-    const armDecision = await evaluatePolicyEnvelopes(ctx.db as any, {
+    const armDecision = await evaluatePolicyEnvelopes(authorityDb as any, {
       tenantId: effectiveTenantId,
       projectId: agent.projectId,
       versionId: resolved.versionId,
@@ -370,10 +385,7 @@ export const start = mutation({
     });
     const budgetRemaining = Math.max(agent.budgetDaily - agent.spendToday, 0);
     const activeLegacyPolicy = !armDecision && args.toolName
-      ? await ctx.db
-          .query("policies")
-          .withIndex("by_active", (q) => q.eq("active", true))
-          .first()
+      ? await loadActiveLegacyPolicy({ ...ctx, db: authorityDb }, agent.projectId)
       : null;
     const legacyDecision =
       !armDecision && args.toolName
@@ -609,6 +621,7 @@ export const start = mutation({
       tenantId: effectiveTenantId,
       projectId: agent.projectId,
       idempotencyKey: args.idempotencyKey,
+      requestDigest,
       agentId: args.agentId,
       instanceId: resolved.instanceId,
       versionId: resolved.versionId,
@@ -827,7 +840,7 @@ export const complete = mutation({
     
     // Update agent's spend
     if (args.costUsd > 0) {
-      const agent = await ctx.db.get(run.agentId);
+      const agent = await missionAuthorityDatabase(ctx).get(run.agentId);
       if (agent) {
         const newSpend = agent.spendToday + args.costUsd;
         await ctx.db.patch(run.agentId, {
@@ -843,7 +856,7 @@ export const complete = mutation({
             severity: "WARNING",
             type: "BUDGET_EXCEEDED",
             title: "Agent daily budget exceeded",
-            description: `Agent ${agent.name} exceeded daily budget: $${newSpend.toFixed(2)} / $${agent.budgetDaily.toFixed(2)}`,
+            description: `Agent ${agent.name} reached its daily budget limit`,
             agentId: run.agentId,
             status: "OPEN",
           });

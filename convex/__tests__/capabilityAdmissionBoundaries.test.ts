@@ -1,3 +1,4 @@
+import "./support/domainFunctions.fixture";
 import { afterEach, expect, it, vi } from 'vitest';
 
 vi.mock('../lib/deliveryAuthorization', () => ({
@@ -19,7 +20,7 @@ it('rejects anonymous challenge requests before querying owner policy', async ()
   expect(runQuery).not.toHaveBeenCalled();
 });
 
-it('real Mission and shared WorkOrder handlers cannot write execution before policy revalidation', async () => {
+it('Mission and shared WorkOrder domain handlers revalidate capability policy before writes', async () => {
   vi.stubEnv('MC_CAPABILITY_CONTROL_ENABLED', 'true');
   vi.stubEnv('MC_CAPABILITY_ENVIRONMENT', 'qualification');
   vi.stubEnv('MC_CAPABILITY_INSTALLATION_ID', 'synthetic-isolated');

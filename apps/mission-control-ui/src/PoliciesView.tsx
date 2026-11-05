@@ -83,11 +83,12 @@ export function PoliciesView({ projectId }: { projectId: Id<"projects"> | null }
   }, [selectedVersionId, versions]);
 
   const handleCreatePolicy = async () => {
+    if (!projectId) { toast("Select a workspace before creating a policy.", true); return; }
     try {
       const suffix = Date.now().toString().slice(-6);
       await createPolicyEnvelope({
         tenantId: selectedTenantId ?? undefined,
-        projectId: projectId ?? undefined,
+        projectId,
         templateId: selectedTemplateId ?? undefined,
         versionId: selectedVersionId ?? undefined,
         name: `Guardrail Policy ${suffix}`,
@@ -132,7 +133,7 @@ export function PoliciesView({ projectId }: { projectId: Id<"projects"> | null }
             <Button size="sm" variant="outline" onClick={() => setActiveOnly((v) => !v)}>
               {activeOnly ? "Show All" : "Active Only"}
             </Button>
-            <Button size="sm" onClick={handleCreatePolicy}>
+            <Button size="sm" onClick={handleCreatePolicy} disabled={!projectId} title={!projectId ? "Select a workspace before creating a policy" : undefined}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />
               Create Policy
             </Button>
@@ -141,6 +142,7 @@ export function PoliciesView({ projectId }: { projectId: Id<"projects"> | null }
       />
 
       <div className="mx-auto max-w-[1200px] px-6 py-6 flex flex-col gap-6">
+      {!projectId && <p role="status" className="text-sm text-ink-secondary">Select a workspace before creating or changing policies.</p>}
       {/* Summary bar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-1 px-3 py-2">

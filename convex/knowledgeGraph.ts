@@ -4,7 +4,7 @@
 
 import { v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import type { Id } from "./_generated/dataModel";
 import {
   getNeighborhoodForNode,

@@ -1,4 +1,4 @@
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "../lib/missionScopedFunctions";
 import { api } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { buildAutomationDraft, isAutomationDraftDue } from "../lib/automationDispatch";

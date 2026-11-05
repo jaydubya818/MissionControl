@@ -1,3 +1,4 @@
+import "./support/domainFunctions.fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createGitVerificationSubject, createPrepublicationGitVerificationSubject } from "@mission-control/workflow-engine/verification-subject";
 import { retryVerification, retryVerificationHandler, reportVerificationInternal, claimInternal, authorizePublicationInternal } from "../factory/attempts";
@@ -395,6 +396,14 @@ describe("retry evidence and authority boundaries", () => {
     await expect(f.invoke(retryVerification, retryArgs)).rejects.toThrow(/no active Verification Factory/);
     expect(f.tables).toEqual(before);
     expect(f.jobs).toHaveLength(0);
+  });
+
+  it("skips an older Verification Factory whose active version is unreadable", async () => {
+    const f = await configuredFixture();
+    f.tables.factoryDefinitions.unshift({ _id: "unrelated-verifier", tenantId: "tenant-1", projectId: "project-1",
+      repositoryId: "repository-1", status: "ACTIVE", purpose: "VERIFICATION", activeVersionId: "unreadable-version" });
+    const result = await f.invoke(retryVerification, retryArgs);
+    expect(result.workflowRun.factoryDefinitionVersionId).toBe("version-1");
   });
 
   it("rejects a competing active source before retrying", async () => {

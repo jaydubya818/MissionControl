@@ -3,7 +3,7 @@ import { isLocalQualificationRepository, loadLocalRepositoryAdmission } from "./
 import { factoryWorkerVersionBindingValidator } from "./lib/factoryWorkerValidators";
 import { isNoInferenceConstraint } from "./lib/offlineExecutionPolicy";
 import type { FactoryWorkerVersionBinding } from "./lib/factoryWorkerRuntime";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./lib/missionScopedFunctions";
 import type { MutationCtx } from "./_generated/server";
 import { validateHostBinding } from "./lib/workspaceBindings";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";

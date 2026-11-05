@@ -1,3 +1,6 @@
+import { hasAuthenticatedApproval, isTaskCompletionApproval } from "./lib/approvalIdentity";
+import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, requireWorkspaceAccess, requireWorkspacePermission } from "./lib/companyAccess";
+import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Tasks — Convex Functions
  *
@@ -7,7 +10,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import { api } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
@@ -149,7 +152,7 @@ const TRANSITION_RULES: TransitionRule[] = [
   { from: "NEEDS_APPROVAL", to: "IN_PROGRESS", allowedActors: ["HUMAN"] },
   { from: "NEEDS_APPROVAL", to: "REVIEW", allowedActors: ["HUMAN"] },
   { from: "NEEDS_APPROVAL", to: "BLOCKED", allowedActors: ["HUMAN", "SYSTEM"] },
-  { from: "NEEDS_APPROVAL", to: "DONE", allowedActors: ["HUMAN"] },
+  { from: "NEEDS_APPROVAL", to: "DONE", allowedActors: ["HUMAN"], humanOnly: true },
   { from: "NEEDS_APPROVAL", to: "CANCELED", allowedActors: ["HUMAN"] },
   
   // FROM BLOCKED
@@ -977,7 +980,7 @@ export const simulateExecutionPlan = query({
       .first();
 
     const primaryAssigneeId = task.assigneeIds?.[0];
-    const assignee = primaryAssigneeId ? await ctx.db.get(primaryAssigneeId) : null;
+    const assignee = primaryAssigneeId ? await missionAuthorityDatabase(ctx).get(primaryAssigneeId) : null;
     const triggeredRules: string[] = [];
     const remediationHints: string[] = [];
     const requiredApprovals: Array<{ type: string; reason: string }> = [];
@@ -1005,7 +1008,7 @@ export const simulateExecutionPlan = query({
       const budgetRemaining = assignee.budgetDaily - assignee.spendToday;
       if (estimatedCost > budgetRemaining) {
         policyDecision = "NEEDS_APPROVAL";
-        policyReason = `Estimated cost ($${estimatedCost.toFixed(2)}) exceeds remaining daily budget ($${budgetRemaining.toFixed(2)})`;
+        policyReason = "Estimated cost exceeds the available daily budget";
         triggeredRules.push("budget_exceeded");
         requiredApprovals.push({
           type: "BUDGET_EXCEEDED",
@@ -1332,6 +1335,10 @@ export const linkToWorkOrder = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const project = await missionAuthorityDatabase(ctx).get(args.projectId);
+    if (!identity || !project?.tenantId) throw new Error("Authenticated delivery assignment required.");
+    await requireWorkspaceAccess({ ...ctx, db: missionAuthorityDatabase(ctx) }, project.tenantId, args.projectId, { permission: COMPANY_PERMISSIONS.ASSIGN_DELIVERY });
     const [task, workOrder] = await Promise.all([
       ctx.db.get(args.taskId),
       ctx.db.get(args.workOrderId),
@@ -1352,8 +1359,10 @@ export const linkToWorkOrder = mutation({
       && task.planningRepositorySha !== workOrder.planningRepositorySha) {
       throw new Error("Task planning revision does not match the selected Work Order.");
     }
+    const preExecution = task.startedAt === undefined && ["INBOX", "ASSIGNED", "READY"].includes(task.status);
     if (task.workOrderId === args.workOrderId) {
       if (task.planningRepositorySha !== workOrder.planningRepositorySha) {
+        if (!preExecution) throw new Error("A started Task cannot adopt a different planning revision. Use an explicit reviewed migration.");
         await ctx.db.patch(task._id, { planningRepositorySha: workOrder.planningRepositorySha });
       }
       return {
@@ -1363,6 +1372,7 @@ export const linkToWorkOrder = mutation({
       };
     }
 
+    if (!preExecution) throw new Error("Only pre-execution Tasks can be linked to a Work Order.");
     const linkedAt = Date.now();
     const authorityScope = buildWorkOrderTaskAuthority(workOrder);
     const beforeState = {
@@ -1379,15 +1389,15 @@ export const linkToWorkOrder = mutation({
         authorityScope,
         governanceOrigin: "GOVERNED_WORK_ORDER",
         relationshipCreatedAt: linkedAt,
-        relationshipActorType: args.actorType,
-        relationshipActorId: args.actorId,
+        relationshipActorType: "HUMAN",
+        relationshipActorId: identity.subject,
         relationshipIdempotencyKey: args.idempotencyKey,
       },
     });
     await ctx.db.insert("activities", {
       projectId: args.projectId,
-      actorType: args.actorType,
-      actorId: args.actorId,
+      actorType: "HUMAN",
+      actorId: identity.subject,
       action: "TASK_LINKED_TO_WORK_ORDER",
       description: `Task "${task.title}" linked to Work Order "${workOrder.title}"`,
       targetType: "TASK",
@@ -1406,8 +1416,8 @@ export const linkToWorkOrder = mutation({
       taskId: task._id,
       projectId: args.projectId,
       eventType: "TASK_LINKED_TO_WORK_ORDER",
-      actorType: args.actorType,
-      actorId: args.actorId,
+      actorType: "HUMAN",
+      actorId: identity.subject,
       relatedId: workOrder._id,
       beforeState,
       afterState: {
@@ -1488,6 +1498,10 @@ export const transition = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Authenticated task actor required.");
+    const actorUserId = identity?.subject;
+
     // 1. Check idempotency - return existing if same key
     const existingTransition = await ctx.db
       .query("taskTransitions")
@@ -1550,7 +1564,11 @@ export const transition = mutation({
     
     const fromStatus = task.status as TaskStatus;
     const toStatus = args.toStatus as TaskStatus;
-    const actorType = args.actorType as "AGENT" | "HUMAN" | "SYSTEM";
+    const actorType = args.actorType;
+    if (actorType !== "HUMAN") {
+      if (!task.projectId) throw new Error("An authorized workspace is required.");
+      await requireWorkspacePermission({ ...ctx, db: missionAuthorityDatabase(ctx) }, task.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    }
 
     const operatorControl = await getEffectiveOperatorControl(ctx.db, task.projectId);
     const operatorGate = evaluateOperatorGate({
@@ -1603,6 +1621,11 @@ export const transition = mutation({
       };
     }
     
+    if (rule.humanOnly || toStatus === "DONE") {
+      const project = task.projectId ? await ctx.db.get(task.projectId) : null;
+      if (!identity || !project?.tenantId) throw new Error("Authenticated human approval is required.");
+      await requireWorkspaceAccess({ ...ctx, db: missionAuthorityDatabase(ctx) }, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.APPROVE_DELIVERY });
+    }
     // 5. Check human-only transitions
     if (rule.humanOnly && actorType !== "HUMAN") {
       return {
@@ -1684,15 +1707,16 @@ export const transition = mutation({
       errors.push({ field: "assigneeIds", message: "Task must have at least one assignee" });
     }
     
-    // Check REVIEW → DONE approval gate
-    if (fromStatus === "REVIEW" && toStatus === "DONE") {
+    // Every completion path must satisfy the workspace approval gate.
+    if (toStatus === "DONE") {
       // Get active policy to check if approval is required
-      const policy = await ctx.db
+      const policies = await ctx.db
         .query("policies")
         .withIndex("by_active", (q) => q.eq("active", true))
-        .first();
+        .filter(q => q.or(q.eq(q.field("projectId"), task.projectId), q.eq(q.field("projectId"), undefined)))
+        .collect();
       
-      if (policy && (policy.rules as any)?.reviewToDoneRequiresApproval) {
+      if (policies.some(policy => (policy.rules as any)?.reviewToDoneRequiresApproval)) {
         // Check for approved approval record
         const approvals = await ctx.db
           .query("approvals")
@@ -1700,10 +1724,10 @@ export const transition = mutation({
           .filter((q) => q.eq(q.field("status"), "APPROVED"))
           .collect();
         
-        if (approvals.length === 0) {
+        if (!approvals.some(isTaskCompletionApproval)) {
           errors.push({
             field: "status",
-            message: "REVIEW → DONE requires an approved approval record. Request approval first.",
+            message: "Completion requires an authenticated approved record. Request approval first.",
           });
         }
       }
@@ -1716,7 +1740,7 @@ export const transition = mutation({
     // 7. Build task update
     const now = Date.now();
     const actorRef =
-      args.actorUserId ?? args.actorAgentId?.toString() ?? args.actorType;
+      actorUserId ?? args.actorAgentId?.toString() ?? args.actorType;
     const taskUpdate: any = {
       status: toStatus,
       stateEnteredAt: now,
@@ -1818,7 +1842,7 @@ export const transition = mutation({
       toStatus,
       actorType,
       actorAgentId: args.actorAgentId,
-      actorUserId: args.actorUserId,
+      actorUserId: actorUserId,
       reason: args.reason,
       sessionKey: args.sessionKey,
       validationResult: { valid: true },
@@ -1844,7 +1868,7 @@ export const transition = mutation({
         toStatus,
         actorType,
         actorAgentId: args.actorAgentId,
-        actorUserId: args.actorUserId,
+        actorUserId: actorUserId,
       },
       relatedTable: "tasks",
       relatedId: args.taskId,
@@ -1854,7 +1878,7 @@ export const transition = mutation({
     await ctx.db.insert("activities", {
       projectId: task.projectId,
       actorType,
-      actorId: args.actorAgentId?.toString() ?? args.actorUserId,
+      actorId: args.actorAgentId?.toString() ?? actorUserId,
       action: "TASK_TRANSITION",
       description: `Task transitioned: ${fromStatus} → ${toStatus}`,
       targetType: "TASK",
@@ -1870,7 +1894,7 @@ export const transition = mutation({
       projectId: task.projectId,
       eventType: "TASK_TRANSITION",
       actorType,
-      actorId: args.actorAgentId?.toString() ?? args.actorUserId,
+      actorId: args.actorAgentId?.toString() ?? actorUserId,
       relatedId: transitionId,
       beforeState: { status: fromStatus, review: task.review, blocker: task.blocker },
       afterState: { status: toStatus, review: taskUpdate.review, blocker: taskUpdate.blocker },
@@ -1919,7 +1943,7 @@ export const transition = mutation({
           body: updatedTask.description ?? undefined,
           taskId: args.taskId,
           fromAgentId: args.actorAgentId,
-          fromUserId: args.actorUserId,
+          fromUserId: actorUserId,
         });
       }
     }
@@ -2112,6 +2136,7 @@ export const resolveApprovedWorkflowGate = mutation({
     ]);
     if (!task) return { success: false, error: "Task not found" };
     if (!approval) return { success: false, error: "Approval not found" };
+    if (!hasAuthenticatedApproval(approval)) return { success:false, error:"A new authenticated approval is required for this gate." };
 
     const metadata = (task.metadata ?? {}) as Record<string, any>;
     const gate = metadata.gate ?? {};

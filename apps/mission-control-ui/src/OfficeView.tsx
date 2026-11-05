@@ -1,15 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id, Doc } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "./components/PageHeader";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { StatusBadge } from "./components/factory/badges";
 import { MetricBlock } from "./components/factory/MetricBlock";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Building2, RotateCcw } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 interface OfficeViewProps {
   projectId: Id<"projects"> | null;
@@ -73,10 +72,8 @@ function getRoleBadge(role: string) {
 export function OfficeView({ projectId }: OfficeViewProps) {
   const agents = useQuery(api.agents.list, { projectId: projectId ?? undefined });
   const tasks = useQuery(api.tasks.list, { projectId: projectId ?? undefined });
-  const resetAllAgents = useMutation(api.agents.resetAll);
   const [selectedAgent, setSelectedAgent] = useState<Id<"agents"> | null>(null);
   const [filterStatus, setFilterStatus] = useState<"ALL" | AgentStatusType>("ALL");
-  const [resetting, setResetting] = useState(false);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -146,29 +143,6 @@ export function OfficeView({ projectId }: OfficeViewProps) {
         eyebrow="Comms"
         icon={<Building2 size={16} strokeWidth={1.7} />}
         status={<StatusBadge tone="neutral">{stats.total} agents</StatusBadge>}
-        actions={
-          stats.quarantined > 0 ? (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={async () => {
-                setResetting(true);
-                try {
-                  await resetAllAgents({ projectId: projectId ?? undefined });
-                } catch (err: any) {
-                  console.error("Reset all agents failed:", err);
-                  alert(err.message || "Failed to reset agents. Please try again.");
-                } finally {
-                  setResetting(false);
-                }
-              }}
-              disabled={resetting}
-            >
-              <RotateCcw className="h-4 w-4" />
-              {resetting ? "Resetting" : `Reset ${stats.quarantined} quarantined`}
-            </Button>
-          ) : undefined
-        }
       />
 
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-6 py-6">
@@ -472,7 +446,7 @@ function AgentCard({ agent, currentTask, isSelected, onSelect }: AgentCardProps)
         {/* Budget bar */}
         <div>
           <div className="flex justify-between mb-0.5">
-            <span className="text-ink-muted text-[11.5px]">Budget</span>
+            <span className="text-ink-muted text-[11.5px]">Visible cost / limit</span>
             <span className="text-ink-muted text-[11.5px] font-medium">
               ${agent.spendToday.toFixed(2)} / ${agent.budgetDaily.toFixed(2)}
             </span>
@@ -622,7 +596,7 @@ function AgentDetailPanel({
                 value={heartbeat.text}
                 valueClass={heartbeat.healthy ? "text-ok" : "text-err"}
               />
-              <DetailRow label="Error Streak" value={String(agent.errorStreak)} />
+              <DetailRow label="Error Streak" value={agent.errorStreak === undefined ? "Unavailable" : String(agent.errorStreak)} />
               {agent.lastError && (
                 <DetailRow label="Last Error" value={agent.lastError} valueClass="text-err" />
               )}
@@ -641,7 +615,7 @@ function AgentDetailPanel({
 
           {/* Budget */}
           <div>
-            <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-muted mb-2">Budget</div>
+            <div className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-muted mb-2">Visible cost / limit</div>
             <div className="p-2.5 px-3 rounded-lg bg-surface-2 border border-line">
               <div className="flex justify-between mb-1.5">
                 <span className="text-[13.5px] text-ink-muted">

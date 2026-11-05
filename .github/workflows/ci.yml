@@ -1,10 +1,14 @@
 name: CI — Mission Control
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main, master, 'feat/*', 'bugfix/*', 'sf/*', 'codex/unified-capability-control-plane']
+    branches: [main, master, 'feat/*', 'bugfix/*', 'sf/*', 'codex/unified-capability-control-plane', 'codex/checkpoint-h-authenticated-enterprise', 'codex/integration-reconcile-20261104']
   pull_request:
-    branches: [main, master, 'sf/*']
+    branches: [main, master, 'sf/*', 'codex/enterprise-golden-journey']
+
+permissions:
+  contents: read
 
 jobs:
   smoke:
@@ -12,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -36,6 +43,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
       
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -68,6 +78,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
           fetch-depth: 0
       
       - name: Setup Node.js
@@ -87,7 +99,11 @@ jobs:
           pnpm run lint
 
       - name: Guard public Convex runtime contracts
-        run: pnpm run ci:runtime-contract
+        run: |
+          if [[ -z "$RUNTIME_CONTRACT_BASE_SHA" || "$RUNTIME_CONTRACT_BASE_SHA" =~ ^0{40}$ ]]; then
+            export RUNTIME_CONTRACT_BASE_SHA="$(git rev-parse origin/main)"
+          fi
+          pnpm run ci:runtime-contract
         env:
           RUNTIME_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
@@ -96,6 +112,9 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -146,6 +165,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -167,6 +188,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -192,6 +216,9 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -221,6 +248,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -235,7 +264,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Enforce dependency and credential policy
-        run: pnpm run release:security
+        run: |
+          if [[ -z "$AUTHORIZATION_BASE_SHA" || "$AUTHORIZATION_BASE_SHA" =~ ^0{40}$ ]]; then
+            export AUTHORIZATION_BASE_SHA="$(git rev-parse origin/main)"
+          fi
+          pnpm run release:security
         env:
           AUTHORIZATION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
 
@@ -244,6 +277,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -270,6 +306,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup Node.js

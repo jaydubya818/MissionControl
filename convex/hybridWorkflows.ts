@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, action } from "./lib/missionScopedFunctions";
 import { api } from "./_generated/api";
 
 function buildWorkflowId(): string {

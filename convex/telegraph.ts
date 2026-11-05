@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation } from "./lib/missionScopedFunctions";
 
 const channelValidator = v.union(v.literal("INTERNAL"), v.literal("TELEGRAM"));
 const senderTypeValidator = v.union(

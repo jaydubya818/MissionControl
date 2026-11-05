@@ -1,9 +1,10 @@
+import { internalMutation as administrativeMutation } from "./_generated/server";
 /**
  * Content Drops — Agent-submitted deliverables
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 
 const contentTypeValidator = v.union(
   v.literal("BLOG_POST"),
@@ -150,7 +151,7 @@ export const getStats = query({
   },
 });
 
-export const seedContentDrops = mutation({
+export const seedContentDrops = administrativeMutation({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
     const existing = args.projectId

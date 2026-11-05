@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 
 // ============================================================================

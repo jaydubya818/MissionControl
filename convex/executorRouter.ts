@@ -6,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./lib/missionScopedFunctions";
 
 // ============================================================================
 // ROUTING RULES
