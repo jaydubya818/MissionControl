@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -76,7 +76,6 @@ export function DirectoryView({ projectId }: { projectId: Id<"projects"> | null 
   const [selectedTenantId, setSelectedTenantId] = useState<Id<"tenants"> | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<Id<"agentTemplates"> | null>(null);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
-  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [isTenantBackfilling, setIsTenantBackfilling] = useState(false);
 
@@ -99,7 +98,6 @@ export function DirectoryView({ projectId }: { projectId: Id<"projects"> | null 
   );
   const migrationHealth = useQuery(api["migrations/backfillInstanceRefs"].getMigrationHealth, {});
 
-  const seedMissionControlDemo = useMutation(api.seedMissionControlDemo.run);
   const runInstanceRefBackfill = useAction(api["migrations/backfillInstanceRefs"].runBackfill);
   const runTenantBackfill = useAction(api["migrations/backfillInstanceRefs"].runTenantBackfill);
 
@@ -136,19 +134,6 @@ export function DirectoryView({ projectId }: { projectId: Id<"projects"> | null 
     for (const e of environments ?? []) map.set(e._id, { name: e.name, type: e.type });
     return map;
   }, [environments]);
-
-  const handleSeedDemo = async () => {
-    try {
-      setIsSeedingDemo(true);
-      const result = await seedMissionControlDemo({});
-      const counts = Object.entries(result.counts ?? {}).map(([k, v]) => `${k}:${v}`).join(" ");
-      toast(`Demo data seeded. ${counts}`);
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Seed failed", true);
-    } finally {
-      setIsSeedingDemo(false);
-    }
-  };
 
   const handleRunBackfill = async () => {
     try {
@@ -418,12 +403,10 @@ export function DirectoryView({ projectId }: { projectId: Id<"projects"> | null 
         {devToolsOpen && (
           <Card className="mt-2 p-4">
             <p className="text-[12.5px] text-ink-secondary mb-3">
-              Seed demo data and backfill legacy agent refs into ARM instance/version fields.
+              Backfill legacy agent refs into ARM instance/version fields. Demo installation is managed by the deployment administrator.
             </p>
             <div className="flex flex-wrap gap-2 mb-3">
-              <Button size="sm" variant="outline" onClick={handleSeedDemo} disabled={isSeedingDemo}>
-                {isSeedingDemo ? "Seeding…" : "Seed Mission Control Demo"}
-              </Button>
+
               <Button size="sm" variant="outline" onClick={handleRunBackfill} disabled={isBackfilling}>
                 {isBackfilling ? "Backfilling…" : "Run Instance Ref Backfill"}
               </Button>

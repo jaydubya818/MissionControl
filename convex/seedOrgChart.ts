@@ -3,10 +3,10 @@
  * Run: npx convex run seedOrgChart:run
  */
 
-import { mutation } from "./lib/missionScopedFunctions";
+import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
-export const run = mutation({
+export const run = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Get or create default project
@@ -186,7 +186,7 @@ export const run = mutation({
 /**
  * Clear all org members and agents (for testing)
  */
-export const clear = mutation({
+export const clear = internalMutation({
   args: {},
   handler: async (ctx) => {
     const members = await ctx.db.query("orgMembers").collect();

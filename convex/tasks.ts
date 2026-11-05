@@ -1,3 +1,5 @@
+import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, requireWorkspaceAccess, requireWorkspacePermission } from "./lib/companyAccess";
+import { missionServiceBinding } from "./lib/missionScopedFunctions";
 import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Tasks — Convex Functions
@@ -1489,6 +1491,12 @@ export const transition = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const service = missionServiceBinding(ctx);
+    if (!identity && !service) throw new Error("Authenticated task actor required.");
+    if (service && args.actorType === "HUMAN") throw new Error("A service cannot assert human approval.");
+    const actorUserId = identity?.subject;
+
     // 1. Check idempotency - return existing if same key
     const existingTransition = await ctx.db
       .query("taskTransitions")
@@ -1551,7 +1559,11 @@ export const transition = mutation({
     
     const fromStatus = task.status as TaskStatus;
     const toStatus = args.toStatus as TaskStatus;
-    const actorType = args.actorType as "AGENT" | "HUMAN" | "SYSTEM";
+    const actorType = service ? "AGENT" : args.actorType;
+    if (!service && actorType !== "HUMAN") {
+      if (!task.projectId) throw new Error("An authorized workspace is required.");
+      await requireWorkspacePermission({ ...ctx, db: missionAuthorityDatabase(ctx) }, task.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    }
 
     const operatorControl = await getEffectiveOperatorControl(ctx.db, task.projectId);
     const operatorGate = evaluateOperatorGate({
@@ -1604,6 +1616,11 @@ export const transition = mutation({
       };
     }
     
+    if (rule.humanOnly && !taskWorkOrder?.missionId) {
+      const project = task.projectId ? await ctx.db.get(task.projectId) : null;
+      if (!identity || !project?.tenantId) throw new Error("Authenticated human approval is required.");
+      await requireWorkspaceAccess({ ...ctx, db: missionAuthorityDatabase(ctx) }, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.APPROVE_DELIVERY });
+    }
     // 5. Check human-only transitions
     if (rule.humanOnly && actorType !== "HUMAN") {
       return {
@@ -1717,7 +1734,7 @@ export const transition = mutation({
     // 7. Build task update
     const now = Date.now();
     const actorRef =
-      args.actorUserId ?? args.actorAgentId?.toString() ?? args.actorType;
+      actorUserId ?? args.actorAgentId?.toString() ?? args.actorType;
     const taskUpdate: any = {
       status: toStatus,
       stateEnteredAt: now,
@@ -1819,7 +1836,7 @@ export const transition = mutation({
       toStatus,
       actorType,
       actorAgentId: args.actorAgentId,
-      actorUserId: args.actorUserId,
+      actorUserId: actorUserId,
       reason: args.reason,
       sessionKey: args.sessionKey,
       validationResult: { valid: true },
@@ -1845,7 +1862,7 @@ export const transition = mutation({
         toStatus,
         actorType,
         actorAgentId: args.actorAgentId,
-        actorUserId: args.actorUserId,
+        actorUserId: actorUserId,
       },
       relatedTable: "tasks",
       relatedId: args.taskId,
@@ -1855,7 +1872,7 @@ export const transition = mutation({
     await ctx.db.insert("activities", {
       projectId: task.projectId,
       actorType,
-      actorId: args.actorAgentId?.toString() ?? args.actorUserId,
+      actorId: args.actorAgentId?.toString() ?? actorUserId,
       action: "TASK_TRANSITION",
       description: `Task transitioned: ${fromStatus} → ${toStatus}`,
       targetType: "TASK",
@@ -1871,7 +1888,7 @@ export const transition = mutation({
       projectId: task.projectId,
       eventType: "TASK_TRANSITION",
       actorType,
-      actorId: args.actorAgentId?.toString() ?? args.actorUserId,
+      actorId: args.actorAgentId?.toString() ?? actorUserId,
       relatedId: transitionId,
       beforeState: { status: fromStatus, review: task.review, blocker: task.blocker },
       afterState: { status: toStatus, review: taskUpdate.review, blocker: taskUpdate.blocker },
@@ -1920,7 +1937,7 @@ export const transition = mutation({
           body: updatedTask.description ?? undefined,
           taskId: args.taskId,
           fromAgentId: args.actorAgentId,
-          fromUserId: args.actorUserId,
+          fromUserId: actorUserId,
         });
       }
     }

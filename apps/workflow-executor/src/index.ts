@@ -29,6 +29,10 @@ if (!CONVEX_URL) {
   console.error("❌ Error: CONVEX_URL environment variable is required");
   process.exit(1);
 }
+if (!CONVEX_SERVICE_AUTH_TOKEN) {
+  console.error("Error: CONVEX_SERVICE_AUTH_TOKEN is required for authorized workflow access");
+  process.exit(1);
+}
 if (!createExecutor) {
   console.error("❌ Error: workflow engine factory is unavailable");
   process.exit(1);

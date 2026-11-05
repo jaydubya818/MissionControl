@@ -1,3 +1,4 @@
+import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 /**
  * Workflow Metrics — Convex Functions
  * 
@@ -133,11 +134,11 @@ export const updateMetrics = internalMutation({
     const periodStart = now - 30 * 24 * 60 * 60 * 1000; // Last 30 days
     
     // Get all runs for this workflow in the period
-    const runs = await ctx.db
-      .query("workflowRuns")
+    let runQuery = ctx.db.query("workflowRuns")
       .withIndex("by_workflow_id", (q) => q.eq("workflowId", args.workflowId))
-      .filter((q) => q.gte(q.field("startedAt"), periodStart))
-      .collect();
+      .filter((q) => q.gte(q.field("startedAt"), periodStart));
+    if (args.projectId) runQuery = runQuery.filter(q => q.eq(q.field("projectId"), args.projectId));
+    const runs = await runQuery.collect();
     
     if (runs.length === 0) {
       return { success: true, message: "No runs to analyze" };
@@ -240,13 +241,15 @@ export const updateMetrics = internalMutation({
  * Refresh metrics for all workflows
  */
 export const refreshAll = mutation({
-  handler: async (ctx) => {
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
     // Get all unique workflow IDs
-    const workflows = await ctx.db.query("workflows").collect();
+    const workflows = await ctx.db.query("workflows").filter(q => q.eq(q.field("projectId"), args.projectId)).collect();
     
     for (const workflow of workflows) {
       await ctx.runMutation(internal.workflowMetrics.updateMetrics, {
-        workflowId: workflow.workflowId,
+        workflowId: workflow.workflowId, projectId: args.projectId,
       });
     }
     

@@ -107,6 +107,9 @@ const proposalList = {
 };
 export const useQuery = (reference:any) => {
   const name=getFunctionName(reference);
+  if(name === "workOrders:factoryOverview") return {summary:{activeWorkOrders:0,blockedWorkOrders:0,awaitingApproval:0,staleEvidence:0,runsNeedingAttention:0,recentlyAccepted:0,verificationFailures:0,approvalsPending:0},recentAccepted:[],blockedWorkOrders:[],approvalQueue:[],staleEvidence:[],runsNeedingAttention:[]};
+  if(name === "workflowMetrics:getAllMetrics") return [];
+  if(name === "workflowMetrics:getSummary") return {total:0,completed:0,failed:0,running:0,paused:0,successRate:0,avgDurationMs:0,totalRetries:0,totalEscalations:0};
   if(name === "workflows:list") return [
     {_id:"workflow-own",workflowId:"scoped",name:"Scoped workflow",description:"Component fixture only",projectId:"project-ui-fixture",contractVersion:"factory-workflow-contract/v1",agents:[],steps:[]},
     {_id:"workflow-global",workflowId:"global",name:"Global workflow",description:"Not directly startable",agents:[],steps:[]},
@@ -124,5 +127,6 @@ export const useQuery = (reference:any) => {
 };
 functions["missions:updateDraft"] = async(args) => ({mission:{...args,_id:args.missionId,state:"DRAFT"},updated:true});
 functions["workflowRuns:start"] = async() => ({runId:"component-fixture-no-execution"});
+functions["workflowMetrics:refreshAll"] = async() => { throw new Error("Synthetic refresh refusal — try again"); };
 export const useMutation = (reference: any) =>
   functions[getFunctionName(reference)];

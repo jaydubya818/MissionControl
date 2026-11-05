@@ -10,7 +10,7 @@
  *   npx convex run seedMissionControlDemo:run
  */
 
-import { mutation } from "./lib/missionScopedFunctions";
+import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { computeGenomeHash } from "./lib/genomeHash";
 import { seedDemoExtensions } from "./lib/demoSeedExtensions";
@@ -747,7 +747,7 @@ async function collectCounts(ctx: any, projectId: Id<"projects">, tenantId: Id<"
   };
 }
 
-export const run = mutation({
+export const run = internalMutation({
   args: {
     force: v.optional(v.boolean()),
   },

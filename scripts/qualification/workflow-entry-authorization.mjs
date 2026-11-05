@@ -10,7 +10,7 @@ const db=await startFixtureDatabase(process.cwd(),{nativeExecution:true});
 try{
  const s=db.seed,mutate=(name,args)=>db.owner.mutation(name,args),query=(name,args)=>db.owner.query(name,args);
  const check=async(name,fn)=>{try{await fn();receipt.checks.push(name);}catch(error){receipt.failures.push({name,error:String(error)});}};
- const denied=/Authenticated operator|unavailable or unauthorized|role does not permit|authorized workspace/i;
+ const denied=/Authenticated operator|unavailable or unauthorized|role does not permit|authorized workspace|MISSION_UNAVAILABLE|Workflow run not found/i;
  const privateFunction=/Could not find public function|not.*public|not found/i;
  const workflowId='legacy-entry-'+randomUUID();
  const args={projectId:s.projectId,workflowId,name:'Synthetic v1 boundary',description:'No execution; permission regression only',topology:'LINEAR',agents:[{id:'worker',persona:'Synthetic gate only'}],steps:[{id:'gate',kind:'GATE',agent:'',input:'Wait',expects:'Owner decision',retryLimit:0,timeoutMinutes:1}],active:true};
@@ -32,7 +32,7 @@ try{
    assert.deepEqual(await client.query('workflowRuns:listArtifacts',{workflowRunId:record._id}),[]);
   });
   for(const [operation,extra] of [['updateContext',{context:{foreign:true}}],['updateStatus',{status:'FAILED'}],['updateStep',{stepIndex:0,status:'DONE'}],['incrementRetry',{stepIndex:0}],['advance',{}],['claimExecution',{leaseId:'foreign',ownerId:'foreign',dispatchMode:'MANUAL',estimatedCostUsd:0}]])
-   await check(`${name}-${operation}-denied`,async()=>{const own=await start();await assert.rejects(client.mutation(`workflowRuns:${operation}`,{runId:own.runId,...extra}),denied);});
+   await check(`${name}-${operation}-denied`,async()=>{const own=await start();const before=await query("workflowRuns:get",{runId:own.runId});await assert.rejects(client.mutation(`workflowRuns:${operation}`,{runId:own.runId,...extra}),denied);assert.deepEqual(await query("workflowRuns:get",{runId:own.runId}),before);});
  }
  await check('deployment-admin-only-legacy-upsert',async()=>{
   const legacy={workflowId:'synthetic-global-boundary',name:'Legacy',description:'Deployment administration fixture',agents:[],steps:[],active:false};

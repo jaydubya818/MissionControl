@@ -1,3 +1,4 @@
+import { internalMutation as administrativeMutation } from "./_generated/server";
 /**
  * Projects — Convex Functions
  *
@@ -1147,7 +1148,7 @@ export const remove = mutation({
  * approvals, artifacts, and receipt rows so the factory overview has a complete
  * project-scoped read model immediately after creation.
  */
-export const createSoftwareFactoryProject = mutation({
+export const createSoftwareFactoryProject = administrativeMutation({
   args: {
     name: v.optional(v.string()),
     slug: v.optional(v.string()),
@@ -1261,6 +1262,8 @@ export const createSoftwareFactoryProject = mutation({
           metadata: { source: "createSoftwareFactoryProject", idempotencyScope: seed.idempotencyScope },
         });
         workflowDoc = await ctx.db.get(workflowDocId);
+      } else if (workflowDoc.projectId && workflowDoc.projectId !== project!._id) {
+        throw new Error("Demo administration cannot reactivate another workspace workflow.");
       } else if (!workflowDoc.active) {
         await ctx.db.patch(workflowDoc._id, { active: true, updatedAt: now });
         workflowDoc = await ctx.db.get(workflowDoc._id);

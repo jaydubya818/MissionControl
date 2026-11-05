@@ -1,3 +1,4 @@
+import { internalMutation as administrativeMutation } from "./_generated/server";
 import { dispatchArgs } from './lib/workOrderDispatchArgs';
 import { requireWorkOrderCapabilityAdmission, type CapabilityPermits } from "./lib/capabilityAdmission";
 import { serviceInternalMutation } from "./lib/missionScopedFunctions";
@@ -6098,7 +6099,7 @@ export const expireGovernanceRecords = mutation({
   },
 });
 
-export const seedDemo = mutation({
+export const seedDemo = administrativeMutation({
   args: {},
   handler: async (ctx) => {
     const existing = await ctx.db

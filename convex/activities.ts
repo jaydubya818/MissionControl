@@ -22,7 +22,11 @@ export const create = mutation({
     afterState: v.optional(v.any()),
     metadata: v.optional(v.any()),
   },
-  handler: async (ctx, args) => await ctx.db.insert("activities", args),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Authenticated operator required.");
+    return await ctx.db.insert("activities", { ...args, actorType: "HUMAN", actorId: identity.subject });
+  },
 });
 
 export const list = query({

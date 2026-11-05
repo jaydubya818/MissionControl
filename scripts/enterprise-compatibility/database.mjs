@@ -109,9 +109,10 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
       c.setAdminAuth(key, { subject, issuer: "https://fixture.example.test", email: `${subject}@example.test` });
       return c;
     }
-    const owner = client(nativeExecution ? "user_SyntheticHandoffQualification" : "fixture-owner"), other = client("fixture-other");
+    const ownerSubject = nativeExecution ? "user_SyntheticHandoffQualification" : "fixture-owner";
+    const owner = client(ownerSubject), other = client("fixture-other");
     const seed = await owner.mutation(nativeExecution ? "nativeFixture:seed" : "fixtureSeed:seed", {});
-    return { root, seed, owner, other, peer: client("fixture-peer"), anonymous: new ConvexHttpClient(url), stop,
+    return { root, seed, ownerSubject, owner, other, peer: client("fixture-peer"), anonymous: new ConvexHttpClient(url), stop,
       ...(nativeExecution ? { client, runLegacyWorkflowSeeder() {
         return runFixtureCommand("SEED_LEGACY_WORKFLOWS", process.execPath, ["--import", "tsx", join(repo, "scripts/seed-workflows.ts")],
           { cwd: repo, env, encoding: "utf8", timeout: 60000, stdio: "pipe" });

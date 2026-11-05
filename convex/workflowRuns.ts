@@ -1203,7 +1203,6 @@ export const start = mutation({
       metadata: {
         workflowId: args.workflowId,
         runId,
-        initialInput: args.initialInput,
       },
     });
 
@@ -1217,7 +1216,7 @@ export const start = mutation({
       status: "PENDING",
       startedAt: now,
       commandSummary: `Workflow ${args.workflowId} created`,
-      metadata: { runId, workflowId: args.workflowId, initialInput: args.initialInput },
+      metadata: { runId, workflowId: args.workflowId },
       idempotencyKey: `run-start:${runId}`,
     });
     

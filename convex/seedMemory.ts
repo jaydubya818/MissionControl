@@ -3,9 +3,9 @@
  * Run: npx convex run seedMemory:run
  */
 
-import { mutation } from "./lib/missionScopedFunctions";
+import { internalMutation } from "./_generated/server";
 
-export const run = mutation({
+export const run = internalMutation({
   args: {},
   handler: async (ctx) => {
     // Find the Mission Control project (or any project)

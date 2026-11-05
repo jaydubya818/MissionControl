@@ -1,3 +1,4 @@
+import { legacyWorkspaceAccess } from './legacyWorkspaceAccess';
 import { SOFIE_APPLICATION } from '../../packages/shared/src/sofieEnterprise';
 import { getFunctionName } from 'convex/server';
 import { authorizeSofieApplicationCommand, requireSofieApplicationAuthority, type SofieApplicationAuthority } from './sofieEnterpriseAuthority';
@@ -49,6 +50,7 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     if (key === "get") return (id: string) => read(id);
     const value = Reflect.get(target, key); return typeof value === "function" ? value.bind(target) : value;
   } }) };
+  const legacyAllowed = legacyWorkspaceAccess(policyCtx as Context, read, lineage);
   const invalidate = (id: string) => { rowCache.clear(); decisions.clear(); resourceDecisions.clear(); completedReads.clear(); authorizationEpoch++; };
   function allowed(row: Row | null, capability: MissionCapability, seen = new Set<string>(), table?: string, epoch = authorizationEpoch): Promise<boolean> {
     if (epoch !== authorizationEpoch || pendingWrites) return Promise.resolve(false);
@@ -165,7 +167,7 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
       if (seen.has(id)) continue;
       if (!await allowed(parent, application ? "READ" : service && row._id === service.workflowRunId && row.verificationAttemptBinding?.sourceAttemptId === id ? "READ" : capability, seen, undefined, epoch)) return false;
     }
-    return true;
+    return await legacyAllowed(row, table, capability !== "READ");
   }
   async function assertWrite(row: Row, table: string | undefined, epoch: number) {
     if (!await allowed(row, writeCapability, new Set(), table, epoch) || epoch !== authorizationEpoch || pendingWrites) throw Error("MISSION_UNAVAILABLE");
@@ -179,6 +181,10 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     table ??= lineage.tableOf(row._id) ?? undefined;
     if (table === "alerts" && row.type === "BUDGET_EXCEEDED" && row.agentId) {
       return { ...row, description: "Agent daily budget limit reached", metadata: undefined };
+    }
+    if (table === "activities" && row.action === "WORKFLOW_STARTED" && row.metadata) {
+      const { initialInput: _initialInput, ...metadata } = row.metadata;
+      return { ...row, metadata };
     }
     if (table !== "agents") return row;
     const start = new Date(); start.setUTCHours(0, 0, 0, 0);

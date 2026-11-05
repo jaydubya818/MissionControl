@@ -1,6 +1,6 @@
 import { requireServiceAttemptAuthority } from "./lib/missionServiceAuthority";
 // Deployed only to the disposable qualification database.
-import { mutationGeneric as fixtureMutation } from "convex/server";
+import { mutationGeneric as fixtureMutation, internalMutationGeneric as fixtureInternalMutation } from "convex/server";
 import { query, contributorMutation, missionScopedContext } from "./lib/missionScopedFunctions";
 import { v } from "convex/values";
 import schema from "./schema";
@@ -161,3 +161,15 @@ export const clearRepositoryMutationPeer = fixtureMutation({args:{missionId:v.id
   ||wo.metadata?.repositoryMutationFixture!==true||run.metadata?.repositoryMutationFixture!==true)throw Error("SYNTHETIC_REPOSITORY_SCOPE_REQUIRED");
  await ctx.db.delete(run._id);await ctx.db.delete(wo._id);await ctx.db.delete(mission._id);
 }});
+
+// Disposable qualification only; this module is copied into the temporary backend.
+export const legacyDeliveryRole = fixtureInternalMutation({
+ args: { operatorId:v.id('operators'), projectId:v.id('projects'), tenantId:v.id('tenants') },
+ handler: async(ctx,args)=>{
+  const operator=await ctx.db.get(args.operatorId),project=await ctx.db.get(args.projectId);
+  if(operator?.authId!=='fixture-peer'||operator.tenantId!==args.tenantId||project?.tenantId!==args.tenantId)throw Error('Fixture identity mismatch');
+  for(const row of await ctx.db.query('roleAssignments').withIndex('by_operator',q=>q.eq('operatorId',args.operatorId)).collect())await ctx.db.delete(row._id);
+  const roleId=await ctx.db.insert('roles',{tenantId:args.tenantId,name:'Delivery-only fixture',permissions:['factory.read','delivery.write']});
+  await ctx.db.insert('roleAssignments',{operatorId:args.operatorId,roleId,assignedAt:Date.now(),scope:{type:'project',id:args.projectId}});
+ }
+});

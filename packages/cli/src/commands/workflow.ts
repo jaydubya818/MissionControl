@@ -23,6 +23,12 @@ if (!CONVEX_URL) {
 }
 
 const client = new ConvexHttpClient(CONVEX_URL);
+const workflowAuthToken = process.env.CONVEX_SERVICE_AUTH_TOKEN?.trim();
+if (!workflowAuthToken) {
+  console.error(chalk.red("Error: CONVEX_SERVICE_AUTH_TOKEN is required for authorized workflow access"));
+  process.exit(1);
+}
+client.setAuth(workflowAuthToken);
 
 export const workflowCommand = new Command("workflow")
   .description("Manage multi-agent workflows")
