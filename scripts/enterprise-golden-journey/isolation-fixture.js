@@ -182,7 +182,7 @@ export const legacyPermissionRevocation = fixtureInternalMutation({
   const role=await ctx.db.get(assignment.roleId);if(role.name!=='Delivery-only fixture')throw Error('Fixture role mismatch');
   const scoped=missionScopedContext(ctx);
   const before=await scoped.db.get(args.taskId);
-  await scoped.db.patch(role._id,{permissions:[]});
+  await scoped.db.patch(operator._id,{active:false});
   const after=await scoped.db.get(args.taskId);
   return {visibleBefore:Boolean(before),visibleAfter:Boolean(after)};
  }
