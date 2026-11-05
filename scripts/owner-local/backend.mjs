@@ -60,4 +60,6 @@ const cmd = process.argv[2] ?? 'start';
 if (cmd === 'start') { await start(); await push(); }
 else if (cmd === 'push') await push();
 else if (cmd === 'stop') await stop();
-else if (cmd === 'reset') { await stop(); await new Promise(r => setTimeout(r, 1500)); await rm(storage, { recursive: true, force: true }); await rm(db, { force: true }); await start(); await push(); }
+else if (cmd === 'reset') { await stop(); await new Promise(r => setTimeout(r, 1500)); await rm(storage, { recursive: true, force: true }); await rm(db, { force: true });
+  // Bridge single-use claims belong to this disposable backend's decisions and are discarded with them.
+  await rm(join(MC_DIR, 'claims'), { recursive: true, force: true }); await start(); await push(); }

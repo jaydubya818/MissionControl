@@ -33,7 +33,9 @@ await insert('teamMemberships', { tenantId, projectId, teamId, memberId: ownerMe
 await insert('teamMemberships', { tenantId, projectId, teamId, memberId: plannerMemberId, operatorId: plannerOperatorId, role: 'DEVELOPER', active: true, activeFrom: now - 1000, createdAt: now, updatedAt: now });
 await insert('workflows', { workflowId: 'myfactory-owner-local-build', name: 'MyFactory owner-local build', version: 1, active: true, projectId,
   description: 'Bounded MyFactory build and tests for the owner-local dashboard', agents: [], steps: [], createdAt: now, updatedAt: now });
-const repositoryId = await insert('workspaceRepositories', { tenantId, projectId, provider: 'GITHUB', repositoryMode: 'GITHUB', repository: 'local/dashboard', displayName: 'Owner-local dashboard',
+// The single repository this disposable MissionControl is scoped to; the bridge refuses a confirmation naming any other.
+const REPOSITORY = 'local/dashboard';
+const repositoryId = await insert('workspaceRepositories', { tenantId, projectId, provider: 'GITHUB', repositoryMode: 'GITHUB', repository: REPOSITORY, displayName: 'Owner-local dashboard',
   defaultBranch: 'main', isDefault: true, status: 'READY', webhookStatus: 'MISSING', dataClassification: 'INTERNAL', createdAt: now, updatedAt: now });
 const codeScopeId = await insert('repositoryCodeScopes', { tenantId, projectId, repositoryId, name: 'Dashboard app', slug: 'dashboard-app',
   includePaths: ['src/**', 'test/**', 'playwright.config.ts', 'playwright.unit.config.ts', 'package.json', 'README.md'], excludePaths: [],
@@ -70,7 +72,7 @@ envSet('MC_CAPABILITY_RECEIVER_EPOCH', binding.incarnation);
 writeSecret('mc-owner-token', mintToken(OWNER_ID, 3 * 3600));
 writeSecret('mc-planner-token', mintToken(PLANNER_SUBJECT, 3 * 3600));
 const { x, y, kty, crv } = receiverJwk;
-const setup = { tenantId, projectId, repositoryId, codeScopeId, ownerOperatorId, plannerOperatorId, ownerMemberId, plannerMemberId, teamId, workflowId: 'myfactory-owner-local-build',
+const setup = { tenantId, projectId, repository: REPOSITORY, repositoryId, codeScopeId, ownerOperatorId, plannerOperatorId, ownerMemberId, plannerMemberId, teamId, workflowId: 'myfactory-owner-local-build',
   permitKey: { keyId: permitKeyId, publicKeyPem: permitPublic.export({ type: 'spki', format: 'pem' }).toString() },
   receiver: { backendId: binding.backendId, incarnation: binding.incarnation, enrollmentVersion: 1, keyId: binding.acknowledgmentKey.keyId, publicJwk: { kty, crv, x, y } },
   installationId: binding.installationId, organizationId: binding.organizationId, applicationKeyId: 'owner-local-sofie', createdAt: new Date(now).toISOString() };

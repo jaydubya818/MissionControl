@@ -5,9 +5,13 @@
 //   A /confirm         1 connect app  2 authorize proposal  3 approve Plan (releases the APPLIED WorkOrder revision)
 //   B /approve-permits 4..n approve INSTALLED_EXECUTION_PERMIT for exactly the confirmed stage Works
 // Without a valid, fresh, unused confirmation nothing is called. MissionControl's own checks decide every mutation; nothing is bypassed.
+// Single use is a durable exclusive claim (O_EXCL file, fsync) taken synchronously after verification and BEFORE any MissionControl write:
+// step A once per confirmation, step B once per (Work, generation). Concurrent requests: exactly one claim succeeds. A claimed step that then
+// fails is never retried (fail closed); the owner confirms again. Step B approves only a request whose Work tuple equals the tuple MyEve
+// signed under the same confirmation, and every step refuses a confirmation whose repository is not the one MissionControl is scoped to.
 import { createServer } from 'node:http';
 import { createHash, createHmac, createPublicKey, randomUUID, verify } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ConvexHttpClient } from 'convex/browser';
@@ -19,6 +23,17 @@ const ROOT = new URL('../..', import.meta.url).pathname, cli = join(ROOT, 'node_
 const AUDIT = join(EVIDENCE, 'mc-owner-approvals.jsonl');
 const FRESH_MS = 10 * 60 * 1000, JOURNEY_MS = 120 * 60 * 1000;
 const setup = () => JSON.parse(readFileSync(join(MC_DIR, 'setup.json'), 'utf8'));
+const CLAIMS = join(MC_DIR, 'claims');
+const SHA = /^[a-f0-9]{64}$/;
+/** Durable single-use claim. Synchronous (no await between the caller's checks and the claim); EEXIST means another request owns it. */
+export function claimOnce(key, content) {
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(key)) throw Error('CLAIM_KEY_INVALID');
+  mkdirSync(CLAIMS, { recursive: true, mode: 0o700 });
+  let fd;
+  try { fd = openSync(join(CLAIMS, key), 'wx', 0o600); } catch (error) { if (error?.code === 'EEXIST') throw Error('CONFIRMATION_ALREADY_CLAIMED'); throw error; }
+  try { writeSync(fd, JSON.stringify({ at: new Date().toISOString(), ...content })); fsyncSync(fd); } finally { closeSync(fd); }
+}
+const confirmationKey = () => createPublicKey(readFileSync(join(CONFIG, 'owner-confirmation.public.pem'), 'utf8'));
 const ref = name => makeFunctionReference(name);
 const canonical = v => Array.isArray(v) ? `[${v.map(canonical).join(',')}]` : v && typeof v === 'object'
   ? `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}` : JSON.stringify(v);
@@ -31,15 +46,19 @@ const envSet = (name, value) => execFileSync(process.execPath, [cli, 'env', 'set
   { cwd: join(MC_DIR, 'project'), stdio: ['ignore', 'ignore', 'inherit'], env: { PATH: process.env.PATH, HOME: process.env.HOME } });
 
 /** Verifies MyEve's signature, owner, profile, freshness and single use of a confirmation for one bridge step. */
-export function verifyConfirmation(body, step) {
+export function verifyConfirmation(body, step, s = setup()) {
   const { binding, signature } = body ?? {};
   if (!binding || typeof signature !== 'string') throw Error('CONFIRMATION_REQUIRED');
-  const key = createPublicKey(readFileSync(join(CONFIG, 'owner-confirmation.public.pem'), 'utf8'));
+  const key = confirmationKey();
   if (!verify(null, Buffer.from('myeve-owner-confirmation/v1\n' + canonical(binding)), key, Buffer.from(signature, 'base64url'))) throw Error('CONFIRMATION_SIGNATURE');
   if (binding.schema !== 'myeve-owner-confirmation/v1' || binding.profile !== 'myeve.private-beta.owner/v1' || binding.ownerId !== OWNER_ID
     || !/^[a-f0-9]{64}$/.test(binding.planSha256) || binding.confirmCode !== binding.planSha256.slice(0, 12)
     || binding.requestSha256 !== sha256(binding.request) || !Array.isArray(binding.works) || binding.works.length !== 3
     || !(Date.now() - binding.confirmedAt < (step === 'A' ? FRESH_MS : JOURNEY_MS) && binding.confirmedAt <= Date.now() + 5000)) throw Error('CONFIRMATION_INVALID_OR_STALE');
+  if (binding.works.some((w, i) => w?.stage !== i + 1 || typeof w.id !== 'string' || !w.id || !Number.isSafeInteger(w.version) || w.version < 1
+    || !Number.isSafeInteger(w.generation) || w.generation < 1) || new Set(binding.works.map(w => w.id)).size !== 3) throw Error('CONFIRMATION_WORKS_INVALID');
+  // The signed repository must be exactly the repository (and its code scope) MissionControl's Mission is scoped to.
+  if (typeof s.repository !== 'string' || !s.repository || binding.repository !== s.repository) throw Error('CONFIRMATION_REPOSITORY_MISMATCH');
   const digest = sha256(canonical(binding));
   if (step === 'A' && used().some(r => r.confirmationDigest === digest && r.step === 'A' && r.kind === 'STEP_COMPLETED')) throw Error('CONFIRMATION_ALREADY_USED');
   if (step === 'B' && !used().some(r => r.confirmationDigest === digest && r.step === 'A' && r.kind === 'STEP_COMPLETED')) throw Error('CONFIRMATION_STEP_ORDER');
@@ -56,8 +75,10 @@ function serviceCommand(s, connectionId, secret, payload) {
 }
 
 /** Step A: connect, enrollment install (operator), proposal authorize, Mission draft, Plan authored by the planner, Plan approved by the owner. */
-export async function confirmStep(body) {
-  const { binding, digest } = verifyConfirmation(body, 'A'), s = setup(), owner = client('mc-owner-token'), planner = client('mc-planner-token'), admin = adminClient();
+export async function confirmStep(body, deps = {}) {
+  const s = deps.setup ?? setup(), { binding, digest } = verifyConfirmation(body, 'A', s);
+  claimOnce(`A-${digest}`, { step: 'A', confirmationDigest: digest, planSha256: binding.planSha256 });
+  const owner = deps.owner ?? client('mc-owner-token'), planner = deps.planner ?? client('mc-planner-token'), admin = deps.admin ?? adminClient(), setEnv = deps.envSet ?? envSet;
   const record = (kind, extra) => audit({ step: 'A', kind, confirmationDigest: digest, ownerId: binding.ownerId, planSha256: binding.planSha256,
     repository: binding.repository, works: binding.works.map(w => ({ stage: w.stage, id: w.id, version: w.version, generation: w.generation })), ...extra });
   record('CONFIRMATION_ACCEPTED', { requestSha256: binding.requestSha256, confirmedAt: binding.confirmedAt });
@@ -75,7 +96,7 @@ export async function confirmStep(body) {
     capabilityPolicySha256: p.capabilityPolicySha256, relayLeaseEnrollmentSha256: p.relayLeaseEnrollmentSha256, ownerFactoryAdapter: p.ownerFactoryAdapter,
     maxCostMicrousd: p.maxCostMicrousd, maxDurationSeconds: p.maxDurationSeconds,
     permitKeys: [{ keyId: s.permitKey.keyId, publicKey: s.permitKey.publicKeyPem, activeFrom: now - 1000, notAfter: expiresAt, revokedAt: null }] };
-  envSet('MC_SOFIE_CONNECTION_SECRETS', JSON.stringify({ [connected.connectionId]: { keyId: s.applicationKeyId, secret: readSecret('mc-sofie-connection-secret') } }));
+  setEnv('MC_SOFIE_CONNECTION_SECRETS', JSON.stringify({ [connected.connectionId]: { keyId: s.applicationKeyId, secret: readSecret('mc-sofie-connection-secret') } }));
   // MissionControl's enrollment schema is strict; the relay-lease and owner-Factory-adapter pins are MyEve-only and stay in MyEve's copy.
   const { relayLeaseEnrollmentSha256: _relay, ownerFactoryAdapter: _adapter, ...missionControlEnrollment } = enrollment;
   await admin.mutation(ref('ownerLocalOperator:installEnrollment'), { connectionId: connected.connectionId, enrollment: missionControlEnrollment });
@@ -141,31 +162,42 @@ export async function confirmStep(body) {
   return result;
 }
 
-/** Step B: approve exactly the prepared permit requests whose Work tuples are the confirmed stage Works, under the approved Plan. */
-export async function approvePermitsStep(body) {
-  const { binding, digest } = verifyConfirmation(body, 'B'), s = setup(), owner = client('mc-owner-token');
+/** Verifies MyEve's Work-tuple attestation: signed under the same confirmation, for exactly its three Works and the step-A connection. */
+export function verifyTuples(tuples, digest, binding, a) {
+  const document = tuples?.document;
+  if (!document || typeof tuples.signature !== 'string') throw Error('TUPLES_REQUIRED');
+  if (!verify(null, Buffer.from('myeve-owner-confirmation-tuples/v1\n' + canonical(document)), confirmationKey(), Buffer.from(tuples.signature, 'base64url'))) throw Error('TUPLES_SIGNATURE');
+  if (document.schema !== 'myeve-owner-confirmation-tuples/v1' || document.confirmationDigest !== digest || document.connectionId !== a.connectionId
+    || document.enrollmentRevision !== binding.enrollmentPins?.revision || !Array.isArray(document.works) || document.works.length !== 3
+    || document.works.some((w, i) => { const c = binding.works[i];
+      return !c || w?.stage !== c.stage || w.id !== c.id || w.version !== c.version || w.generation !== c.generation || !SHA.test(w.tupleSha256); })) throw Error('TUPLES_INVALID');
+  return new Map(document.works.map(w => [w.id, w.tupleSha256]));
+}
+
+/** Step B: approve exactly ONE prepared permit request whose Work tuple is the signed tuple of a confirmed stage Work, under the approved Plan. */
+export async function approvePermitsStep(body, deps = {}) {
+  const s = deps.setup ?? setup(), { binding, digest } = verifyConfirmation(body, 'B', s), owner = deps.owner ?? client('mc-owner-token');
   const a = used().find(r => r.confirmationDigest === digest && r.step === 'A' && r.kind === 'STEP_COMPLETED').result;
+  const tuples = verifyTuples(body.tuples, digest, binding, a);
+  // One request per call: a batch can never be half-approved.
+  if (!Array.isArray(body.requestIds) || body.requestIds.length !== 1 || typeof body.requestIds[0] !== 'string') throw Error('PERMIT_REQUEST_EXACTLY_ONE');
+  const [requestId] = body.requestIds;
   const pending = await owner.query(ref('sofieExecutionPermitState:pending'), { projectId: s.projectId, connectionId: a.connectionId });
-  const want = new Map(binding.works.map(w => [w.id, w]));
-  const approvals = [];
-  for (const requestId of body.requestIds ?? []) {
-    const r = pending.requests.find(x => x.requestId === requestId), w = r && want.get(r.work.id);
-    const stageWorkOrder = w && a.workOrders.find(x => x.stage === w.stage);
-    if (used().some(x => x.kind === 'OWNER_APPROVAL' && x.approval === 'INSTALLED_EXECUTION_PERMIT' && x.confirmationDigest === digest && x.work?.id === r?.work.id))
-      throw Error('PERMIT_ALREADY_APPROVED_FOR_WORK');
-    if (!r || !w || r.work.version !== w.version || r.work.generation !== w.generation || r.planDigest !== a.planDigest || r.workOrderId !== stageWorkOrder?.workOrderId
-      || r.admission.maxCostMicrousd > binding.enrollmentPins.maxCostMicrousd || r.admission.maxDurationSeconds > binding.enrollmentPins.maxDurationSeconds
-      || r.admission.factoryVersion !== binding.enrollmentPins.factoryVersion) throw Error('PERMIT_REQUEST_NOT_CONFIRMED');
-    want.delete(r.work.id);
-    const approved = await owner.mutation(ref('sofieExecutionPermitState:approvePrepared'), { projectId: s.projectId, requestId });
-    approvals.push(audit({ step: 'B', kind: 'OWNER_APPROVAL', approval: 'INSTALLED_EXECUTION_PERMIT', mutation: 'sofieExecutionPermitState:approvePrepared',
-      confirmationDigest: digest, ownerId: binding.ownerId, planSha256: binding.planSha256, repository: binding.repository, requestId,
-      work: r.work, admission: r.admission, planDigest: r.planDigest, workOrderId: r.workOrderId, permitId: approved.document.permitId,
-      approvalId: approved.document.approvalId, permitSha256: sha256('mc-execution-permit/v1\n' + canonical(approved.document)) }));
-  }
-  if (!approvals.length) throw Error('PERMIT_REQUESTS_EMPTY');
-  audit({ step: 'B', kind: 'STEP_COMPLETED', confirmationDigest: digest, permits: approvals.map(x => x.permitId) });
-  return { permits: approvals.map(x => ({ workId: x.work.id, permitId: x.permitId, approvalId: x.approvalId })) };
+  const r = pending?.requests?.find(x => x.requestId === requestId), w = r && binding.works.find(x => x.id === r.work?.id);
+  const stageWorkOrder = w && a.workOrders.find(x => x.stage === w.stage);
+  if (!r || !w || r.work.version !== w.version || r.work.generation !== w.generation || !SHA.test(r.work.tupleSha256 ?? '') || r.work.tupleSha256 !== tuples.get(w.id)
+    || r.planDigest !== a.planDigest || r.workOrderId !== stageWorkOrder?.workOrderId
+    || r.admission.maxCostMicrousd > binding.enrollmentPins.maxCostMicrousd || r.admission.maxDurationSeconds > binding.enrollmentPins.maxDurationSeconds
+    || r.admission.factoryVersion !== binding.enrollmentPins.factoryVersion) throw Error('PERMIT_REQUEST_NOT_CONFIRMED');
+  // Durable single use per Work revision, claimed synchronously after the checks and before the approval write.
+  claimOnce(`B-${w.id}-${w.generation}`, { step: 'B', confirmationDigest: digest, requestId, tupleSha256: r.work.tupleSha256 });
+  const approved = await owner.mutation(ref('sofieExecutionPermitState:approvePrepared'), { projectId: s.projectId, requestId });
+  const approval = audit({ step: 'B', kind: 'OWNER_APPROVAL', approval: 'INSTALLED_EXECUTION_PERMIT', mutation: 'sofieExecutionPermitState:approvePrepared',
+    confirmationDigest: digest, ownerId: binding.ownerId, planSha256: binding.planSha256, repository: binding.repository, requestId,
+    work: r.work, signedTupleSha256: tuples.get(w.id), admission: r.admission, planDigest: r.planDigest, workOrderId: r.workOrderId, permitId: approved.document.permitId,
+    approvalId: approved.document.approvalId, permitSha256: sha256('mc-execution-permit/v1\n' + canonical(approved.document)) });
+  audit({ step: 'B', kind: 'STEP_COMPLETED', confirmationDigest: digest, permits: [approval.permitId] });
+  return { permits: [{ workId: approval.work.id, permitId: approval.permitId, approvalId: approval.approvalId }] };
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
