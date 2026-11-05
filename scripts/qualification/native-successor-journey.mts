@@ -197,7 +197,7 @@ try {
     input: { title: mode === 'hybrid' ? 'Employee Identity API Contract v1' : 'Native Successor Qualification', paragraphs: mode === 'hybrid' ? ['Contract version: employee-core/v1.', 'Employee identity: employeeId and tenantId are required immutable strings. Cross-tenant identity reuse is forbidden.', 'GET /v1/employees/{employeeId} returns employeeId, tenantId, displayName and employmentStatus. Unknown identities return 404.', 'Recruiting and Onboarding reference employeeId and tenantId. Breaking changes require a new contract version.'] : ['Independent verification precedes enterprise acceptance.'], outputPath: 'docs/qualification.md' } };
   const verification = { reference: VERIFY_DOCUMENT_OPERATION, digest: VERIFY_DOCUMENT_OPERATION_DIGEST,
     input: { path: 'docs/qualification.md', expectedContentSha256: `sha256:${sha256Hex(renderMarkdownCandidate(operation).content)}` } };
-  async function registerNativePair(prefix: string, operation: any, verification: any, contextVerifierId: string) {
+  async function registerNativePair(prefix: string, operation: any, verification: any, contextVerifierId: string, policyEnvelopeId = policy._id) {
   const factories: any = {};
   for (const [purpose, workload, factoryPurpose] of [['producer', operation, 'SOFTWARE'], ['verifier', verification, 'VERIFICATION']] as const) {
     const workflowId = await step(prefix + '-' + purpose + 'Workflow', () => mutate('workflows:registerProduction', { projectId: s.projectId, workflowId: `${prefix}-${purpose}`,
@@ -206,7 +206,7 @@ try {
         outputSchema: { type: 'object', required: ['status'], properties: { status: { type: 'string' } } } }] }));
     const definitionId = await step(prefix + '-' + purpose + 'Factory', () => mutate('factory/configuration:create', { repositoryId, name: `${prefix} ${purpose}`, purpose: factoryPurpose, isolatedQualification: true }));
     const versionId = await step(prefix + '-' + purpose + 'FactoryVersion', () => mutate('factory/configuration:createVersion', { factoryDefinitionId: definitionId, workflowId,
-      executionProfileId: profiles[purpose].executionProfileId, codeScopeIds: [scope.scopeId], agentBindings: [], policyEnvelopeId: policy._id, environmentId: s.environmentId,
+      executionProfileId: profiles[purpose].executionProfileId, codeScopeIds: [scope.scopeId], agentBindings: [], policyEnvelopeId, environmentId: s.environmentId,
       budget: { maxCostUsd: 0.01, maxRuntimeMinutes: 1, maxAttempts: 3 }, verifierIds: [contextVerifierId], riskBoundary: 'GREEN', recovery: { pause: false, cancel: true, retry: true, resume: false } }));
     factories[purpose] = { definitionId, versionId };
     const detail = await query('factory/configuration:getDetail', { factoryDefinitionId: definitionId });
@@ -221,6 +221,9 @@ try {
   return factories;
   }
   const factories = await registerNativePair('native-successor', operation, verification, contextVerifierId);
+  const sharedHostPolicy = await step('sharedHostUnrelatedPolicy', () => mutate('governance/policyEnvelopes:createPolicyEnvelope', {
+    projectId:s.projectId,tenantId:s.tenantId,name:'Unrelated shared-host configuration',rules:{maxResourceCostUsd:1,maxProviderCalls:0,productionAuthority:'NONE',publicationAuthority:'NONE'},metadata:{synthetic:true,repositoryId} }));
+  await step('sharedHostUnrelatedFactoryVersions', () => registerNativePair('shared-host-unused',operation,verification,contextVerifierId,sharedHostPolicy._id));
   state.prepared = true;
   await writeFile(join(output, 'journey.json'), JSON.stringify(state, null, 2) + '\n');
   if (mode === 'prepare') console.log(JSON.stringify({ preparation: 'PASS', nativeExecution: 'NOT_RUN' }));

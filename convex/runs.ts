@@ -19,6 +19,7 @@ import { evaluatePolicyEnvelopes } from "./lib/armPolicy";
 import { evaluateLegacyToolPolicy } from "./lib/legacyToolPolicy";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 import { loadActiveLegacyPolicy } from "./lib/policyAuthority";
+import { canonicalDigest } from "@mission-control/shared";
 
 function toPreview(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
@@ -246,6 +247,11 @@ export const start = mutation({
     if (!agent?.projectId) throw new Error("Run workspace is unavailable or unauthorized.");
     const access = await requireWorkspacePermission({ ...ctx, db: authorityDb }, agent.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
     if (agent.tenantId && agent.tenantId !== access.project.tenantId) throw new Error("Run workspace is unavailable or unauthorized.");
+    const requestDigest = canonicalDigest("legacy-run-request/v1", {
+      agentId: args.agentId, taskId: args.taskId ?? null, workflowRunId: args.workflowRunId ?? null,
+      sessionKey: args.sessionKey, model: args.model, estimatedCost: args.estimatedCost ?? 0,
+      toolName: args.toolName ?? null, toolArgs: args.toolArgs ?? null,
+    });
     // Check idempotency
     const existing = await ctx.db
       .query("runs")
@@ -255,6 +261,7 @@ export const start = mutation({
     if (existing) {
       if (existing.agentId !== args.agentId || existing.projectId !== agent.projectId
         || existing.taskId !== args.taskId || existing.workflowRunId !== args.workflowRunId) throw new Error("Run receipt is unavailable or unauthorized.");
+      if (!existing.requestDigest || existing.requestDigest !== requestDigest) throw new Error("Run receipt does not match this request; historical unbound receipts require explicit migration.");
       return { run: existing, created: false };
     }
     
@@ -613,6 +620,7 @@ export const start = mutation({
       tenantId: effectiveTenantId,
       projectId: agent.projectId,
       idempotencyKey: args.idempotencyKey,
+      requestDigest,
       agentId: args.agentId,
       instanceId: resolved.instanceId,
       versionId: resolved.versionId,

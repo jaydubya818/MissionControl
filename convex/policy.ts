@@ -703,7 +703,7 @@ export const evaluateWithARM = mutation({
     if (decision === "NEEDS_APPROVAL") {
       await ctx.db.insert("approvalRecords", {
         tenantId: effectiveTenantId,
-        projectId: legacyAgent?.projectId,
+        projectId,
         instanceId: resolved?.instanceId,
         versionId: resolved?.versionId,
         actionType: args.actionType,
@@ -718,7 +718,7 @@ export const evaluateWithARM = mutation({
     if (decision === "DENY") {
       changeRecordId = await appendChangeRecord(ctx.db as any, {
         tenantId: effectiveTenantId,
-        projectId: legacyAgent?.projectId,
+        projectId,
         instanceId: resolved?.instanceId,
         versionId: resolved?.versionId,
         legacyAgentId,
@@ -735,7 +735,7 @@ export const evaluateWithARM = mutation({
 
     await appendOpEvent(ctx.db as any, {
       tenantId: effectiveTenantId,
-      projectId: legacyAgent?.projectId,
+      projectId,
       instanceId: resolved?.instanceId,
       versionId: resolved?.versionId,
       type:

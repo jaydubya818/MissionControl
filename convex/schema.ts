@@ -3645,6 +3645,7 @@ export const schemaTablesPartOne = {
     
     // Idempotency
     idempotencyKey: v.string(),
+    requestDigest: v.optional(v.string()),
     
     // References
     agentId: v.id("agents"),

@@ -173,11 +173,18 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
         if (nodes.length !== 1 || !await allowed(nodes[0], capability, seen, "knowledgeGraphNodes", epoch)) return false;
       }
     }
+    // Host inventory and the mutable active-version pointer describe available
+    // configuration, not the immutable configuration selected by this Attempt.
+    // Keep every other provenance field and direct version authorization intact.
+    const configurationRow = (service || application) && table === "workspaceHostBindings" && row.workerRuntime
+      ? { ...row, workerRuntime: { ...row.workerRuntime, factoryVersionBindings: [] } }
+      : (service || application) && table === "factoryDefinitions"
+        ? { ...row, activeVersionId: undefined } : row;
     const lineageRow = service && table === "workOrders" && row._id === service.workOrderId
-      ? { ...row, dependencies: [] }
+      ? { ...configurationRow, dependencies: [] }
       : service && table === "workOrderRevisions" && row.workOrderId === service.workOrderId
-        ? { ...row, ...Object.fromEntries(["requestedChanges", "previousSnapshot", "nextSnapshot"].map(key => [key, { ...row[key], dependencies: [] }])) }
-        : row;
+        ? { ...configurationRow, ...Object.fromEntries(["requestedChanges", "previousSnapshot", "nextSnapshot"].map(key => [key, { ...row[key], dependencies: [] }])) }
+        : configurationRow;
     const referenceRow = service ? serviceInputLineageRow(lineageRow, table, service) : lineageRow;
     if (!references.has(referenceRow)) references.set(referenceRow, lineage.references(referenceRow, table));
     for (const id of references.get(referenceRow)!) {
