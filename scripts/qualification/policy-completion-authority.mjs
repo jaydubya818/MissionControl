@@ -76,6 +76,15 @@ try{
   assert.equal(await db.client('fixture-unregistered').query('policy:getActive',{}),null);
   await assert.rejects(o.mutation('policy:deactivate',{policyId:id}),denied);
  });
+ await check('started-Task-link-retry-is-read-only',async()=>{
+  await fault(m.readyId,{status:'IN_PROGRESS',startedAt:Date.now()});
+  const before=await o.query('tasks:get',{taskId:m.readyId});const result=await link(o,m.readyId);assert.equal(result.linked,false);assert.equal(result.idempotencyHit,true);assert.deepEqual(await o.query('tasks:get',{taskId:m.readyId}),before);
+ });
+ await check('started-Task-link-retry-cannot-adopt-missing-planning-revision',async()=>{
+  await fault(m.wo,{planningRepositorySha:'a'.repeat(40)});
+  await assert.rejects(link(o,m.readyId),/pre-execution|started|before execution|planning revision/i);
+  assert.equal((await o.query('tasks:get',{taskId:m.readyId})).planningRepositorySha,undefined);
+ });
  assert.deepEqual(report.failures,[]);report.status='PASS';
 }catch(e){report.status='FAIL';report.error=String(e);throw e;}
 finally{await db.destroy();report.cleanup='VERIFIED';await writeFile(join(output,'qualification.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({status:report.status,checks:report.checks.length,failures:report.failures.length}));}

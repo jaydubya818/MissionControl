@@ -1359,8 +1359,10 @@ export const linkToWorkOrder = mutation({
       && task.planningRepositorySha !== workOrder.planningRepositorySha) {
       throw new Error("Task planning revision does not match the selected Work Order.");
     }
+    const preExecution = task.startedAt === undefined && ["INBOX", "ASSIGNED", "READY"].includes(task.status);
     if (task.workOrderId === args.workOrderId) {
       if (task.planningRepositorySha !== workOrder.planningRepositorySha) {
+        if (!preExecution) throw new Error("A started Task cannot adopt a different planning revision. Use an explicit reviewed migration.");
         await ctx.db.patch(task._id, { planningRepositorySha: workOrder.planningRepositorySha });
       }
       return {
@@ -1370,7 +1372,7 @@ export const linkToWorkOrder = mutation({
       };
     }
 
-    if (task.startedAt || !["INBOX","ASSIGNED","READY"].includes(task.status)) throw new Error("Only pre-execution Tasks can be linked to a Work Order.");
+    if (!preExecution) throw new Error("Only pre-execution Tasks can be linked to a Work Order.");
     const linkedAt = Date.now();
     const authorityScope = buildWorkOrderTaskAuthority(workOrder);
     const beforeState = {
