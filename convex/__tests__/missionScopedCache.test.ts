@@ -26,7 +26,7 @@ function fixture() {
     },
   };
   const ctx:any={db,auth:{getUserIdentity:async()=>({subject:'owner'})}};
-  return {rows,add,doc,mission,foreign,owner,peer,project,tenant,scope:()=>missionScopedContext(ctx),serviceScope:(service:any)=>missionScopedContext({...ctx,auth:{getUserIdentity:async()=>null}},'OWNER',service),
+  return {rows,add,doc,mission,foreign,owner,peer,project,tenant,scope:()=>missionScopedContext(ctx),serviceScope:(service:any)=>missionScopedContext({...ctx,auth:{getUserIdentity:async()=>null}},'OWNER',service),applicationScope:(application:any)=>missionScopedContext({...ctx,auth:{getUserIdentity:async()=>null}},'OWNER',undefined,undefined,application),
     pause(id:string){let entered!:()=>void,release!:()=>void;const reached=new Promise<void>(r=>{entered=r;});
       const wait=new Promise<void>(r=>{release=r;});pauses.set(id,{entered,wait});return {reached,release};}};
 }
@@ -83,6 +83,23 @@ describe('transaction-local complete authorization closures',()=>{
     expect(f.rows.get(f.mission).row.title).toBe('second');
   });
 
+});
+
+describe('application policy dependency reads',()=>{
+ function applicationFixture(operation='enterprise.result'){
+  const f=fixture(),policy=f.add('policyEnvelopes',{tenantId:f.tenant,projectId:f.project,name:'Bound policy'}),other=f.add('policyEnvelopes',{tenantId:f.tenant,projectId:f.project,name:'Unrelated policy'});
+  const version=f.add('factoryDefinitionVersions',{tenantId:f.tenant,projectId:f.project,policyEnvelopeId:policy});
+  const run=f.add('workflowRuns',{tenantId:f.tenant,projectId:f.project,missionId:f.mission,factoryDefinitionVersionId:version,policyEnvelopeId:policy});
+  const scope=f.applicationScope({missionId:f.mission,request:{operation},connection:{ownerId:f.owner,tenantId:f.tenant,projectId:f.project},envelope:{}});
+  return {...f,policy,other,version,run,scope};
+ }
+ it.each(['enterprise.result','enterprise.read'])('allows only the bound run policy dependency for %s',async operation=>{const f=applicationFixture(operation);expect((await f.scope.db.get(f.run as any))?._id).toBe(f.run);});
+ it('does not expose policy resources directly',async()=>{const f=applicationFixture();expect(await f.scope.db.get(f.policy as any)).toBeNull();expect(await f.scope.db.get(f.other as any)).toBeNull();});
+ it('does not allow application policy writes',async()=>{const f=applicationFixture();await expect(f.scope.db.patch(f.policy as any,{active:false} as any)).rejects.toThrow('MISSION_UNAVAILABLE');});
+ it('does not allow another operation to read the dependency',async()=>{const f=applicationFixture('enterprise.inspect');expect(await f.scope.db.get(f.run as any)).toBeNull();});
+ it('requires the immutable version and run to select the same policy',async()=>{const f=applicationFixture();f.rows.get(f.run).row.policyEnvelopeId=f.other;expect(await f.scope.db.get(f.run as any)).toBeNull();});
+ it('denies a foreign Mission even when it uses the same policy',async()=>{const f=applicationFixture();f.rows.get(f.run).row.missionId=f.foreign;expect(await f.scope.db.get(f.run as any)).toBeNull();});
+ it('retains foreign Mission provenance inside the bound policy',async()=>{const f=applicationFixture();f.rows.get(f.policy).row.metadata={sourceMissionId:f.foreign};expect(await f.scope.db.get(f.run as any)).toBeNull();});
 });
 
 describe('service policy dependency reads',()=>{

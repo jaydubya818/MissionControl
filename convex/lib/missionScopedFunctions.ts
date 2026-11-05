@@ -75,7 +75,8 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     return resourceDecisions.get(key)!;
   }
   async function evaluateAllowed(row: Row | null, capability: MissionCapability, seen: Set<string>, table: string | undefined, epoch: number): Promise<boolean> {
-    const dependencyRead = capability === "READ" || seen.size > 0;
+    const hasAncestor = seen.size > 0;
+    const dependencyRead = capability === "READ" || hasAncestor;
     if (epoch !== authorizationEpoch) return false;
     if (!row) return true;
     table ??= row._id ? lineage.tableOf(row._id) ?? undefined : undefined;
@@ -175,6 +176,22 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
       // The full provenance traversal above still rejects foreign Missions.
       return dependencyRead && row._id === run?.policyEnvelopeId && row._id === version?.policyEnvelopeId
         && row.projectId === service.projectId && row.tenantId === service.tenantId;
+    }
+    if (application && table === "policyEnvelopes") {
+      if (capability !== "READ" || !hasAncestor
+        || !["enterprise.read", "enterprise.result"].includes(application.request.operation)
+        || row.projectId !== application.connection.projectId || row.tenantId !== application.connection.tenantId) return false;
+      // A status/Result projection can traverse an exact Mission run's policy.
+      // This grants neither direct policy reads nor access to workspace peers.
+      for (const id of seen) {
+        if (lineage.tableOf(id) !== "workflowRuns") continue;
+        const run = await read(id);
+        if (run?.missionId !== application.missionId || run.policyEnvelopeId !== row._id
+          || run.projectId !== application.connection.projectId || run.tenantId !== application.connection.tenantId) continue;
+        const version = run.factoryDefinitionVersionId ? await read(run.factoryDefinitionVersionId) : null;
+        if (version?.policyEnvelopeId === row._id && version.projectId === run.projectId && version.tenantId === run.tenantId) return true;
+      }
+      return false;
     }
     return await legacyAllowed(row, table, capability !== "READ");
   }
