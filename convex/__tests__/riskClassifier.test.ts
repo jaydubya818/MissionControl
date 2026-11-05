@@ -10,6 +10,11 @@ import {
 import { TOOL_RISK_MAP as POLICY_ENGINE_TOOL_RISK_MAP } from "../../packages/policy-engine/src/rules";
 
 describe("classifyRisk", () => {
+  it("classifies int64 parameters without skipping secret or production checks", () => {
+    expect(classifyRisk("read_file", { value: 42n })).toBe("GREEN");
+    expect(classifyRisk("read_file", { value: 42n, path: ".env.local" })).toBe("RED");
+    expect(classifyRisk("read_file", { value: 42n, path: "deploy/prod.yaml" })).toBe("RED");
+  });
   it("returns the mapped risk for known tools", () => {
     expect(classifyRisk("read_file")).toBe("GREEN");
     expect(classifyRisk("write_file")).toBe("YELLOW");

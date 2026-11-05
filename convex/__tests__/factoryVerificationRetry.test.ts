@@ -398,6 +398,14 @@ describe("retry evidence and authority boundaries", () => {
     expect(f.jobs).toHaveLength(0);
   });
 
+  it("skips an older Verification Factory whose active version is unreadable", async () => {
+    const f = await configuredFixture();
+    f.tables.factoryDefinitions.unshift({ _id: "unrelated-verifier", tenantId: "tenant-1", projectId: "project-1",
+      repositoryId: "repository-1", status: "ACTIVE", purpose: "VERIFICATION", activeVersionId: "unreadable-version" });
+    const result = await f.invoke(retryVerification, retryArgs);
+    expect(result.workflowRun.factoryDefinitionVersionId).toBe("version-1");
+  });
+
   it("rejects a competing active source before retrying", async () => {
     const f = await configuredFixture();
     await f.db.insert("workflowRuns", { _id: "competing-source", workOrderId: "work-order-1", attemptPurpose: "IMPLEMENTATION", status: "RUNNING" });

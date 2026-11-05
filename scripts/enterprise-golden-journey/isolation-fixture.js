@@ -4,7 +4,7 @@ import { makeFunctionReference, mutationGeneric as fixtureMutation, internalMuta
 import { query, mutation, contributorMutation, missionScopedContext } from "./lib/missionScopedFunctions";
 import { v } from "convex/values";
 import schema from "./schema";
-import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS } from "./lib/companyAccess";
+import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, isCompanyAdminRole } from "./lib/companyAccess";
 async function owner(ctx) {
   if (process.env.MC_NATIVE_SUCCESSOR_QUALIFICATION !== "1" || (await ctx.auth.getUserIdentity())?.subject !== "user_SyntheticHandoffQualification") throw Error("FIXTURE_DENIED");
 }
@@ -85,7 +85,8 @@ export const nonAdminMissionPrincipal = fixtureInternalMutation({args:{scope:v.a
  const permissions=[...Object.values(COMPANY_PERMISSIONS),...Object.values(FACTORY_PERMISSIONS)].filter(permission=>permission!==COMPANY_PERMISSIONS.MANAGE_COMPANY);
  const roleId=await ctx.db.insert('roles',{tenantId:s.tenantId,name:'Non-admin Mission principal',permissions});
  await ctx.db.insert('roleAssignments',{operatorId:operator._id,roleId,assignedAt:Date.now(),scope:{type:'project',id:s.projectId}});
- return {operatorId:operator._id,roleId,permissions,companyAdministration:false};
+ const role=await ctx.db.get(roleId);if(!role||isCompanyAdminRole(role))throw Error('Fixture must use a non-admin principal');
+ return {operatorId:operator._id,roleId,permissions,companyAdministration:isCompanyAdminRole(role)};
 }});
 export const policyWorkspaceProbe = fixtureInternalMutation({args:{},handler:async ctx=>{
  if(process.env.MC_NATIVE_SUCCESSOR_QUALIFICATION!=='1'||(await ctx.auth.getUserIdentity())?.subject!=='fixture-peer')throw Error('FIXTURE_DENIED');

@@ -5,7 +5,7 @@ import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
  * Agent execution turn tracking and cost accounting.
  */
 
-import { v } from "convex/values";
+import { convexToJson, v } from "convex/values";
 import { mutation, query } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -247,11 +247,12 @@ export const start = mutation({
     if (!agent?.projectId) throw new Error("Run workspace is unavailable or unauthorized.");
     const access = await requireWorkspacePermission({ ...ctx, db: authorityDb }, agent.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
     if (agent.tenantId && agent.tenantId !== access.project.tenantId) throw new Error("Run workspace is unavailable or unauthorized.");
-    const requestDigest = canonicalDigest("legacy-run-request/v1", {
+    // Preserve bytes, int64 values and special floats before canonical hashing.
+    const requestDigest = `convex-json/v1:${canonicalDigest("legacy-run-request/v2", convexToJson({
       agentId: args.agentId, taskId: args.taskId ?? null, workflowRunId: args.workflowRunId ?? null,
       sessionKey: args.sessionKey, model: args.model, estimatedCost: args.estimatedCost ?? 0,
       toolName: args.toolName ?? null, toolArgs: args.toolArgs ?? null,
-    });
+    }))}`;
     // Check idempotency
     const existing = await ctx.db
       .query("runs")
@@ -261,7 +262,7 @@ export const start = mutation({
     if (existing) {
       if (existing.agentId !== args.agentId || existing.projectId !== agent.projectId
         || existing.taskId !== args.taskId || existing.workflowRunId !== args.workflowRunId) throw new Error("Run receipt is unavailable or unauthorized.");
-      if (!existing.requestDigest || existing.requestDigest !== requestDigest) throw new Error("Run receipt does not match this request; historical unbound receipts require explicit migration.");
+      if (!existing.requestDigest || existing.requestDigest !== requestDigest) throw new Error("Run receipt does not match this request; historical unbound or older-encoding receipts require explicit migration.");
       return { run: existing, created: false };
     }
     

@@ -97,6 +97,8 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     if (epoch !== authorizationEpoch) return false;
     if (!row) return true;
     table ??= row._id ? lineage.tableOf(row._id) ?? undefined : undefined;
+    if ((service || application) && !dependencyRead
+      && ["workspaceHostBindings", "factoryDefinitions", "factoryDefinitionVersions", "factoryReadinessAssessments"].includes(table ?? "")) return false;
     if (application && table === "factoryDefinitionVersions"
       && !(await applicationFactoryBindings()).some(binding => binding.versionId === row._id)) return false;
     if (application && capability !== "READ") {
@@ -176,10 +178,12 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     // Host inventory and the mutable active-version pointer describe available
     // configuration, not the immutable configuration selected by this Attempt.
     // Keep every other provenance field and direct version authorization intact.
-    const configurationRow = (service || application) && table === "workspaceHostBindings" && row.workerRuntime
+    const configurationRow = (service || application) && dependencyRead && table === "workspaceHostBindings" && row.workerRuntime
       ? { ...row, workerRuntime: { ...row.workerRuntime, factoryVersionBindings: [] } }
-      : (service || application) && table === "factoryDefinitions"
-        ? { ...row, activeVersionId: undefined } : row;
+      : (service || application) && dependencyRead && table === "factoryDefinitions"
+        ? { ...row, activeVersionId: undefined, ...(row.qualificationActivation ? { qualificationActivation: {
+          ...row.qualificationActivation, factoryDefinitionVersionId: undefined, assessmentId: undefined,
+        } } : {}) } : row;
     const lineageRow = service && table === "workOrders" && row._id === service.workOrderId
       ? { ...configurationRow, dependencies: [] }
       : service && table === "workOrderRevisions" && row.workOrderId === service.workOrderId

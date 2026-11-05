@@ -3126,8 +3126,11 @@ async function schedulePolicyV2VerificationAttempt(ctx: any, workOrder: any, sou
   const definitions = await ctx.db.query("factoryDefinitions")
     .withIndex("by_repository", (q: any) => q.eq("repositoryId", sourceAttempt.repositoryId))
     .collect();
-  let definition = definitions.find((candidate: any) => candidate.status === "ACTIVE"
-    && candidate.purpose === "VERIFICATION" && candidate.activeVersionId);
+  let definition;
+  for (const candidate of definitions) {
+    if (candidate.status === "ACTIVE" && candidate.purpose === "VERIFICATION" && candidate.activeVersionId
+      && await ctx.db.get(candidate.activeVersionId)) { definition = candidate; break; }
+  }
   if (sourceAttempt.executionManifest?.harness?.adapter === "isolated-invocation" && sourceAttempt.executionManifest.harness.version === "3") {
     const producerVersion = await ctx.db.get(sourceAttempt.factoryDefinitionVersionId);
     const eligible = [];
