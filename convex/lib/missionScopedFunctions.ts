@@ -51,7 +51,7 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     const value = Reflect.get(target, key); return typeof value === "function" ? value.bind(target) : value;
   } }) };
   const legacyAllowed = legacyWorkspaceAccess(policyCtx as Context, read, lineage);
-  const invalidate = (id: string) => { rowCache.clear(); decisions.clear(); resourceDecisions.clear(); completedReads.clear(); authorizationEpoch++; };
+  const invalidate = (id: string) => { legacyAllowed.invalidate(); rowCache.clear(); decisions.clear(); resourceDecisions.clear(); completedReads.clear(); authorizationEpoch++; };
   function allowed(row: Row | null, capability: MissionCapability, seen = new Set<string>(), table?: string, epoch = authorizationEpoch): Promise<boolean> {
     if (epoch !== authorizationEpoch || pendingWrites) return Promise.resolve(false);
     if (capability !== "READ" || !row?._id) return evaluateAllowed(row, capability, seen, table, epoch);

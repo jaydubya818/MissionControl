@@ -173,3 +173,17 @@ export const legacyDeliveryRole = fixtureInternalMutation({
   await ctx.db.insert('roleAssignments',{operatorId:args.operatorId,roleId,assignedAt:Date.now(),scope:{type:'project',id:args.projectId}});
  }
 });
+
+export const legacyPermissionRevocation = fixtureInternalMutation({
+ args:{taskId:v.id('tasks')},handler:async(ctx,args)=>{
+  const identity=await ctx.auth.getUserIdentity();if(identity?.subject!=='fixture-peer')throw Error('Fixture identity mismatch');
+  const operator=await ctx.db.query('operators').withIndex('by_auth_id',q=>q.eq('authId',identity.subject)).unique();
+  const assignment=await ctx.db.query('roleAssignments').withIndex('by_operator',q=>q.eq('operatorId',operator._id)).unique();
+  const role=await ctx.db.get(assignment.roleId);if(role.name!=='Delivery-only fixture')throw Error('Fixture role mismatch');
+  const scoped=missionScopedContext(ctx);
+  const before=await scoped.db.get(args.taskId);
+  await scoped.db.patch(role._id,{permissions:[]});
+  const after=await scoped.db.get(args.taskId);
+  return {visibleBefore:Boolean(before),visibleAfter:Boolean(after)};
+ }
+});

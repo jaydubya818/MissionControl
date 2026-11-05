@@ -45,6 +45,11 @@ try{
   await assert.rejects(db.peer.mutation('tasks:transition',{taskId:extra.task._id,toStatus:'CANCELED',actorType:'HUMAN',idempotencyKey:randomUUID()}),denied);
   assert.equal((await owner.query('tasks:get',{taskId:extra.task._id})).status,'INBOX');
  });
+
+ await check('permission-cache-revocation-within-one-handler',async()=>{
+  const result=await db.peer.mutation('isolationFixture:legacyPermissionRevocation',{taskId:task._id});
+  assert.deepEqual(result,{visibleBefore:true,visibleAfter:false});
+ });
  for(const [fn,args] of [['workOrders:seedDemo',{}],['e2e:seed',{runId:'unauthorized-seed'}],['e2e:cleanup',{runId:'unauthorized-cleanup'}],['seedMissionControlDemo:run',{}],['seed:seedV0',{}],['seed:clearAll',{}],['projects:createSoftwareFactoryProject',{}]])
   await check('administrator-only-'+fn,()=>assert.rejects(db.anonymous.mutation(fn,args),privateFunction));
  assert.deepEqual(receipt.failures,[]);receipt.status='PASS';

@@ -21,20 +21,26 @@ export function legacyWorkspaceAccess(ctx: QueryCtx | MutationCtx, read: (id: st
     }
     return false;
   }
-  return async (row: Row, table: string | undefined, write: boolean): Promise<boolean> => {
+  const permissions = new Map<string, Promise<boolean>>();
+  const allows = async (row: Row, table: string | undefined, write: boolean): Promise<boolean> => {
     if (!protectedTables.has(table ?? '') || await hasMission(row, table)) return true;
     if (!row.projectId || !await ctx.auth.getUserIdentity()) return false;
-    try {
-      const projectId = row.projectId as Id<'projects'>;
-      if (!write) await requireWorkspacePermission(ctx, projectId, FACTORY_PERMISSIONS.VIEW);
-      else if (['workflowRuns', 'runEvents', 'runArtifacts', 'workflowMetrics'].includes(table!))
-        await requireWorkspacePermission(ctx, projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
-      else {
-        const project = await read(projectId);
-        if (!project?.tenantId) return false;
-        await requireWorkspaceAccess(ctx, project.tenantId, projectId, { permission: COMPANY_PERMISSIONS.UPDATE_DELIVERY });
-      }
-      return true;
-    } catch { return false; }
+    const projectId = row.projectId as Id<'projects'>;
+    const permission = !write ? 'read' : ['workflowRuns', 'runEvents', 'runArtifacts', 'workflowMetrics'].includes(table!) ? 'automation' : 'delivery';
+    const key = `${projectId}:${permission}`;
+    if (!permissions.has(key)) permissions.set(key, (async () => {
+      try {
+        if (permission === 'read') await requireWorkspacePermission(ctx, projectId, FACTORY_PERMISSIONS.VIEW);
+        else if (permission === 'automation') await requireWorkspacePermission(ctx, projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+        else {
+          const project = await read(projectId);
+          if (!project?.tenantId) return false;
+          await requireWorkspaceAccess(ctx, project.tenantId, projectId, { permission: COMPANY_PERMISSIONS.UPDATE_DELIVERY });
+        }
+        return true;
+      } catch { return false; }
+    })());
+    return await permissions.get(key)!;
   };
+  return Object.assign(allows, { invalidate: () => permissions.clear() });
 }
