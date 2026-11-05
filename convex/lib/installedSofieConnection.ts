@@ -1,6 +1,6 @@
 import type { MutationCtx, QueryCtx } from '../_generated/server';
 import type { Doc } from '../_generated/dataModel';
-import { parseOwnerEnrollment, permitDenied, permitOrigin } from '../../packages/shared/src/executionPermit';
+import { installedMaxDurationSeconds, parseOwnerEnrollment, permitDenied, permitOrigin } from '../../packages/shared/src/executionPermit';
 
 export function installedOrigins() {
   const raw = process.env.MC_SOFIE_INSTALLED_ORIGINS;
@@ -17,7 +17,7 @@ export async function installedEnrollment(ctx: Pick<MutationCtx | QueryCtx, 'db'
     || enrollment.issuer !== origins.issuer || enrollment.audience !== origins.audience || enrollment.connectionId !== connection._id
     || enrollment.missionControlOwnerId !== connection.ownerId || enrollment.projectId !== connection.projectId
     || enrollment.tenantId !== connection.tenantId || enrollment.revokedAt !== null || enrollment.activeFrom > now || enrollment.expiresAt <= now
-    || enrollment.expiresAt > connection.expiresAt || enrollment.maxCostMicrousd > 1300000 || enrollment.maxDurationSeconds > 180) return permitDenied();
+    || enrollment.expiresAt > connection.expiresAt || enrollment.maxCostMicrousd > 1300000 || enrollment.maxDurationSeconds > installedMaxDurationSeconds()) return permitDenied();
   return { enrollment, project };
 }
 export function configuredConnectionSecret(connectionId: string, keyId?: string): string | undefined {

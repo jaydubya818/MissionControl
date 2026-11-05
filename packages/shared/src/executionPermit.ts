@@ -75,12 +75,21 @@ export function canonicalPermitJson(value: unknown): string {
 }
 export const permitSigningText = (document: ExecutionPermit | AdmissionReceipt | PermitControlDelivery) => `${document.schema}\n${canonicalPermitJson(document)}`;
 export const permitDigest = (document: ExecutionPermit) => sha256Hex(permitSigningText(document));
+/**
+ * Maximum Work duration an installed permit may carry. Default 180 s. An operator may raise it for one installation up to the
+ * owner-local MyFactory subscription route's hard 600 s Work cap (MC_SOFIE_INSTALLED_MAX_DURATION_SECONDS); never above 600 s.
+ */
+export function installedMaxDurationSeconds(raw: string | undefined = typeof process === 'undefined' ? undefined : process.env.MC_SOFIE_INSTALLED_MAX_DURATION_SECONDS) {
+  if (raw === undefined || raw === '') return 180;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value >= 1 && value <= 600 && String(value) === raw ? value : permitDenied();
+}
 export function requirePermitEnrollment(document: ExecutionPermit, enrollment: OwnerEnrollment, now: number) {
   if (!timestamp(now) || enrollment.revokedAt !== null || enrollment.activeFrom > now || enrollment.expiresAt <= now
     || document.issuedAt > now || document.expiresAt <= now || document.expiresAt <= document.issuedAt
     || document.expiresAt - document.issuedAt > 300000 || document.expiresAt > enrollment.expiresAt
     || document.enrollmentRevision !== enrollment.revision || document.admission.maxCostMicrousd > 1300000
-    || document.admission.maxDurationSeconds > 180) return permitDenied();
+    || document.admission.maxDurationSeconds > installedMaxDurationSeconds()) return permitDenied();
   const fields = ['ownerId','ownerSubject','missionControlOwnerId','installationId','connectionId','tenantId','projectId','issuer','audience'] as const;
   if (fields.some(field => document[field] !== enrollment[field])
     || (['factoryVersion','executionContractSha256','capabilityPolicySha256'] as const).some(field => document.admission[field] !== enrollment[field])
