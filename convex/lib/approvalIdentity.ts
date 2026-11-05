@@ -1,9 +1,9 @@
-import type { Doc, Id } from '../_generated/dataModel';
+import type { Id } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess, type CompanyPermission } from './companyAccess';
 import { missionAuthorityDatabase } from './missionScopedFunctions';
 
-export const APPROVAL_IDENTITY_VERSION = 'authenticated-operator/v1' as const;
+export { APPROVAL_IDENTITY_VERSION, hasAuthenticatedApproval, isTaskCompletionApproval } from './approvalProof';
 
 export async function requireApprovalActor(ctx: MutationCtx, projectId: Id<'projects'> | undefined, permission: CompanyPermission, tenantId?: Id<'tenants'>) {
   const identity = await ctx.auth.getUserIdentity();
@@ -19,14 +19,4 @@ export async function requireApprovalActor(ctx: MutationCtx, projectId: Id<'proj
   const operator = access.membership.operatorId ? await db.get(access.membership.operatorId) : null;
   if (!operator?.active || operator.authId !== identity.subject || operator.tenantId !== project.tenantId) throw new Error('Authenticated operator membership is required.');
   return { operatorId: operator._id, subject: identity.subject, projectId, tenantId: project.tenantId };
-}
-
-/** Old display strings are not evidence of an authenticated approval. */
-export function hasAuthenticatedApproval(approval: Doc<'approvals'>): boolean {
-  if (approval.status !== 'APPROVED' || approval.decisionIdentityVersion !== APPROVAL_IDENTITY_VERSION || !approval.decidedByOperatorId || !approval.decidedByUserId) return false;
-  const required = Math.max(approval.riskLevel === 'RED' ? 2 : 1, approval.requiredDecisionCount ?? 1);
-  if ((approval.decisionCount ?? 0) < required || required > 2) return false;
-  return required === 1 || Boolean(approval.firstDecisionOperatorId && approval.firstDecisionByUserId
-    && approval.firstDecisionOperatorId !== approval.decidedByOperatorId
-    && approval.firstDecisionByUserId !== approval.decidedByUserId);
 }

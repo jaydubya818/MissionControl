@@ -194,7 +194,7 @@ export const approvalBoundarySeed = fixtureInternalMutation({args:{scope:v.any()
  async function insert(table,overrides){const row={...overrides};for(const[k,f]of Object.entries(schema.tables[table].validator.json.value))if(!(k in row)&&!f.optional)row[k]=value(f.fieldType);const id=await ctx.db.insert(table,row);known[table]=id;return id;}
  for(const p of await ctx.db.query('policies').collect())if(p.active)await ctx.db.patch(p._id,{active:false});
  await insert('policies',{projectId:s.otherProjectId,name:'Unrelated non-requiring policy',active:true,rules:{reviewToDoneRequiresApproval:false}});
- await insert('policies',{projectId:s.projectId,name:'Approval boundary policy',active:true,rules:{reviewToDoneRequiresApproval:true}});
+ const policyId=await insert('policies',{tenantId:s.tenantId,projectId:s.projectId,name:'Approval boundary policy',active:true,rules:{reviewToDoneRequiresApproval:true}});
  const agentId=await insert('agents',{tenantId:s.tenantId,projectId:s.projectId,name:'Synthetic approval requestor'});
  const workOrderId=await insert('workOrders',{tenantId:s.tenantId,projectId:s.projectId,currentRevisionNumber:1,desiredOutcome:'Synthetic approval authority'});
  const taskId=await insert('tasks',{tenantId:s.tenantId,projectId:s.projectId,workOrderId,status:'REVIEW',type:'OPS',assigneeIds:[agentId],metadata:{}});
@@ -205,7 +205,7 @@ export const approvalBoundarySeed = fixtureInternalMutation({args:{scope:v.any()
  const privateTaskId=await insert('tasks',{tenantId:s.tenantId,projectId:restrictedProjectId,status:'INBOX',type:'OPS',metadata:{}});
  const peerMemberId=await insert('orgMembers',{tenantId:s.tenantId,projectId:s.projectId,operatorId:s.peerId,name:'Delivery-only linked profile',role:'Delivery',level:0,active:true,projectAccess:[]});
  const unboundProjectId=await insert('projects',{name:'Unbound fixture',slug:'unbound-fixture'});
- return{agentId,workOrderId,taskId,secondTaskId,redId,yellowId,expiredId,tasklessId,restrictedProjectId,privateTaskId,peerMemberId,unboundProjectId,otherTenantId:(await ctx.db.get(s.otherProjectId)).tenantId};
+ return{policyId,agentId,workOrderId,taskId,secondTaskId,redId,yellowId,expiredId,tasklessId,restrictedProjectId,privateTaskId,peerMemberId,unboundProjectId,otherTenantId:(await ctx.db.get(s.otherProjectId)).tenantId};
 }});
 
 export const revokeLegacyOperator = fixtureInternalMutation({args:{},handler:async ctx=>{
@@ -217,4 +217,17 @@ export const nestedLegacyPermissionRevocation = fixtureInternalMutation({args:{t
  const scoped=missionScopedContext(ctx),before=await scoped.db.get(args.taskId);
  await scoped.runMutation(makeFunctionReference('isolationFixture:revokeLegacyOperator'),{});
  const after=await scoped.db.get(args.taskId);return{visibleBefore:Boolean(before),visibleAfter:Boolean(after)};
+}});
+
+export const policyCompletionSeed = fixtureInternalMutation({args:{scope:v.any(),missionId:v.id('missions')},handler:async(ctx,{scope:s,missionId})=>{
+ await owner(ctx);const known={tenants:s.tenantId,projects:s.projectId,operators:s.operatorId};
+ function value(v){if(v.type==='literal')return v.value;if(v.type==='string')return 'Synthetic policy';if(v.type==='number')return 1;if(v.type==='boolean')return false;if(v.type==='null'||v.type==='any')return null;if(v.type==='array')return [];if(v.type==='union')return value(v.value[0]);if(v.type==='id'){if(!known[v.tableName])throw Error('Missing '+v.tableName);return known[v.tableName];}if(v.type==='object')return Object.fromEntries(Object.entries(v.value).filter(([,f])=>!f.optional).map(([k,f])=>[k,value(f.fieldType)]));throw Error('Unhandled '+v.type);}
+ async function insert(table,overrides){const row={...overrides};for(const[k,f]of Object.entries(schema.tables[table].validator.json.value))if(!(k in row)&&!f.optional)row[k]=value(f.fieldType);const id=await ctx.db.insert(table,row);known[table]=id;return id;}
+ const wo=await insert('workOrders',{tenantId:s.tenantId,projectId:s.projectId,missionId,currentRevisionNumber:1,desiredOutcome:'Synthetic Mission task boundary'});
+ const taskId=await insert('tasks',{tenantId:s.tenantId,projectId:s.projectId,status:'REVIEW',type:'OPS',metadata:{}});
+ const readyId=await insert('tasks',{tenantId:s.tenantId,projectId:s.projectId,status:'INBOX',type:'OPS',metadata:{}});
+ const operatorId=await insert('operators',{tenantId:s.tenantId,authId:'fixture-approver',active:true});
+ const roleId=await insert('roles',{tenantId:s.tenantId,name:'Approver-only fixture',permissions:['factory.read','delivery.write','delivery.approve']});
+ await insert('roleAssignments',{operatorId,roleId,assignedAt:Date.now(),scope:{type:'project',id:s.projectId}});
+ return{wo,taskId,readyId,approverId:operatorId};
 }});

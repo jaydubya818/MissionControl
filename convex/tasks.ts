@@ -1,4 +1,4 @@
-import { hasAuthenticatedApproval } from "./lib/approvalIdentity";
+import { hasAuthenticatedApproval, isTaskCompletionApproval } from "./lib/approvalIdentity";
 import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, requireWorkspaceAccess, requireWorkspacePermission } from "./lib/companyAccess";
 import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
@@ -1335,6 +1335,10 @@ export const linkToWorkOrder = mutation({
     idempotencyKey: v.string(),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const project = await missionAuthorityDatabase(ctx).get(args.projectId);
+    if (!identity || !project?.tenantId) throw new Error("Authenticated delivery assignment required.");
+    await requireWorkspaceAccess({ ...ctx, db: missionAuthorityDatabase(ctx) }, project.tenantId, args.projectId, { permission: COMPANY_PERMISSIONS.ASSIGN_DELIVERY });
     const [task, workOrder] = await Promise.all([
       ctx.db.get(args.taskId),
       ctx.db.get(args.workOrderId),
@@ -1366,6 +1370,7 @@ export const linkToWorkOrder = mutation({
       };
     }
 
+    if (task.startedAt || !["INBOX","ASSIGNED","READY"].includes(task.status)) throw new Error("Only pre-execution Tasks can be linked to a Work Order.");
     const linkedAt = Date.now();
     const authorityScope = buildWorkOrderTaskAuthority(workOrder);
     const beforeState = {
@@ -1382,15 +1387,15 @@ export const linkToWorkOrder = mutation({
         authorityScope,
         governanceOrigin: "GOVERNED_WORK_ORDER",
         relationshipCreatedAt: linkedAt,
-        relationshipActorType: args.actorType,
-        relationshipActorId: args.actorId,
+        relationshipActorType: "HUMAN",
+        relationshipActorId: identity.subject,
         relationshipIdempotencyKey: args.idempotencyKey,
       },
     });
     await ctx.db.insert("activities", {
       projectId: args.projectId,
-      actorType: args.actorType,
-      actorId: args.actorId,
+      actorType: "HUMAN",
+      actorId: identity.subject,
       action: "TASK_LINKED_TO_WORK_ORDER",
       description: `Task "${task.title}" linked to Work Order "${workOrder.title}"`,
       targetType: "TASK",
@@ -1409,8 +1414,8 @@ export const linkToWorkOrder = mutation({
       taskId: task._id,
       projectId: args.projectId,
       eventType: "TASK_LINKED_TO_WORK_ORDER",
-      actorType: args.actorType,
-      actorId: args.actorId,
+      actorType: "HUMAN",
+      actorId: identity.subject,
       relatedId: workOrder._id,
       beforeState,
       afterState: {
@@ -1614,7 +1619,7 @@ export const transition = mutation({
       };
     }
     
-    if ((rule.humanOnly || toStatus === "DONE") && !taskWorkOrder?.missionId) {
+    if (rule.humanOnly || toStatus === "DONE") {
       const project = task.projectId ? await ctx.db.get(task.projectId) : null;
       if (!identity || !project?.tenantId) throw new Error("Authenticated human approval is required.");
       await requireWorkspaceAccess({ ...ctx, db: missionAuthorityDatabase(ctx) }, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.APPROVE_DELIVERY });
@@ -1717,7 +1722,7 @@ export const transition = mutation({
           .filter((q) => q.eq(q.field("status"), "APPROVED"))
           .collect();
         
-        if (!approvals.some(approval => approval.actionType === "TASK_COMPLETION" && hasAuthenticatedApproval(approval))) {
+        if (!approvals.some(isTaskCompletionApproval)) {
           errors.push({
             field: "status",
             message: "Completion requires an authenticated approved record. Request approval first.",

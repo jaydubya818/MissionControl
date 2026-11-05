@@ -109,7 +109,8 @@ export const useQuery = (reference:any) => {
   const name=getFunctionName(reference);
   if(name === "workOrders:factoryOverview") return {summary:{activeWorkOrders:0,blockedWorkOrders:0,awaitingApproval:0,staleEvidence:0,runsNeedingAttention:0,recentlyAccepted:0,verificationFailures:0,approvalsPending:0},recentAccepted:[],blockedWorkOrders:[],approvalQueue:[],staleEvidence:[],runsNeedingAttention:[]};
   if(name === "workflowMetrics:getAllMetrics") return [];
-  if(name.startsWith("registry/")) return [];
+  if(name.startsWith("registry/") || name === "governance/policyEnvelopes:listPolicyEnvelopes") return [];
+  if(name === "governance/policyEnvelopes:evaluate") return {decision:"ALLOW",source:"fallback"};
   if(name === "agents:list" || name === "agents:listAll") return [{_id:"agent-fixture",name:"Quarantined fixture agent",role:"SPECIALIST",status:"QUARANTINED",spendToday:0,budgetDaily:1,budgetPerRun:1,allowedTaskTypes:[],lastHeartbeatAt:Date.now(),errorStreak:1}];
   if(name === "tasks:list" || name === "tasks:listAll" || name === "contentDrops:list" || name === "projects:list") return [];
   if(name === "projects:get") return {_id:"project-ui-fixture",name:"Component fixture"};

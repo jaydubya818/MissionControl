@@ -1,14 +1,13 @@
+import { requirePolicyAdministration } from "../lib/policyAuthority";
 import { v } from "convex/values";
 import { mutation, query } from "../lib/missionScopedFunctions";
 import { appendChangeRecord } from "../lib/armAudit";
 import { evaluatePolicyEnvelopes } from "../lib/armPolicy";
-import { resolveActiveTenantId } from "../lib/getActiveTenant";
-import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";
 
 export const createPolicyEnvelope = mutation({
   args: {
     tenantId: v.optional(v.id("tenants")),
-    projectId: v.optional(v.id("projects")),
+    projectId: v.id("projects"),
     templateId: v.optional(v.id("agentTemplates")),
     versionId: v.optional(v.id("agentVersions")),
     name: v.string(),
@@ -17,19 +16,12 @@ export const createPolicyEnvelope = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    if (args.projectId) {
-      await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    const actor = await requirePolicyAdministration(ctx, args.projectId, args.tenantId);
+    const tenantId = actor.tenantId;
+    for (const id of [args.templateId,args.versionId]) if (id) {
+      const linked = await ctx.db.get(id);
+      if (!linked || linked.tenantId && linked.tenantId !== tenantId) throw new Error("Policy definition is unavailable in this company.");
     }
-    const tenantId = await resolveActiveTenantId(
-      { db: ctx.db as any },
-      {
-        tenantId: args.tenantId,
-        projectId: args.projectId,
-        templateId: args.templateId,
-        versionId: args.versionId,
-        createDefaultIfMissing: true,
-      }
-    );
 
     const now = Date.now();
     const id = await ctx.db.insert("policyEnvelopes", {
@@ -67,6 +59,9 @@ export const attachPolicy = mutation({
     active: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const envelope = await ctx.db.get(args.envelopeId);
+    if (!envelope) throw new Error("Policy envelope unavailable or unauthorized.");
+    await requirePolicyAdministration(ctx, envelope.projectId, envelope.tenantId);
     await ctx.db.patch(args.envelopeId, {
       active: args.active,
       updatedAt: Date.now(),

@@ -33,6 +33,7 @@ const AUTHORIZATION_MARKERS = [
   "requireMemberAdministration",
   "requireMemberCreation",
   "requireApprovalActor",
+  "requirePolicyAdministration",
   "requireWebhookWorkspace",
   "requireAgentFleetAuthority",
   "requireFactoryActionWithAudit",
