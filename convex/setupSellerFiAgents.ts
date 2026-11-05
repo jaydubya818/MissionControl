@@ -1,3 +1,4 @@
+import { internalMutation as administrativeMutation } from "./_generated/server";
 /**
  * Setup SellerFi Agents - Import agents from SellerFi repo
  * 
@@ -6,7 +7,7 @@
 
 import { mutation } from "./lib/missionScopedFunctions";
 
-export const createSellerFiAgents = mutation({
+export const createSellerFiAgents = administrativeMutation({
   args: {},
   handler: async (ctx) => {
     const results = [];

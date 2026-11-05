@@ -1,3 +1,4 @@
+import { internalMutation as administrativeMutation } from "./_generated/server";
 import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Agents — Convex Functions
@@ -856,7 +857,7 @@ export const detectStaleAgents = internalMutation({
  * Reset all quarantined/offline agents back to ACTIVE with a fresh heartbeat.
  * Useful during development when no agent runtime is sending heartbeats.
  */
-export const resetAll = mutation({
+export const resetAll = administrativeMutation({
   args: {
     projectId: v.optional(v.id("projects")),
   },

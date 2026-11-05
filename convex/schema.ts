@@ -3785,6 +3785,11 @@ export const schemaTablesPartOne = {
       v.literal("CANCELED")
     ),
     
+    // Server-owned authenticated decision identity; legacy display IDs do not qualify.
+    requestorOperatorId: v.optional(v.id("operators")),
+    decidedByOperatorId: v.optional(v.id("operators")),
+    firstDecisionOperatorId: v.optional(v.id("operators")),
+    decisionIdentityVersion: v.optional(v.literal("authenticated-operator/v1")),
     // Decision
     decidedByAgentId: v.optional(v.id("agents")),
     decidedByUserId: v.optional(v.string()),

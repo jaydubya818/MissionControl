@@ -31,6 +31,8 @@ const AUTHORIZATION_MARKERS = [
   "assertAuthorizedDeliveryRecord",
   "requireApprovalDecisionAuthority",
   "requireMemberAdministration",
+  "requireMemberCreation",
+  "requireApprovalActor",
   "requireWebhookWorkspace",
   "requireAgentFleetAuthority",
   "requireFactoryActionWithAudit",

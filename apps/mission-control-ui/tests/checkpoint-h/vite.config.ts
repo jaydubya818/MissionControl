@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
+      "@/lib/gatewayStatus": path.resolve(__dirname, "gateway-status.ts"),
       "@": path.resolve(__dirname, "../../src"),
       "convex/react": path.resolve(__dirname, "transport.ts"),
     },

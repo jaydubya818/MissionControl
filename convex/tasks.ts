@@ -1,5 +1,5 @@
+import { hasAuthenticatedApproval } from "./lib/approvalIdentity";
 import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, requireWorkspaceAccess, requireWorkspacePermission } from "./lib/companyAccess";
-import { missionServiceBinding } from "./lib/missionScopedFunctions";
 import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Tasks — Convex Functions
@@ -152,7 +152,7 @@ const TRANSITION_RULES: TransitionRule[] = [
   { from: "NEEDS_APPROVAL", to: "IN_PROGRESS", allowedActors: ["HUMAN"] },
   { from: "NEEDS_APPROVAL", to: "REVIEW", allowedActors: ["HUMAN"] },
   { from: "NEEDS_APPROVAL", to: "BLOCKED", allowedActors: ["HUMAN", "SYSTEM"] },
-  { from: "NEEDS_APPROVAL", to: "DONE", allowedActors: ["HUMAN"] },
+  { from: "NEEDS_APPROVAL", to: "DONE", allowedActors: ["HUMAN"], humanOnly: true },
   { from: "NEEDS_APPROVAL", to: "CANCELED", allowedActors: ["HUMAN"] },
   
   // FROM BLOCKED
@@ -1492,9 +1492,7 @@ export const transition = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    const service = missionServiceBinding(ctx);
-    if (!identity && !service) throw new Error("Authenticated task actor required.");
-    if (service && args.actorType === "HUMAN") throw new Error("A service cannot assert human approval.");
+    if (!identity) throw new Error("Authenticated task actor required.");
     const actorUserId = identity?.subject;
 
     // 1. Check idempotency - return existing if same key
@@ -1559,8 +1557,8 @@ export const transition = mutation({
     
     const fromStatus = task.status as TaskStatus;
     const toStatus = args.toStatus as TaskStatus;
-    const actorType = service ? "AGENT" : args.actorType;
-    if (!service && actorType !== "HUMAN") {
+    const actorType = args.actorType;
+    if (actorType !== "HUMAN") {
       if (!task.projectId) throw new Error("An authorized workspace is required.");
       await requireWorkspacePermission({ ...ctx, db: missionAuthorityDatabase(ctx) }, task.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
     }
@@ -1616,7 +1614,7 @@ export const transition = mutation({
       };
     }
     
-    if (rule.humanOnly && !taskWorkOrder?.missionId) {
+    if ((rule.humanOnly || toStatus === "DONE") && !taskWorkOrder?.missionId) {
       const project = task.projectId ? await ctx.db.get(task.projectId) : null;
       if (!identity || !project?.tenantId) throw new Error("Authenticated human approval is required.");
       await requireWorkspaceAccess({ ...ctx, db: missionAuthorityDatabase(ctx) }, project.tenantId, project._id, { permission: COMPANY_PERMISSIONS.APPROVE_DELIVERY });
@@ -1702,15 +1700,16 @@ export const transition = mutation({
       errors.push({ field: "assigneeIds", message: "Task must have at least one assignee" });
     }
     
-    // Check REVIEW → DONE approval gate
-    if (fromStatus === "REVIEW" && toStatus === "DONE") {
+    // Every completion path must satisfy the workspace approval gate.
+    if (toStatus === "DONE") {
       // Get active policy to check if approval is required
-      const policy = await ctx.db
+      const policies = await ctx.db
         .query("policies")
         .withIndex("by_active", (q) => q.eq("active", true))
-        .first();
+        .filter(q => q.or(q.eq(q.field("projectId"), task.projectId), q.eq(q.field("projectId"), undefined)))
+        .collect();
       
-      if (policy && (policy.rules as any)?.reviewToDoneRequiresApproval) {
+      if (policies.some(policy => (policy.rules as any)?.reviewToDoneRequiresApproval)) {
         // Check for approved approval record
         const approvals = await ctx.db
           .query("approvals")
@@ -1718,10 +1717,10 @@ export const transition = mutation({
           .filter((q) => q.eq(q.field("status"), "APPROVED"))
           .collect();
         
-        if (approvals.length === 0) {
+        if (!approvals.some(approval => approval.actionType === "TASK_COMPLETION" && hasAuthenticatedApproval(approval))) {
           errors.push({
             field: "status",
-            message: "REVIEW → DONE requires an approved approval record. Request approval first.",
+            message: "Completion requires an authenticated approved record. Request approval first.",
           });
         }
       }
@@ -2130,6 +2129,7 @@ export const resolveApprovedWorkflowGate = mutation({
     ]);
     if (!task) return { success: false, error: "Task not found" };
     if (!approval) return { success: false, error: "Approval not found" };
+    if (!hasAuthenticatedApproval(approval)) return { success:false, error:"A new authenticated approval is required for this gate." };
 
     const metadata = (task.metadata ?? {}) as Record<string, any>;
     const gate = metadata.gate ?? {};

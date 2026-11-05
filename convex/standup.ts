@@ -1,3 +1,4 @@
+import { internalMutation as maintenanceMutation } from "./_generated/server";
 /**
  * Daily Standup Report — aggregates tasks, agents, approvals for human review.
  */
@@ -136,7 +137,7 @@ export const save = mutation({
 });
 
 /** Run daily standup (mutation — for cron). Builds report and saves to activities. */
-export const runDaily = mutation({
+export const runDaily = maintenanceMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();

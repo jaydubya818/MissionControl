@@ -109,6 +109,11 @@ export const useQuery = (reference:any) => {
   const name=getFunctionName(reference);
   if(name === "workOrders:factoryOverview") return {summary:{activeWorkOrders:0,blockedWorkOrders:0,awaitingApproval:0,staleEvidence:0,runsNeedingAttention:0,recentlyAccepted:0,verificationFailures:0,approvalsPending:0},recentAccepted:[],blockedWorkOrders:[],approvalQueue:[],staleEvidence:[],runsNeedingAttention:[]};
   if(name === "workflowMetrics:getAllMetrics") return [];
+  if(name.startsWith("registry/")) return [];
+  if(name === "agents:list" || name === "agents:listAll") return [{_id:"agent-fixture",name:"Quarantined fixture agent",role:"SPECIALIST",status:"QUARANTINED",spendToday:0,budgetDaily:1,budgetPerRun:1,allowedTaskTypes:[],lastHeartbeatAt:Date.now(),errorStreak:1}];
+  if(name === "tasks:list" || name === "tasks:listAll" || name === "contentDrops:list" || name === "projects:list") return [];
+  if(name === "projects:get") return {_id:"project-ui-fixture",name:"Component fixture"};
+  if(name === "contentDrops:getStats") return {total:0,byStatus:{},byType:{}};
   if(name === "workflowMetrics:getSummary") return {total:0,completed:0,failed:0,running:0,paused:0,successRate:0,avgDurationMs:0,totalRetries:0,totalEscalations:0};
   if(name === "workflows:list") return [
     {_id:"workflow-own",workflowId:"scoped",name:"Scoped workflow",description:"Component fixture only",projectId:"project-ui-fixture",contractVersion:"factory-workflow-contract/v1",agents:[],steps:[]},
@@ -130,3 +135,5 @@ functions["workflowRuns:start"] = async() => ({runId:"component-fixture-no-execu
 functions["workflowMetrics:refreshAll"] = async() => { throw new Error("Synthetic refresh refusal — try again"); };
 export const useMutation = (reference: any) =>
   functions[getFunctionName(reference)];
+
+export const useAction = useMutation;

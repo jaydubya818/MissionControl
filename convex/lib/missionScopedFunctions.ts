@@ -307,11 +307,14 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     }
   }
   const scoped: any = { ...ctx, db, [authorityDatabase]: raw, [checkArguments]: assertArguments, [serviceAuthority]: service };
+  const carry = (input: Row) => serviceClaim ? { ...input, __missionService: serviceClaim } : input;
+  if ("runMutation" in ctx) scoped.runMutation = (reference: any, input: Row) => serializedWrite(async () => {
+    pendingWrites++; invalidate("");
+    try { return await (ctx as MutationCtx).runMutation(reference, carry(input)); }
+    finally { pendingWrites--; invalidate(""); }
+  });
   if (serviceClaim) {
-    const carry = (input: Row) => ({ ...input, __missionService: serviceClaim });
-    for (const method of ["runQuery", "runMutation"] as const) if (method in ctx) {
-      scoped[method] = (reference: any, input: Row) => (ctx as any)[method](reference, carry(input));
-    }
+    if ("runQuery" in ctx) scoped.runQuery = (reference: any, input: Row) => ctx.runQuery(reference, carry(input));
     if ("scheduler" in ctx) scoped.scheduler = new Proxy(ctx.scheduler, { get(target: any, key) {
       if (key === "runAt" || key === "runAfter") return (when: any, reference: any, input: Row) => target[key](when, reference, carry(input));
       const value = Reflect.get(target, key); return typeof value === "function" ? value.bind(target) : value;

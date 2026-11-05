@@ -511,14 +511,11 @@ export function ContentPipelineView({ projectId }: ContentPipelineViewProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
-  const [seeding, setSeeding] = useState(false);
 
   const captures    = useQuery(api.tasks.listAll, projectId ? { projectId } : {});
   const contentDrops = useQuery(api.contentDrops.list, projectId ? { projectId } : {});
   const agents      = useQuery(api.agents.listAll, projectId ? { projectId } : {});
   const stats       = useQuery(api.contentDrops.getStats, projectId ? { projectId } : {});
-
-  const seedDrops = useMutation(api.contentDrops.seedContentDrops);
 
   const isLoading = !captures || !contentDrops || !agents;
 
@@ -541,12 +538,6 @@ export function ContentPipelineView({ projectId }: ContentPipelineViewProps) {
       </section>
     );
   }
-
-  const handleSeed = async () => {
-    setSeeding(true);
-    try { await seedDrops({ projectId: projectId ?? undefined }); }
-    finally { setSeeding(false); }
-  };
 
   const filteredDrops = contentDrops.filter((d) => {
     if (statusFilter !== "ALL" && d.status !== statusFilter) return false;
@@ -573,17 +564,6 @@ export function ContentPipelineView({ projectId }: ContentPipelineViewProps) {
         eyebrow="Content"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-          {contentDrops.length === 0 && (
-            <button
-              onClick={handleSeed}
-              disabled={seeding}
-              className="flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-medium text-ink-secondary transition-colors duration-150 hover:border-line-strong hover:text-ink disabled:opacity-50"
-            >
-              {seeding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-              Seed Sample Data
-            </button>
-          )}
-
           {/* Create button */}
           <button
             onClick={() => setShowCreate(true)}
@@ -712,19 +692,12 @@ export function ContentPipelineView({ projectId }: ContentPipelineViewProps) {
               </p>
               <p className="mb-6 max-w-xs text-[12.5px] text-ink-muted">
                 {contentDrops.length === 0
-                  ? "Seed sample data to get started, or create your first content drop."
+                  ? "Create your first content drop to start the publishing pipeline."
                   : "Try adjusting the status or type filter."}
               </p>
               {contentDrops.length === 0 && (
                 <div className="flex gap-3">
-                  <button
-                    onClick={handleSeed}
-                    disabled={seeding}
-                    className="flex h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-medium text-ink-secondary transition-colors duration-150 hover:border-line-strong hover:text-ink disabled:opacity-50"
-                  >
-                    {seeding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    Seed Sample Data
-                  </button>
+
                   <button
                     onClick={() => setShowCreate(true)}
                     className="flex h-9 items-center gap-1.5 rounded-lg bg-act px-3 text-[13px] font-medium text-act-ink transition-opacity duration-150 hover:opacity-90"

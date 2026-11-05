@@ -1,3 +1,4 @@
+import { requireMemberAdministration, requireMemberCreation, validateMemberLinks } from "./lib/orgMemberAuthority";
 /**
  * Convex functions for org members (human team + org chart + RBAC)
  */
@@ -229,6 +230,7 @@ export const get = query({
 export const create = mutation({
   args: {
     projectId: v.optional(v.id("projects")),
+    tenantId: v.optional(v.id("tenants")),
     name: v.string(),
     email: v.optional(v.string()),
     role: v.string(),
@@ -243,29 +245,11 @@ export const create = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const project = args.projectId ? await ctx.db.get(args.projectId) : null;
-    if (args.projectId && (!project || !project.tenantId)) {
-      throw new Error("Workspace company assignment is incomplete");
-    }
-    if (project?.tenantId) {
-      await requireWorkspaceAccess(ctx, project.tenantId, project._id, {
-        permission: COMPANY_PERMISSIONS.MANAGE_WORKSPACES,
-      });
-    }
-    // Check for duplicate email
-    if (args.email) {
-      const existing = await ctx.db
-        .query("orgMembers")
-        .withIndex("by_email", (q) => q.eq("email", args.email))
-        .first();
-      if (existing && existing.active) {
-        throw new Error(`A member with email ${args.email} already exists`);
-      }
-    }
-
+    const tenantId = await requireMemberCreation(ctx, args.projectId, args.tenantId);
+    await validateMemberLinks(ctx, tenantId, args);
     return await ctx.db.insert("orgMembers", {
       ...args,
-      tenantId: project?.tenantId,
+      tenantId,
       active: true,
       invitedAt: Date.now(),
     });
@@ -293,6 +277,8 @@ export const update = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    const authority = await requireMemberAdministration(ctx, args.id);
+    await validateMemberLinks(ctx, authority.tenantId, args, args.id);
     const { id, ...updates } = args;
     const filtered = Object.fromEntries(
       Object.entries(updates).filter(([_, v]) => v !== undefined)
@@ -313,6 +299,8 @@ export const updatePermissions = mutation({
     permissions: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    const authority = await requireMemberAdministration(ctx, args.id);
+    await validateMemberLinks(ctx, authority.tenantId, args, args.id);
     const member = await ctx.db.get(args.id);
     if (!member) throw new Error("Member not found");
 
@@ -336,6 +324,8 @@ export const addProjectAccess = mutation({
     accessLevel: accessLevelValidator,
   },
   handler: async (ctx, args) => {
+    const authority = await requireMemberAdministration(ctx, args.memberId);
+    await validateMemberLinks(ctx, authority.tenantId, args, args.memberId);
     const member = await ctx.db.get(args.memberId);
     if (!member) throw new Error("Member not found");
 
@@ -363,6 +353,8 @@ export const removeProjectAccess = mutation({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
+    const authority = await requireMemberAdministration(ctx, args.memberId);
+    await validateMemberLinks(ctx, authority.tenantId, args, args.memberId);
     const member = await ctx.db.get(args.memberId);
     if (!member) throw new Error("Member not found");
 
@@ -384,6 +376,8 @@ export const remove = mutation({
     id: v.id("orgMembers"),
   },
   handler: async (ctx, args) => {
+    const authority = await requireMemberAdministration(ctx, args.id);
+    await validateMemberLinks(ctx, authority.tenantId, args, args.id);
     await ctx.db.patch(args.id, { active: false });
     return args.id;
   },
@@ -399,6 +393,8 @@ export const move = mutation({
     newLevel: v.number(),
   },
   handler: async (ctx, args) => {
+    const authority = await requireMemberAdministration(ctx, args.id);
+    await validateMemberLinks(ctx, authority.tenantId, args, args.id);
     const member = await ctx.db.get(args.id);
     if (!member) {
       throw new Error("Member not found");
@@ -424,6 +420,8 @@ export const move = mutation({
 
       const childrenMap = new Map<Id<"orgMembers">, Id<"orgMembers">[]>();
       for (const m of allMembers) {
+        const sameCompany = m.tenantId === authority.tenantId || (!m.tenantId && member.projectId && m.projectId === member.projectId);
+        if (!sameCompany) continue;
         if (m.parentMemberId) {
           const siblings = childrenMap.get(m.parentMemberId) || [];
           siblings.push(m._id);

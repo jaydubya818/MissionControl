@@ -1,3 +1,4 @@
+import { internalMutation as administrativeMutation } from "./_generated/server";
 /**
  * Content Drops — Agent-submitted deliverables
  */
@@ -150,7 +151,7 @@ export const getStats = query({
   },
 });
 
-export const seedContentDrops = mutation({
+export const seedContentDrops = administrativeMutation({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
     const existing = args.projectId

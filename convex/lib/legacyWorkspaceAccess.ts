@@ -3,7 +3,7 @@ import type { Id } from '../_generated/dataModel';
 import { COMPANY_PERMISSIONS, FACTORY_PERMISSIONS, requireWorkspaceAccess, requireWorkspacePermission } from './companyAccess';
 
 type Row = Record<string, any>;
-const protectedTables = new Set(['tasks', 'taskEvents', 'taskTransitions', 'activities', 'workflowRuns', 'runEvents', 'runArtifacts', 'workflowMetrics']);
+const protectedTables = new Set(['tasks', 'taskEvents', 'taskTransitions', 'activities', 'workflowRuns', 'runEvents', 'runArtifacts', 'workflowMetrics', 'approvals', 'approvalRecords']);
 
 /** Legacy resources have workspace authority. Exact Mission grants keep their
  * existing lineage policy; this fallback cannot replace or widen those grants. */
@@ -24,9 +24,17 @@ export function legacyWorkspaceAccess(ctx: QueryCtx | MutationCtx, read: (id: st
   const permissions = new Map<string, Promise<boolean>>();
   const allows = async (row: Row, table: string | undefined, write: boolean): Promise<boolean> => {
     if (!protectedTables.has(table ?? '') || await hasMission(row, table)) return true;
-    if (!row.projectId || !await ctx.auth.getUserIdentity()) return false;
-    const projectId = row.projectId as Id<'projects'>;
-    const permission = !write ? 'read' : ['workflowRuns', 'runEvents', 'runArtifacts', 'workflowMetrics'].includes(table!) ? 'automation' : 'delivery';
+    if (!await ctx.auth.getUserIdentity()) return false;
+    let projectId = row.projectId as Id<'projects'> | undefined;
+    if (!projectId && ['taskEvents', 'taskTransitions', 'activities', 'approvals', 'approvalRecords'].includes(table!)) {
+      const approval = row.legacyApprovalId ? await read(row.legacyApprovalId) : null;
+      const taskId = row.taskId ?? approval?.taskId;
+      const task = taskId ? await read(taskId) : null;
+      projectId = approval?.projectId ?? task?.projectId;
+    }
+    if (!projectId && ['runEvents', 'runArtifacts'].includes(table!) && row.workflowRunId) projectId = (await read(row.workflowRunId))?.projectId;
+    if (!projectId) return false;
+    const permission = !write ? 'read' : ['approvals', 'approvalRecords'].includes(table!) && ['APPROVED', 'DENIED'].includes(row.status) ? 'approval' : ['workflowRuns', 'runEvents', 'runArtifacts', 'workflowMetrics'].includes(table!) ? 'automation' : 'delivery';
     const key = `${projectId}:${permission}`;
     if (!permissions.has(key)) permissions.set(key, (async () => {
       try {
@@ -35,7 +43,7 @@ export function legacyWorkspaceAccess(ctx: QueryCtx | MutationCtx, read: (id: st
         else {
           const project = await read(projectId);
           if (!project?.tenantId) return false;
-          await requireWorkspaceAccess(ctx, project.tenantId, projectId, { permission: COMPANY_PERMISSIONS.UPDATE_DELIVERY });
+          await requireWorkspaceAccess(ctx, project.tenantId, projectId, { permission: permission === 'approval' ? COMPANY_PERMISSIONS.APPROVE_DELIVERY : COMPANY_PERMISSIONS.UPDATE_DELIVERY });
         }
         return true;
       } catch { return false; }

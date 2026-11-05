@@ -1,6 +1,6 @@
 import { requireServiceAttemptAuthority } from "./lib/missionServiceAuthority";
 // Deployed only to the disposable qualification database.
-import { mutationGeneric as fixtureMutation, internalMutationGeneric as fixtureInternalMutation } from "convex/server";
+import { makeFunctionReference, mutationGeneric as fixtureMutation, internalMutationGeneric as fixtureInternalMutation } from "convex/server";
 import { query, contributorMutation, missionScopedContext } from "./lib/missionScopedFunctions";
 import { v } from "convex/values";
 import schema from "./schema";
@@ -187,3 +187,34 @@ export const legacyPermissionRevocation = fixtureInternalMutation({
   return {visibleBefore:Boolean(before),visibleAfter:Boolean(after)};
  }
 });
+
+export const approvalBoundarySeed = fixtureInternalMutation({args:{scope:v.any()},handler:async(ctx,{scope:s})=>{
+ await owner(ctx);const known={tenants:s.tenantId,projects:s.projectId,operators:s.operatorId};
+ function value(v){if(v.type==='literal')return v.value;if(v.type==='string')return 'Synthetic approval';if(v.type==='number')return 1;if(v.type==='boolean')return false;if(v.type==='null'||v.type==='any')return null;if(v.type==='array')return [];if(v.type==='union')return value(v.value[0]);if(v.type==='id'){if(!known[v.tableName])throw Error('Missing '+v.tableName);return known[v.tableName];}if(v.type==='object')return Object.fromEntries(Object.entries(v.value).filter(([,f])=>!f.optional).map(([k,f])=>[k,value(f.fieldType)]));throw Error('Unhandled '+v.type);}
+ async function insert(table,overrides){const row={...overrides};for(const[k,f]of Object.entries(schema.tables[table].validator.json.value))if(!(k in row)&&!f.optional)row[k]=value(f.fieldType);const id=await ctx.db.insert(table,row);known[table]=id;return id;}
+ for(const p of await ctx.db.query('policies').collect())if(p.active)await ctx.db.patch(p._id,{active:false});
+ await insert('policies',{projectId:s.otherProjectId,name:'Unrelated non-requiring policy',active:true,rules:{reviewToDoneRequiresApproval:false}});
+ await insert('policies',{projectId:s.projectId,name:'Approval boundary policy',active:true,rules:{reviewToDoneRequiresApproval:true}});
+ const agentId=await insert('agents',{tenantId:s.tenantId,projectId:s.projectId,name:'Synthetic approval requestor'});
+ const workOrderId=await insert('workOrders',{tenantId:s.tenantId,projectId:s.projectId,currentRevisionNumber:1,desiredOutcome:'Synthetic approval authority'});
+ const taskId=await insert('tasks',{tenantId:s.tenantId,projectId:s.projectId,workOrderId,status:'REVIEW',type:'OPS',assigneeIds:[agentId],metadata:{}});
+ const secondTaskId=await insert('tasks',{tenantId:s.tenantId,projectId:s.projectId,workOrderId,status:'NEEDS_APPROVAL',type:'OPS',assigneeIds:[agentId],metadata:{}});
+ const approval=async(risk,task=taskId,expiresAt=Date.now()+300000)=>insert('approvals',{tenantId:s.tenantId,projectId:s.projectId,taskId:task ?? undefined,requestorAgentId:agentId,actionType:'TASK_COMPLETION',actionSummary:'Synthetic approval',riskLevel:risk,status:'PENDING',justification:'Regression fixture',expiresAt,requiredDecisionCount:risk==='RED'?2:1,decisionCount:0});
+ const redId=await approval('RED'),yellowId=await approval('YELLOW'),expiredId=await approval('YELLOW',taskId,Date.now()-1000),tasklessId=await approval('YELLOW',null);
+ const restrictedProjectId=await insert('projects',{tenantId:s.tenantId,name:'Restricted fixture',slug:'restricted-fixture'});
+ const privateTaskId=await insert('tasks',{tenantId:s.tenantId,projectId:restrictedProjectId,status:'INBOX',type:'OPS',metadata:{}});
+ const peerMemberId=await insert('orgMembers',{tenantId:s.tenantId,projectId:s.projectId,operatorId:s.peerId,name:'Delivery-only linked profile',role:'Delivery',level:0,active:true,projectAccess:[]});
+ const unboundProjectId=await insert('projects',{name:'Unbound fixture',slug:'unbound-fixture'});
+ return{agentId,workOrderId,taskId,secondTaskId,redId,yellowId,expiredId,tasklessId,restrictedProjectId,privateTaskId,peerMemberId,unboundProjectId,otherTenantId:(await ctx.db.get(s.otherProjectId)).tenantId};
+}});
+
+export const revokeLegacyOperator = fixtureInternalMutation({args:{},handler:async ctx=>{
+ const identity=await ctx.auth.getUserIdentity();if(identity?.subject!=='fixture-peer')throw Error('Fixture identity mismatch');
+ const operator=await ctx.db.query('operators').withIndex('by_auth_id',q=>q.eq('authId',identity.subject)).unique();
+ await ctx.db.patch(operator._id,{active:false});
+}});
+export const nestedLegacyPermissionRevocation = fixtureInternalMutation({args:{taskId:v.id('tasks')},handler:async(ctx,args)=>{
+ const scoped=missionScopedContext(ctx),before=await scoped.db.get(args.taskId);
+ await scoped.runMutation(makeFunctionReference('isolationFixture:revokeLegacyOperator'),{});
+ const after=await scoped.db.get(args.taskId);return{visibleBefore:Boolean(before),visibleAfter:Boolean(after)};
+}});

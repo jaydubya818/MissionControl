@@ -17,14 +17,14 @@ const crons = cronJobs();
 crons.interval(
   "expire stale approvals",
   { minutes: 60 },
-  api.approvals.expireStale
+  internal.approvals.expireStale
 );
 
 // Escalate pending approvals breaching SLA every 10 minutes
 crons.interval(
   "escalate overdue approvals",
   { minutes: 60 },
-  api.approvals.escalateOverdue,
+  internal.approvals.escalateOverdue,
   {}
 );
 
@@ -39,7 +39,7 @@ crons.interval(
 crons.daily(
   "daily standup report",
   { hourUTC: 9, minuteUTC: 0 },
-  api.standup.runDaily
+  internal.standup.runDaily
 );
 
 // Daily CEO brief to Telegram at 09:00 UTC
