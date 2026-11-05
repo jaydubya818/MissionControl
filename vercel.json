@@ -29,7 +29,8 @@
       "codex/live-retry-runbook-20261003": false,
       "codex/checkpoint-h-authenticated-enterprise": false,
       "codex/enterprise-golden-journey": false,
-      "codex/unified-beta-missioncontrol-20261011": false
+      "codex/unified-beta-missioncontrol-20261011": false,
+      "codex/owner-local-mc-20261104": false
     }
   }
 }
