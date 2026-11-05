@@ -9,14 +9,27 @@ import { sha256Hex } from '../../packages/shared/src/canonicalDigest';
 import { enterprisePlanApprovedByOwner } from './enterpriseDelegationAdmission';
 import { canonicalPermitJson, parseOwnerEnrollment, parseExecutionPermit, permitDenied, permitDigest, requirePermitEnrollment } from '../../packages/shared/src/executionPermit';
 
+/**
+ * The authenticated owner must be the enrolled subject from the enrolled issuer and authorized party, for the enrolled audience.
+ * Convex validates a token's `aud` against the deployment's provider `applicationID` and never exposes `aud` on the identity, so an
+ * identity without `aud` is accepted only when the operator pinned that same applicationID (MC_OWNER_AUTH_APPLICATION_ID) and it equals
+ * the enrolled audience. A present `aud` must still equal it exactly. The tokenIdentifier must be the issuer-scoped subject.
+ */
+export function ownerIdentityMatches(identity: any, enrollment: { ownerSubject: string; clerkIssuer: string; clerkAudience: string; clerkAuthorizedParty: string },
+  applicationId: string | undefined = process.env.MC_OWNER_AUTH_APPLICATION_ID) {
+  if (!identity || identity.subject !== enrollment.ownerSubject || identity.issuer !== enrollment.clerkIssuer
+    || identity.azp !== enrollment.clerkAuthorizedParty) return false;
+  if (identity.tokenIdentifier !== undefined && identity.tokenIdentifier !== `${enrollment.clerkIssuer}|${enrollment.ownerSubject}`) return false;
+  if (identity.aud !== undefined) return identity.aud === enrollment.clerkAudience;
+  return !!applicationId && applicationId === enrollment.clerkAudience;
+}
 export async function permitConnection(ctx: MutationCtx, connectionId: Id<'enterpriseAppConnections'>, authenticatedOwner: boolean) {
   const live = await currentConnection(ctx, connectionId), { enrollment } = await installedEnrollment(ctx, live.connection);
   if (live.owner.authId !== enrollment.ownerSubject) return permitDenied();
   if (authenticatedOwner) {
     const identity = await ctx.auth.getUserIdentity();
     const access = await requireWorkspaceAccess(ctx, live.connection.tenantId, live.connection.projectId, { permission: COMPANY_PERMISSIONS.APPROVE_DELIVERY });
-    if (!identity || identity.subject !== enrollment.ownerSubject || identity.issuer !== enrollment.clerkIssuer
-      || (identity as any).aud !== enrollment.clerkAudience || (identity as any).azp !== enrollment.clerkAuthorizedParty
+    if (!ownerIdentityMatches(identity, enrollment)
       || access.membership.mode !== 'AUTHENTICATED' || access.membership.operatorId !== live.owner._id) return permitDenied();
   }
   return { ...live, enrollment };
@@ -87,8 +100,7 @@ export async function permitLifecycleOwner(ctx:MutationCtx,connectionId:Id<'ente
  const live=await controlConnection(ctx,connectionId,'enterprise.readPermitControl');
  const identity=await ctx.auth.getUserIdentity();
  const access=await requireWorkspaceAccess(ctx,live.connection.tenantId,live.connection.projectId,{permission:COMPANY_PERMISSIONS.APPROVE_DELIVERY});
- if(!identity||identity.subject!==live.enrollment.ownerSubject||identity.issuer!==live.enrollment.clerkIssuer
-  ||(identity as any).aud!==live.enrollment.clerkAudience||(identity as any).azp!==live.enrollment.clerkAuthorizedParty
+ if(!ownerIdentityMatches(identity,live.enrollment)
   ||!live.owner.active||access.membership.mode!=='AUTHENTICATED'||access.membership.operatorId!==live.owner._id)return permitDenied();
  return live;
 }
