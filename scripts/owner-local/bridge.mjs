@@ -17,7 +17,7 @@ import { BRIDGE_PORT, MC_URL, MC_DIR, CONFIG, EVIDENCE, OWNER_ID, LOCAL_ISSUER, 
 
 const ROOT = new URL('../..', import.meta.url).pathname, cli = join(ROOT, 'node_modules/convex/bin/main.js');
 const AUDIT = join(EVIDENCE, 'mc-owner-approvals.jsonl');
-const FRESH_MS = 10 * 60 * 1000;
+const FRESH_MS = 10 * 60 * 1000, JOURNEY_MS = 120 * 60 * 1000;
 const setup = () => JSON.parse(readFileSync(join(MC_DIR, 'setup.json'), 'utf8'));
 const ref = name => makeFunctionReference(name);
 const canonical = v => Array.isArray(v) ? `[${v.map(canonical).join(',')}]` : v && typeof v === 'object'
@@ -39,9 +39,9 @@ export function verifyConfirmation(body, step) {
   if (binding.schema !== 'myeve-owner-confirmation/v1' || binding.profile !== 'myeve.private-beta.owner/v1' || binding.ownerId !== OWNER_ID
     || !/^[a-f0-9]{64}$/.test(binding.planSha256) || binding.confirmCode !== binding.planSha256.slice(0, 12)
     || binding.requestSha256 !== sha256(binding.request) || !Array.isArray(binding.works) || binding.works.length !== 3
-    || !(Date.now() - binding.confirmedAt < FRESH_MS && binding.confirmedAt <= Date.now() + 5000)) throw Error('CONFIRMATION_INVALID_OR_STALE');
+    || !(Date.now() - binding.confirmedAt < (step === 'A' ? FRESH_MS : JOURNEY_MS) && binding.confirmedAt <= Date.now() + 5000)) throw Error('CONFIRMATION_INVALID_OR_STALE');
   const digest = sha256(canonical(binding));
-  if (used().some(r => r.confirmationDigest === digest && r.step === step && r.kind === 'STEP_COMPLETED')) throw Error('CONFIRMATION_ALREADY_USED');
+  if (step === 'A' && used().some(r => r.confirmationDigest === digest && r.step === 'A' && r.kind === 'STEP_COMPLETED')) throw Error('CONFIRMATION_ALREADY_USED');
   if (step === 'B' && !used().some(r => r.confirmationDigest === digest && r.step === 'A' && r.kind === 'STEP_COMPLETED')) throw Error('CONFIRMATION_STEP_ORDER');
   return { binding, digest };
 }
@@ -106,6 +106,8 @@ export async function confirmStep(body) {
   const assigned = await owner.mutation(ref('softwareFactoryControlPlane:assignMissionMember'), { tenantId: s.tenantId, projectId: s.projectId, missionId,
     memberId: s.plannerMemberId, teamId: s.teamId, role: 'CONTRIBUTOR', expiresAt: Date.now() + 60 * 60 * 1000 });
   record('OWNER_APPROVAL', { approval: 'ASSIGN_PLANNER_CONTRIBUTOR', mutation: 'softwareFactoryControlPlane:assignMissionMember', missionId, assignmentId: assigned.assignmentId });
+  const blueprintFor = stage => ({ ...blueprint, id: `stage-${stage}`, title: `Stage ${stage}/3: ${binding.title}`.slice(0, 160), sequence: stage,
+    dependsOnBlueprintIds: stage === 1 ? [] : [`stage-${stage - 1}`] });
   const blueprint = { id: 'owner-request-build', title: binding.title, desiredOutcome: binding.request, workflowId: s.workflowId, sequence: 1, role: 'WORKER',
     isMutating: true, priority: 2, riskLevel: 'MEDIUM', constraints: [`Repository ${binding.repository} only`, 'MyFactory is the only execution engine', 'Owner-local; no production'],
     requiredApprovals: [], assertionIds: ['build-and-tests'], dependsOnBlueprintIds: [], branchStrategy: 'sofie/owner-requests',
@@ -117,21 +119,24 @@ export async function confirmStep(body) {
     requiresIndependentValidation: true, waiverAllowed: false };
   const draft = await planner.mutation(ref('missions:savePlanDraft'), { projectId: s.projectId, missionId, idempotencyKey: `plan:${binding.planSha256}`,
     summary: `Owner-confirmed plan ${binding.planSha256}`, rollbackApproach: 'Candidate commits only; the baseline is unchanged until the owner publishes.',
-    workOrderBlueprints: [blueprint], assertions: [assertion], metadata: { myevePlanSha256: binding.planSha256, works: binding.works.map(w => w.id) } });
+    workOrderBlueprints: [1, 2, 3].map(blueprintFor), assertions: [assertion], metadata: { myevePlanSha256: binding.planSha256, works: binding.works.map(w => w.id) } });
   const planId = draft.plan._id;
   await planner.mutation(ref('missions:submitPlan'), { projectId: s.projectId, missionId, planId, idempotencyKey: `submit:${binding.planSha256}` });
   record('PLANNER_AUTHORED', { missionId, planId });
   // 3 Owner decision: approve the exact Plan; this releases its WorkOrder with an APPLIED revision.
   const approved = await owner.mutation(ref('missions:approvePlan'), { projectId: s.projectId, missionId, planId,
     decisionReason: `Owner confirmed Sofie plan ${binding.confirmCode} (${binding.planSha256})`, idempotencyKey: `approve:${binding.planSha256}` });
-  const workOrder = approved.workOrders[0];
+  const byStage = [1, 2, 3].map(stage => approved.workOrders.find(w => (w.metadata?.missionBlueprintId ?? w.missionBlueprintId) === `stage-${stage}`));
+  if (byStage.some(w => !w?.currentRevisionId)) throw Error('PLAN_WORKORDERS_INCOMPLETE');
+  const workOrder = byStage[0];
   const read = await owner.action(ref('sofieEnterprise:command'), serviceCommand(s, connected.connectionId, secret,
     { operation: 'enterprise.read', connectionId: connected.connectionId, proposalId, missionId, expectedPlanDigest: null }));
   const planDigest = read.response.plan.digest;
   record('OWNER_APPROVAL', { approval: 'APPROVE_PLAN_RELEASE_WORKORDER', mutation: 'missions:approvePlan', missionId, planId, planDigest,
-    workOrderId: workOrder._id, workOrderRevisionId: workOrder.currentRevisionId, releasedWorkOrderIds: approved.workOrders.map(w => w._id) });
+    workOrders: byStage.map((w, i) => ({ stage: i + 1, workOrderId: w._id, workOrderRevisionId: w.currentRevisionId })), releasedWorkOrderIds: approved.workOrders.map(w => w._id) });
   const result = { connectionId: connected.connectionId, enrollment, proposalId, missionId, planId, planDigest, workOrderId: workOrder._id,
-    expectedWorkOrderRevisionId: workOrder.currentRevisionId, projectId: s.projectId };
+    expectedWorkOrderRevisionId: workOrder.currentRevisionId, projectId: s.projectId,
+    workOrders: byStage.map((w, i) => ({ stage: i + 1, workOrderId: w._id, expectedWorkOrderRevisionId: w.currentRevisionId })) };
   record('STEP_COMPLETED', { result: { ...result, enrollment: undefined } });
   return result;
 }
@@ -145,7 +150,10 @@ export async function approvePermitsStep(body) {
   const approvals = [];
   for (const requestId of body.requestIds ?? []) {
     const r = pending.requests.find(x => x.requestId === requestId), w = r && want.get(r.work.id);
-    if (!r || !w || r.work.version !== w.version || r.work.generation !== w.generation || r.planDigest !== a.planDigest || r.workOrderId !== a.workOrderId
+    const stageWorkOrder = w && a.workOrders.find(x => x.stage === w.stage);
+    if (used().some(x => x.kind === 'OWNER_APPROVAL' && x.approval === 'INSTALLED_EXECUTION_PERMIT' && x.confirmationDigest === digest && x.work?.id === r?.work.id))
+      throw Error('PERMIT_ALREADY_APPROVED_FOR_WORK');
+    if (!r || !w || r.work.version !== w.version || r.work.generation !== w.generation || r.planDigest !== a.planDigest || r.workOrderId !== stageWorkOrder?.workOrderId
       || r.admission.maxCostMicrousd > binding.enrollmentPins.maxCostMicrousd || r.admission.maxDurationSeconds > binding.enrollmentPins.maxDurationSeconds
       || r.admission.factoryVersion !== binding.enrollmentPins.factoryVersion) throw Error('PERMIT_REQUEST_NOT_CONFIRMED');
     want.delete(r.work.id);
@@ -155,7 +163,7 @@ export async function approvePermitsStep(body) {
       work: r.work, admission: r.admission, planDigest: r.planDigest, workOrderId: r.workOrderId, permitId: approved.document.permitId,
       approvalId: approved.document.approvalId, permitSha256: sha256('mc-execution-permit/v1\n' + canonical(approved.document)) }));
   }
-  if (want.size) throw Error('PERMIT_REQUESTS_INCOMPLETE');
+  if (!approvals.length) throw Error('PERMIT_REQUESTS_EMPTY');
   audit({ step: 'B', kind: 'STEP_COMPLETED', confirmationDigest: digest, permits: approvals.map(x => x.permitId) });
   return { permits: approvals.map(x => ({ workId: x.work.id, permitId: x.permitId, approvalId: x.approvalId })) };
 }
