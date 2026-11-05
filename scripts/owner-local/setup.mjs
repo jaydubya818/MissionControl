@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync, createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { newSecret, MC_URL, MC_DIR, CONFIG, OWNER_ID, PLANNER_SUBJECT, MC_ISSUER_LABEL, MYEVE_AUDIENCE_LABEL, readSecret, ensureSecret, writeSecret, mintToken } from './common.mjs';
+import { LOCAL_ISSUER, newSecret, MC_URL, MC_DIR, CONFIG, OWNER_ID, PLANNER_SUBJECT, MC_ISSUER_LABEL, MYEVE_AUDIENCE_LABEL, readSecret, ensureSecret, writeSecret, mintToken } from './common.mjs';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname), cli = join(ROOT, 'node_modules/convex/bin/main.js');
 const admin = readSecret('mc-admin-key');
@@ -56,6 +56,7 @@ const binding = { tenantId, projectId, ownerMemberId, ownerId: OWNER_ID, organiz
 envSet('MC_SOFIE_INSTALLED_ORIGINS', JSON.stringify({ environment: 'APPROVED_NONPRODUCTION', issuer: MC_ISSUER_LABEL, audience: MYEVE_AUDIENCE_LABEL }));
 envSet('MC_SOFIE_APPLICATION_KEY_ID', 'owner-local-sofie');
 envSet('MC_OWNER_AUTH_APPLICATION_ID', 'convex');
+envSet('MC_OWNER_LOCAL_ISSUER', LOCAL_ISSUER); // disposable local issuer only (.invalid); hosted Clerk keeps the aud check
 envSet('MC_SOFIE_INSTALLED_MAX_DURATION_SECONDS', '600'); // Jay: max 10 minutes per Work (owner-local)
 envSet('MC_SOFIE_APPLICATION_OWNER_ID', ownerOperatorId);
 envSet('MC_SOFIE_PERMIT_SIGNING_KEYS', JSON.stringify({ [permitKeyId]: permitPrivate.export({ type: 'pkcs8', format: 'pem' }).toString() }));

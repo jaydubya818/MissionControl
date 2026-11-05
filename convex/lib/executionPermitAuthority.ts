@@ -11,17 +11,23 @@ import { canonicalPermitJson, parseOwnerEnrollment, parseExecutionPermit, permit
 
 /**
  * The authenticated owner must be the enrolled subject from the enrolled issuer and authorized party, for the enrolled audience.
- * Convex validates a token's `aud` against the deployment's provider `applicationID` and never exposes `aud` on the identity, so an
- * identity without `aud` is accepted only when the operator pinned that same applicationID (MC_OWNER_AUTH_APPLICATION_ID) and it equals
- * the enrolled audience. A present `aud` must still equal it exactly. The tokenIdentifier must be the issuer-scoped subject.
+ * Every issuer keeps the original check unchanged: `aud` must equal the enrolled audience.
+ * Single exception, for the disposable owner-local backend only: Convex never exposes `aud` on a real identity (it validates it against the
+ * provider applicationID), so an identity WITHOUT `aud` is accepted only when it comes from the operator-pinned LOCAL issuer
+ * (MC_OWNER_LOCAL_ISSUER, an RFC 6761 `.invalid` origin that no hosted Clerk issuer can be), that issuer is the enrolled one, the operator
+ * pinned the same applicationID (MC_OWNER_AUTH_APPLICATION_ID) as the enrolled audience, and the tokenIdentifier is the issuer-scoped subject.
  */
+const localIssuer = (value: string | undefined) => { try { const u = new URL(value ?? ''); return u.protocol === 'https:' && u.hostname.endsWith('.invalid') && u.origin === value ? value : undefined; } catch { return undefined; } };
 export function ownerIdentityMatches(identity: any, enrollment: { ownerSubject: string; clerkIssuer: string; clerkAudience: string; clerkAuthorizedParty: string },
-  applicationId: string | undefined = process.env.MC_OWNER_AUTH_APPLICATION_ID) {
+  env: { applicationId?: string; localIssuer?: string } = { applicationId: process.env.MC_OWNER_AUTH_APPLICATION_ID, localIssuer: process.env.MC_OWNER_LOCAL_ISSUER }) {
   if (!identity || identity.subject !== enrollment.ownerSubject || identity.issuer !== enrollment.clerkIssuer
-    || identity.azp !== enrollment.clerkAuthorizedParty) return false;
-  if (identity.tokenIdentifier !== undefined && identity.tokenIdentifier !== `${enrollment.clerkIssuer}|${enrollment.ownerSubject}`) return false;
-  if (identity.aud !== undefined) return identity.aud === enrollment.clerkAudience;
-  return !!applicationId && applicationId === enrollment.clerkAudience;
+    || identity.aud !== enrollment.clerkAudience || identity.azp !== enrollment.clerkAuthorizedParty) {
+    const local = localIssuer(env.localIssuer);
+    return !!identity && identity.aud === undefined && !!local && identity.issuer === local && enrollment.clerkIssuer === local
+      && identity.subject === enrollment.ownerSubject && identity.azp === enrollment.clerkAuthorizedParty
+      && !!env.applicationId && env.applicationId === enrollment.clerkAudience && identity.tokenIdentifier === `${local}|${enrollment.ownerSubject}`;
+  }
+  return true;
 }
 export async function permitConnection(ctx: MutationCtx, connectionId: Id<'enterpriseAppConnections'>, authenticatedOwner: boolean) {
   const live = await currentConnection(ctx, connectionId), { enrollment } = await installedEnrollment(ctx, live.connection);
