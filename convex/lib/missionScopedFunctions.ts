@@ -75,6 +75,7 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
     return resourceDecisions.get(key)!;
   }
   async function evaluateAllowed(row: Row | null, capability: MissionCapability, seen: Set<string>, table: string | undefined, epoch: number): Promise<boolean> {
+    const dependencyRead = capability === "READ" || seen.size > 0;
     if (epoch !== authorizationEpoch) return false;
     if (!row) return true;
     table ??= row._id ? lineage.tableOf(row._id) ?? undefined : undefined;
@@ -166,6 +167,14 @@ export function missionScopedContext<T extends Context>(ctx: T, writeCapability:
         || (row.projectId && parent.projectId && row.projectId !== parent.projectId)) return false;
       if (seen.has(id)) continue;
       if (!await allowed(parent, application ? "READ" : service && row._id === service.workflowRunId && row.verificationAttemptBinding?.sourceAttemptId === id ? "READ" : capability, seen, undefined, epoch)) return false;
+    }
+    if (service && table === "policyEnvelopes") {
+      const run = await read(service.workflowRunId);
+      const version = await read(service.factoryDefinitionVersionId);
+      // Read only the policy selected by the run and immutable Factory version.
+      // The full provenance traversal above still rejects foreign Missions.
+      return dependencyRead && row._id === run?.policyEnvelopeId && row._id === version?.policyEnvelopeId
+        && row.projectId === service.projectId && row.tenantId === service.tenantId;
     }
     return await legacyAllowed(row, table, capability !== "READ");
   }
