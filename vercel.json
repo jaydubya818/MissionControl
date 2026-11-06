@@ -23,6 +23,7 @@
   ],
   "git": {
     "deploymentEnabled": {
+      "codex/mc-hosted-auth-20261105": false,
       "main": false,
       "codex/unified-capability-control-plane": false,
       "codex/factory-turn-budget-test": false,
