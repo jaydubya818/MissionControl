@@ -8,6 +8,26 @@ import { canonicalServiceCommand, validateServiceCommandEnvelope, type ServiceCo
 import { sha256Hex } from '../../packages/shared/src/canonicalDigest';
 import { enterprisePlanApprovedByOwner } from './enterpriseDelegationAdmission';
 import { canonicalPermitJson, parseOwnerEnrollment, parseExecutionPermit, permitDenied, permitDigest, requirePermitEnrollment } from '../../packages/shared/src/executionPermit';
+import authConfig from '../auth.config';
+
+type ConvexAuthProvider = { domain?: string; applicationID?: string };
+/**
+ * The authenticated owner must be the enrolled subject from the enrolled issuer and authorized party, for the enrolled audience.
+ * An identity that carries `aud` keeps the original check exactly: `aud` must equal the enrolled audience.
+ * Real Convex identities never carry `aud`: Convex itself rejects any JWT whose `aud` differs from the `applicationID` of the
+ * provider in convex/auth.config.ts whose `domain` is the token issuer. So an identity WITHOUT `aud` is accepted only when the
+ * deployment's own auth.config pins a provider whose domain is exactly the enrolled issuer and whose applicationID is exactly the
+ * enrolled audience (the pin is deployed source, not an environment variable), and its tokenIdentifier is the issuer-scoped subject.
+ * There is no local-issuer or environment exception.
+ */
+export function ownerIdentityMatches(identity: any, enrollment: { ownerSubject: string; clerkIssuer: string; clerkAudience: string; clerkAuthorizedParty: string },
+  providers: readonly ConvexAuthProvider[] = authConfig.providers as readonly ConvexAuthProvider[]) {
+  if (!identity || identity.subject !== enrollment.ownerSubject || identity.issuer !== enrollment.clerkIssuer
+    || identity.azp !== enrollment.clerkAuthorizedParty) return false;
+  if (identity.aud !== undefined) return identity.aud === enrollment.clerkAudience;
+  return identity.tokenIdentifier === `${enrollment.clerkIssuer}|${enrollment.ownerSubject}`
+    && providers.some(provider => provider.domain === enrollment.clerkIssuer && provider.applicationID === enrollment.clerkAudience);
+}
 
 export async function permitConnection(ctx: MutationCtx, connectionId: Id<'enterpriseAppConnections'>, authenticatedOwner: boolean) {
   const live = await currentConnection(ctx, connectionId), { enrollment } = await installedEnrollment(ctx, live.connection);
@@ -15,8 +35,7 @@ export async function permitConnection(ctx: MutationCtx, connectionId: Id<'enter
   if (authenticatedOwner) {
     const identity = await ctx.auth.getUserIdentity();
     const access = await requireWorkspaceAccess(ctx, live.connection.tenantId, live.connection.projectId, { permission: COMPANY_PERMISSIONS.APPROVE_DELIVERY });
-    if (!identity || identity.subject !== enrollment.ownerSubject || identity.issuer !== enrollment.clerkIssuer
-      || (identity as any).aud !== enrollment.clerkAudience || (identity as any).azp !== enrollment.clerkAuthorizedParty
+    if (!ownerIdentityMatches(identity, enrollment)
       || access.membership.mode !== 'AUTHENTICATED' || access.membership.operatorId !== live.owner._id) return permitDenied();
   }
   return { ...live, enrollment };
@@ -87,8 +106,7 @@ export async function permitLifecycleOwner(ctx:MutationCtx,connectionId:Id<'ente
  const live=await controlConnection(ctx,connectionId,'enterprise.readPermitControl');
  const identity=await ctx.auth.getUserIdentity();
  const access=await requireWorkspaceAccess(ctx,live.connection.tenantId,live.connection.projectId,{permission:COMPANY_PERMISSIONS.APPROVE_DELIVERY});
- if(!identity||identity.subject!==live.enrollment.ownerSubject||identity.issuer!==live.enrollment.clerkIssuer
-  ||(identity as any).aud!==live.enrollment.clerkAudience||(identity as any).azp!==live.enrollment.clerkAuthorizedParty
+ if(!ownerIdentityMatches(identity,live.enrollment)
   ||!live.owner.active||access.membership.mode!=='AUTHENTICATED'||access.membership.operatorId!==live.owner._id)return permitDenied();
  return live;
 }
