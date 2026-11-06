@@ -180,6 +180,16 @@ export const pending=query({args:{projectId:v.id('projects'),connectionId:v.id('
     planDigest:r.request.expectedPlanDigest,admission:r.request.admission,createdAt:r.createdAt}))};
 }});
 
+/** One pending request by id, under exactly the same owner authorization as `pending` (no cap, so a flood of other requests cannot hide it). */
+export const pendingRequest=query({args:{projectId:v.id('projects'),connectionId:v.id('enterpriseAppConnections'),requestId:v.id('enterprisePermitRequests')},handler:async(ctx,args)=>{
+  if(!await ctx.auth.getUserIdentity())return permitDenied();
+  const live=await permitLifecycleOwner(ctx as any,args.connectionId);if(live.project._id!==args.projectId)return permitDenied();
+  if(live.connection.revokedAt!==undefined||live.connection.expiresAt<=Date.now()||live.enrollment.revokedAt!==null||live.enrollment.expiresAt<=Date.now())return {request:null,setupRequired:true};
+  const r=await ctx.db.get(args.requestId);
+  if(!r||r.connectionId!==args.connectionId)return {request:null};
+  return {request:{requestId:r._id,missionId:r.missionId,workOrderId:r.workOrderId,work:r.request.work,planDigest:r.request.expectedPlanDigest,admission:r.request.admission,createdAt:r.createdAt}};
+}});
+
 export const pendingControl=internalMutation({args:{envelope:commandEnvelope,payloadJson:v.string()},handler:async(ctx,args)=>{
  let input:any;try{input=JSON.parse(args.payloadJson);}catch{return permitDenied();}
  if(!input||Object.keys(input).sort().join(',')!=='connectionId,permitId,schema'||input.schema!=='mc-permit-control-read/v1')return permitDenied();
