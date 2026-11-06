@@ -23,9 +23,16 @@ export const SUBMISSION_SCHEMA = 'mc-sofie-confirmation-submission/v1' as const;
 export const CONFIRMATION_SERVICE_ID = 'myeve-hosted-confirmation' as const;
 export const CONFIRM_PLAN = 'sofie.confirmPlan' as const;
 export const APPROVE_CONFIRMED_PERMIT = 'sofie.approveConfirmedPermit' as const;
+/** The confirmation may be accepted (Plan step) only within its signed window of at most 10 minutes. */
 export const CONFIRMATION_MAX_TTL_MS = 10 * 60 * 1000;
-/** Per-Work permits are approved just in time (MissionControl permits live 5 minutes) under the accepted confirmation, never after this. */
-export const CONFIRMED_JOURNEY_MS = 60 * 60 * 1000;
+/**
+ * The confirmed request's stage Works run one after another and MissionControl permits live at most 5 minutes, so each permit is approved just in
+ * time. The person's confirmation therefore signs, explicitly, how long it authorizes those exact permits: `permitsExpiresAt` (>= expiresAt,
+ * <= issuedAt + 45 minutes, <= the enrollment's expiry). MissionControl never substitutes a window of its own; a stage that starts after it fails closed.
+ */
+export const PERMITS_MAX_TTL_MS = 45 * 60 * 1000;
+/** The hosted journey is exactly three stage Works (one WorkOrder blueprint each, `stage-1..3`), fixed when the person confirms. */
+export const STAGE_WORKS = 3;
 const CLOCK_SKEW_MS = 30 * 1000;
 
 export class ConfirmationRefused extends Error { constructor(readonly code: string) { super(`SOFIE_CONFIRMATION_REFUSED:${code}`); } }
@@ -51,7 +58,7 @@ export type ConfirmationBinding = {
   connectionId: string; enrollmentRevision: number; proposalId: string; proposalDigest: string;
   planSha256: string; planContentSha256: string; plan: PlanSpecification; repository: string;
   works: ConfirmedWork[]; limits: { factoryVersion: string; maxCostMicrousd: number; maxDurationSeconds: number };
-  issuedAt: number; expiresAt: number; nonce: string;
+  issuedAt: number; expiresAt: number; permitsExpiresAt: number; nonce: string;
 };
 export type SignedConfirmation = { binding: ConfirmationBinding; keyId: string; signature: string };
 
@@ -62,17 +69,19 @@ export const planContentDigest = (plan: unknown) => sha256Hex(`mc-sofie-confirme
 
 export function parseConfirmationBinding(value: unknown): ConfirmationBinding {
   const b = exact(value, ['schema', 'installationId', 'subject', 'myeveOwnerId', 'connectionId', 'enrollmentRevision', 'proposalId', 'proposalDigest',
-    'planSha256', 'planContentSha256', 'plan', 'repository', 'works', 'limits', 'issuedAt', 'expiresAt', 'nonce'], 'BINDING_SHAPE');
+    'planSha256', 'planContentSha256', 'plan', 'repository', 'works', 'limits', 'issuedAt', 'expiresAt', 'permitsExpiresAt', 'nonce'], 'BINDING_SHAPE');
   if (b.schema !== CONFIRMATION_SCHEMA || !isId(b.installationId) || !isId(b.subject) || !isId(b.myeveOwnerId) || !isId(b.connectionId)
     || !positive(b.enrollmentRevision) || !isId(b.proposalId) || typeof b.proposalDigest !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(b.proposalDigest)
     || !isSha(b.planSha256) || !isSha(b.planContentSha256) || typeof b.repository !== 'string' || !/^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/.test(b.repository)
-    || typeof b.nonce !== 'string' || !UUID.test(b.nonce) || !Number.isSafeInteger(b.issuedAt) || !Number.isSafeInteger(b.expiresAt)) return refuse('BINDING_FIELDS');
+    || typeof b.nonce !== 'string' || !UUID.test(b.nonce) || !Number.isSafeInteger(b.issuedAt) || !Number.isSafeInteger(b.expiresAt)
+    || !Number.isSafeInteger(b.permitsExpiresAt)) return refuse('BINDING_FIELDS');
   const plan = exact(b.plan, ['summary', 'rollbackApproach', 'workOrderBlueprints', 'assertions', 'metadata', ...(b.plan?.estimatedCostUsd !== undefined ? ['estimatedCostUsd'] : [])], 'PLAN_SHAPE');
-  if (typeof plan.summary !== 'string' || typeof plan.rollbackApproach !== 'string' || !Array.isArray(plan.workOrderBlueprints) || plan.workOrderBlueprints.length < 1
-    || plan.workOrderBlueprints.length > 8 || !Array.isArray(plan.assertions) || !plan.metadata || typeof plan.metadata !== 'object' || Array.isArray(plan.metadata)
+  if (typeof plan.summary !== 'string' || typeof plan.rollbackApproach !== 'string' || !Array.isArray(plan.workOrderBlueprints) || plan.workOrderBlueprints.length !== STAGE_WORKS
+    || plan.workOrderBlueprints.some((bp: any, i: number) => bp?.id !== `stage-${i + 1}` || bp?.sequence !== i + 1) || !Array.isArray(plan.assertions) || !plan.metadata || typeof plan.metadata !== 'object' || Array.isArray(plan.metadata)
     || plan.workOrderBlueprints.some((bp: any) => bp?.workflowVersion !== undefined)) return refuse('PLAN_SHAPE');
   if (planContentDigest(plan) !== b.planContentSha256) return refuse('PLAN_CONTENT_DIGEST');
-  if (!Array.isArray(b.works) || b.works.length < 1 || b.works.length !== plan.workOrderBlueprints.length) return refuse('WORKS');
+  // Exactly the confirmed request's stage Work tuples: count and ids are fixed at signing.
+  if (!Array.isArray(b.works) || b.works.length !== STAGE_WORKS) return refuse('WORKS');
   b.works.forEach((w: any, i: number) => {
     exact(w, ['stage', 'id', 'version', 'generation', 'tupleSha256'], 'WORKS');
     if (w.stage !== i + 1 || !isId(w.id) || !positive(w.version) || !positive(w.generation) || !isSha(w.tupleSha256)) refuse('WORKS');
@@ -85,11 +94,21 @@ export function parseConfirmationBinding(value: unknown): ConfirmationBinding {
   return b as ConfirmationBinding;
 }
 
-/** The validity window is part of the signed binding: at most 10 minutes, and only while it is open. */
-export function requireConfirmationFresh(binding: ConfirmationBinding, now: number) {
+/** Both signed windows must be well-formed: acceptance <= 10 minutes; permit authorization from acceptance expiry to <= 45 minutes after issue. */
+export function requireSignedWindows(binding: ConfirmationBinding, now: number) {
   if (binding.expiresAt <= binding.issuedAt || binding.expiresAt - binding.issuedAt > CONFIRMATION_MAX_TTL_MS
+    || binding.permitsExpiresAt < binding.expiresAt || binding.permitsExpiresAt - binding.issuedAt > PERMITS_MAX_TTL_MS
     || binding.issuedAt > now + CLOCK_SKEW_MS) return refuse('CONFIRMATION_WINDOW');
+}
+/** Plan step: only while the signed acceptance window is open. */
+export function requireConfirmationFresh(binding: ConfirmationBinding, now: number) {
+  requireSignedWindows(binding, now);
   if (binding.expiresAt <= now) return refuse('CONFIRMATION_EXPIRED');
+}
+/** Permit step: only while the signed permit authorization is open (no window substituted by MissionControl). */
+export function requirePermitsOpen(binding: ConfirmationBinding, now: number) {
+  requireSignedWindows(binding, now);
+  if (binding.permitsExpiresAt <= now) return refuse('CONFIRMATION_EXPIRED');
 }
 
 export type ConfirmationKey = { keyId: string; publicKey: string; activeFrom: number; notAfter: number; revokedAt: number | null };
@@ -133,6 +152,7 @@ export function requireOwnConfirmation(binding: ConfirmationBinding, installatio
     || enrollment.missionControlOwnerId !== connection.ownerId || enrollment.connectionId !== connection._id || connection._id !== binding.connectionId
     || enrollment.ownerId !== binding.myeveOwnerId || enrollment.revision !== binding.enrollmentRevision) return refuse('IDENTITY_MISMATCH');
   if (binding.repository !== installation.repository) return refuse('REPOSITORY_MISMATCH');
+  if (binding.permitsExpiresAt > enrollment.expiresAt) return refuse('WINDOW_EXCEEDS_ENROLLMENT');
   if (binding.limits.factoryVersion !== enrollment.factoryVersion || binding.limits.maxCostMicrousd > enrollment.maxCostMicrousd
     || binding.limits.maxDurationSeconds > enrollment.maxDurationSeconds) return refuse('LIMITS_EXCEED_ENROLLMENT');
   return enrollment;

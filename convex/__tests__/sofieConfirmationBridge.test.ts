@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createHash, createHmac, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash, createHmac, createPublicKey, generateKeyPairSync, randomUUID, sign, verify } from 'node:crypto';
 import { enterpriseDigest } from '../../packages/shared/src/sofieEnterprise';
 import { canonicalServiceCommand } from '../../packages/shared/src/serviceCommandEnvelope';
 import {
@@ -29,20 +29,20 @@ const enrollmentFor = (who: 'a' | 'b') => ({ schema: 'mc-owner-enrollment/v1', e
 const installation = (who: 'a' | 'b', key: { pem: string; keyId: string }, extra: Record<string, unknown> = {}) => ({ ownerSubject: `user_${who}`, missionControlOwnerId: `op-${who}`,
   repository: 'jay/app', repositoryId: 'repo-1', codeScopeIds: ['scope-1'], planner: { subject: `planner_${who}`, memberId: `planner-member-${who}` },
   keys: [{ keyId: key.keyId, publicKey: key.pem, activeFrom: 0, notAfter: now() + 3600_000, revokedAt: null, ...extra }] });
-const blueprints = [1, 2].map(stage => ({ id: `stage-${stage}`, title: `Stage ${stage}`, desiredOutcome: 'Build it', workflowId: 'wf', sequence: stage, role: 'WORKER',
+const blueprints = [1, 2, 3].map(stage => ({ id: `stage-${stage}`, title: `Stage ${stage}`, desiredOutcome: 'Build it', workflowId: 'wf', sequence: stage, role: 'WORKER',
   isMutating: true, priority: 2, riskLevel: 'MEDIUM', constraints: [], requiredApprovals: [], assertionIds: ['ok'], dependsOnBlueprintIds: stage === 1 ? [] : ['stage-1'] }));
 const proposalBody = (who: string) => ({ connectionId: `conn-${who}`, tenantId: 'tenant', projectId: 'project', ownerId: `op-${who}`, intentKey: `intent-${who}`,
   proposal: { title: 'Build', objective: 'Build it', workstreams: [], milestones: [], stopCondition: 'stop', budgetMicrousd: 0 } });
 
 function bindingFor(who: 'a' | 'b' = 'a', over: Record<string, any> = {}) {
-  const works = [1, 2].map(stage => ({ stage, id: `work-${who}-${stage}`, version: 1, generation: 1, tupleSha256: hex(`tuple-${who}-${stage}`) }));
+  const works = [1, 2, 3].map(stage => ({ stage, id: `work-${who}-${stage}`, version: 1, generation: 1, tupleSha256: hex(`tuple-${who}-${stage}`) }));
   const plan = { summary: 'Confirmed', rollbackApproach: 'none', workOrderBlueprints: blueprints, assertions: [{ assertionId: 'ok' }],
     metadata: { myevePlanSha256: hex(`plan-${who}`), works: works.map(w => w.id) } };
   const issuedAt = now();
   return { schema: CONFIRMATION_SCHEMA, installationId: `inst-${who}`, subject: `user_${who}`, myeveOwnerId: `myeve-${who}`, connectionId: `conn-${who}`,
     enrollmentRevision: 1, proposalId: `prop-${who}`, proposalDigest: enterpriseDigest(proposalBody(who)), planSha256: hex(`plan-${who}`),
     planContentSha256: planContentDigest(plan), plan, repository: 'jay/app', works,
-    limits: { factoryVersion: hex('factory'), maxCostMicrousd: 1_300_000, maxDurationSeconds: 180 }, issuedAt, expiresAt: issuedAt + 300_000, nonce: randomUUID(), ...over };
+    limits: { factoryVersion: hex('factory'), maxCostMicrousd: 1_300_000, maxDurationSeconds: 180 }, issuedAt, expiresAt: issuedAt + 300_000, permitsExpiresAt: issuedAt + 30 * 60_000, nonce: randomUUID(), ...over };
 }
 const signed = (binding: any, key = keyA) => ({ binding, keyId: key.keyId, signature: sign(null, Buffer.from(confirmationSigningText(binding)), key.privateKey).toString('base64url') });
 const submitCommand = (b: any) => ({ envelope: { serviceId: 'myeve-sofie-readiness-v1', capability: 'enterprise.submit', projectId: 'project', repositoryId: `connection:${b.connectionId}`,
@@ -70,7 +70,7 @@ function database() {
       const eqs: Array<[string, unknown]> = [];
       const q: any = { eq: (field: string, value: unknown) => { eqs.push([field, value]); return q; } };
       const result = () => Object.values(rows).filter(r => r._table === table && eqs.every(([f, v]) => r[f] === v)).map(r => structuredClone(r));
-      const chain: any = { withIndex: (_: string, fn: (q: any) => any) => { fn(q); return chain; }, collect: async () => result(), first: async () => result()[0] ?? null };
+      const chain: any = { withIndex: (_: string, fn: (q: any) => any) => { fn(q); return chain; }, collect: async () => result(), take: async (n: number) => result().slice(0, n), first: async () => result()[0] ?? null };
       return chain;
     },
   };
@@ -146,9 +146,12 @@ describe('hosted Sofie confirmation: Plan step', () => {
     const digest = confirmationDigest(c.binding);
     expect(owner.args.decisionReason).toContain(`confirmed-by-sofie: confirmation ${digest}`);
     expect(calls.find(x => x.name === 'updateDraft')!.args).toMatchObject({ repositoryId: 'repo-1', codeScopeIds: ['scope-1'] });
-    expect(result.workOrders.map((w: any) => w.workId)).toEqual(['work-a-1', 'work-a-2']);
+    expect(result.workOrders.map((w: any) => w.workId)).toEqual(['work-a-1', 'work-a-2', 'work-a-3']);
     const [receipt] = d.table('sofieConfirmationReceipts');
     expect(receipt).toMatchObject({ status: 'APPLIED', step: 'PLAN', confirmationDigest: digest, subject: 'user_a', keyId: keyA.keyId, ownerId: 'op-a' });
+    // The receipt alone re-verifies: complete signed bytes + the signer's public key (independent of later configuration).
+    expect(verify(null, Buffer.from(receipt.signedBinding), createPublicKey(receipt.signerPublicKey), Buffer.from(receipt.signature, 'base64url'))).toBe(true);
+    expect(receipt.signedBinding).toBe(confirmationSigningText(c.binding));
     const [event] = d.table('missionEvents');
     expect(event).toMatchObject({ eventType: 'SOFIE_CONFIRMATION_APPLIED', actorId: 'op-a', metadata: { approvalReason: 'confirmed-by-sofie', confirmationDigest: digest } });
   });
@@ -189,10 +192,26 @@ describe('hosted Sofie confirmation: Plan step', () => {
     expect(d.rows()['prop-a'].authorizedAt).toBeUndefined();
   });
 
-  it('refuses expired confirmations and windows longer than 10 minutes', async () => {
-    const d = database(), { h } = handlers(d);
-    await expect(planStep(d, h, signed(bindingFor('a', { issuedAt: now() - 700_000, expiresAt: now() - 100_000 })))).rejects.toThrow('CONFIRMATION_EXPIRED');
-    await expect(planStep(d, h, signed(bindingFor('a', { issuedAt: now(), expiresAt: now() + 601_000 })))).rejects.toThrow('CONFIRMATION_WINDOW');
+  it('refuses expired confirmations and malformed signed windows', async () => {
+    const d = database(), { h } = handlers(d), t = now();
+    await expect(planStep(d, h, signed(bindingFor('a', { issuedAt: t - 700_000, expiresAt: t - 100_000 })))).rejects.toThrow('CONFIRMATION_EXPIRED');
+    await expect(planStep(d, h, signed(bindingFor('a', { issuedAt: t, expiresAt: t + 601_000 })))).rejects.toThrow('CONFIRMATION_WINDOW');
+    await expect(planStep(d, h, signed(bindingFor('a', { issuedAt: t, expiresAt: t + 300_000, permitsExpiresAt: t + 45 * 60_000 + 1 })))).rejects.toThrow('CONFIRMATION_WINDOW');
+    await expect(planStep(d, h, signed(bindingFor('a', { issuedAt: t, expiresAt: t + 300_000, permitsExpiresAt: t + 299_000 })))).rejects.toThrow('CONFIRMATION_WINDOW');
+    // The permit authorization can never outlive the person's MissionControl enrollment.
+    d.set('conn-a', { installedEnrollment: { ...enrollmentFor('a'), expiresAt: t + 20 * 60_000 } });
+    await expect(planStep(d, h, signed(bindingFor('a')))).rejects.toThrow('WINDOW_EXCEEDS_ENROLLMENT');
+  });
+
+  it('enumerates exactly the three stage Works of the one confirmed request (count, ids and blueprints fixed at signing)', async () => {
+    const d = database(), { h, calls } = handlers(d), base = bindingFor();
+    for (const works of [base.works.slice(0, 2), [...base.works, { ...base.works[0], stage: 4, id: 'work-a-4' }]])
+      await expect(planStep(d, h, signed({ ...base, nonce: randomUUID(), works }))).rejects.toThrow('WORKS');
+    const plan = { ...base.plan, workOrderBlueprints: base.plan.workOrderBlueprints.map((b: any, i: number) => i === 2 ? { ...b, id: 'extra' } : b) };
+    await expect(planStep(d, h, signed({ ...base, nonce: randomUUID(), plan, planContentSha256: planContentDigest(plan) }))).rejects.toThrow('PLAN_SHAPE');
+    const four = { ...base.plan, workOrderBlueprints: [...base.plan.workOrderBlueprints, { ...blueprints[0], id: 'stage-4', sequence: 4 }] };
+    await expect(planStep(d, h, signed({ ...base, nonce: randomUUID(), plan: four, planContentSha256: planContentDigest(four) }))).rejects.toThrow('PLAN_SHAPE');
+    expect(calls).toHaveLength(0);
   });
 
   it('cross-user: a confirmation can never act on another person\'s Work or connection', async () => {
@@ -219,10 +238,16 @@ describe('hosted Sofie confirmation: Plan step', () => {
     await expect(d.tx(ctx => applyPlanConfirmation(ctx, { confirmation: c, submit: other }, h))).rejects.toThrow('SUBMIT_COMMAND');
   });
 
-  it('a refused, signature-verified confirmation is audited and burned', async () => {
-    const d = database(), { h } = handlers(d), c = signed(bindingFor());
-    await d.tx(ctx => recordConfirmationRefusal(ctx, { confirmation: c, step: 'PLAN', workId: '', reason: 'SOFIE_CONFIRMATION_REFUSED:PLAN_CHANGED' }));
-    expect(d.table('sofieConfirmationReceipts')[0]).toMatchObject({ status: 'REFUSED', reason: 'SOFIE_CONFIRMATION_REFUSED:PLAN_CHANGED' });
+  it('a refusal is audited but consumes nothing: a poisoned submission cannot block the correct one', async () => {
+    const d = database(), { h, calls } = handlers(d), c = signed(bindingFor());
+    // Someone holding the submitter credential and a copy of the signed confirmation submits it with a wrong submit command.
+    const wrong = submitCommand(c.binding); wrong.payloadJson = JSON.stringify({ ...JSON.parse(wrong.payloadJson), proposalId: 'prop-b' });
+    await expect(d.tx(ctx => applyPlanConfirmation(ctx, { confirmation: c, submit: wrong }, h))).rejects.toThrow('SUBMIT_COMMAND');
+    await d.tx(ctx => recordConfirmationRefusal(ctx, { confirmation: c, step: 'PLAN', workId: '', reason: 'SOFIE_CONFIRMATION_REFUSED:SUBMIT_COMMAND' }));
+    expect(d.table('sofieConfirmationReceipts')[0]).toMatchObject({ status: 'REFUSED', reason: 'SOFIE_CONFIRMATION_REFUSED:SUBMIT_COMMAND', signedBinding: confirmationSigningText(c.binding) });
+    await expect(planStep(d, h, c)).resolves.toMatchObject({ confirmationDigest: confirmationDigest(c.binding) });
+    expect(calls.filter(x => x.name === 'approvePlan')).toHaveLength(1);
+    // Still exactly once.
     await expect(planStep(d, h, c)).rejects.toThrow('CONFIRMATION_REPLAYED');
   });
 });
@@ -271,12 +296,25 @@ describe('hosted Sofie confirmation: per-Work permit step', () => {
     expect(calls.some(x => x.name === 'approvePrepared')).toBe(false);
   });
 
-  it('refuses a permit for an unaccepted confirmation or after the journey window', async () => {
+  it('refuses a permit for an unaccepted confirmation, and honors the SIGNED permit expiry exactly (no substituted window)', async () => {
     const d = database(), { h } = handlers(d), c = signed(bindingFor());
     await expect(permit(d, h, c, 'request-x', 'work-a-1')).rejects.toThrow('CONFIRMATION_NOT_ACCEPTED');
-    const x = await accepted();
-    const receipt = x.d.table('sofieConfirmationReceipts')[0]; x.d.set(receipt._id, { createdAt: now() - 61 * 60_000 });
-    await expect(permit(x.d, x.h, x.c, prepareRequest(x.d, x.accepted, x.c.binding, 1), 'work-a-1')).rejects.toThrow('CONFIRMATION_EXPIRED');
+    const x = await accepted(), r1 = prepareRequest(x.d, x.accepted, x.c.binding, 1), r2 = prepareRequest(x.d, x.accepted, x.c.binding, 2);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(x.c.binding.permitsExpiresAt - 1);
+      await expect(permit(x.d, x.h, x.c, r1, 'work-a-1')).resolves.toMatchObject({ workId: 'work-a-1' });
+      vi.setSystemTime(x.c.binding.permitsExpiresAt);
+      await expect(permit(x.d, x.h, x.c, r2, 'work-a-2')).rejects.toThrow('CONFIRMATION_EXPIRED');
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('a refused permit call (absent request id) does not block the correct request for that Work', async () => {
+    const { d, h, calls, c, accepted: a } = await accepted();
+    await expect(permit(d, h, c, 'request-absent', 'work-a-1')).rejects.toThrow('PERMIT_REQUEST_NOT_CONFIRMED');
+    await d.tx(ctx => recordConfirmationRefusal(ctx, { confirmation: c, step: 'PERMIT', workId: 'work-a-1', reason: 'SOFIE_CONFIRMATION_REFUSED:PERMIT_REQUEST_NOT_CONFIRMED' }));
+    await expect(permit(d, h, c, prepareRequest(d, a, c.binding, 1), 'work-a-1')).resolves.toMatchObject({ workId: 'work-a-1' });
+    expect(calls.filter(x => x.name === 'approvePrepared')).toHaveLength(1);
   });
 });
 

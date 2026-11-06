@@ -2,8 +2,8 @@ import type { MutationCtx } from '../_generated/server';
 import { enterpriseDigest } from '../../packages/shared/src/sofieEnterprise';
 import { canonicalPermitJson } from '../../packages/shared/src/executionPermit';
 import {
-  asPrincipal, CONFIRMED_JOURNEY_MS, confirmationDigest, confirmationInstallation, confirmedIdentity, parseConfirmationBinding, refuse,
-  requireConfirmationFresh, requireOwnConfirmation, verifyConfirmedPlan, type ConfirmationBinding, type ConfirmationInstallation,
+  asPrincipal, confirmationDigest, confirmationSigningText, confirmationInstallation, confirmedIdentity, parseConfirmationBinding, refuse,
+  requireConfirmationFresh, requireOwnConfirmation, requirePermitsOpen, verifyConfirmedPlan, type ConfirmationBinding, type ConfirmationInstallation,
 } from './sofieConfirmation';
 
 /**
@@ -26,7 +26,10 @@ export const CONFIRMED_BY_SOFIE = 'confirmed-by-sofie' as const;
 function requireEnrolledKey(installation: ConfirmationInstallation, keyId: string, now: number) {
   const key = installation.keys.find(k => k.keyId === keyId);
   if (!key || key.revokedAt !== null || key.activeFrom > now || key.notAfter <= now) return refuse('CONFIRMATION_KEY_NOT_ENROLLED');
+  return key;
 }
+/** The complete signed bytes and the signer's public key, retained so any receipt can be re-verified later regardless of configuration changes. */
+const evidence = (binding: ConfirmationBinding, key: { publicKey: string }) => ({ signedBinding: confirmationSigningText(binding), signerPublicKey: key.publicKey });
 
 async function liveOwnConfirmation(ctx: MutationCtx, binding: ConfirmationBinding, installation: ConfirmationInstallation) {
   const connection: any = await ctx.db.get(binding.connectionId as any);
@@ -37,12 +40,15 @@ async function liveOwnConfirmation(ctx: MutationCtx, binding: ConfirmationBindin
 }
 
 /** Single-use claim inside the approving transaction: Convex mutations are serializable, so of two concurrent claims exactly one commits. */
+// Only a step that took effect (APPLIED; CLAIMED exists only inside the applying transaction) consumes anything. REFUSED receipts are audit rows:
+// a refused call (wrong request id, transient failure, someone replaying with the submitter credential) never blocks the correct later call.
+const consumes = (r: any) => r.status !== 'REFUSED';
 async function claim(ctx: MutationCtx, row: { installationId: string; nonce: string; confirmationDigest: string; step: 'PLAN' | 'PERMIT'; workId: string;
-  subject: string; keyId: string; signature: string; connectionId: string }) {
-  const sameNonce = await ctx.db.query('sofieConfirmationReceipts' as any).withIndex('by_installation_nonce', (q: any) => q.eq('installationId', row.installationId).eq('nonce', row.nonce)).collect();
+  subject: string; keyId: string; signature: string; connectionId: string; signedBinding: string; signerPublicKey: string }) {
+  const sameNonce = (await ctx.db.query('sofieConfirmationReceipts' as any).withIndex('by_installation_nonce', (q: any) => q.eq('installationId', row.installationId).eq('nonce', row.nonce)).collect()).filter(consumes);
   if (row.step === 'PLAN' ? sameNonce.length > 0 : sameNonce.some((r: any) => r.step === 'PERMIT' && r.workId === row.workId)) return refuse('CONFIRMATION_REPLAYED');
-  const sameStep = await ctx.db.query('sofieConfirmationReceipts' as any).withIndex('by_digest_step_work', (q: any) => q.eq('confirmationDigest', row.confirmationDigest).eq('step', row.step).eq('workId', row.workId)).first();
-  if (sameStep) return refuse('CONFIRMATION_REPLAYED');
+  const sameStep = (await ctx.db.query('sofieConfirmationReceipts' as any).withIndex('by_digest_step_work', (q: any) => q.eq('confirmationDigest', row.confirmationDigest).eq('step', row.step).eq('workId', row.workId)).collect()).filter(consumes);
+  if (sameStep.length) return refuse('CONFIRMATION_REPLAYED');
   const now = Date.now();
   return ctx.db.insert('sofieConfirmationReceipts' as any, { ...row, status: 'CLAIMED', createdAt: now, updatedAt: now } as any);
 }
@@ -51,10 +57,10 @@ export async function applyPlanConfirmation(ctx: MutationCtx, input: { confirmat
   const now = Date.now(), binding = parseConfirmationBinding(input.confirmation.binding);
   requireConfirmationFresh(binding, now);
   const installation = confirmationInstallation(binding.installationId);
-  requireEnrolledKey(installation, input.confirmation.keyId, now);
+  const key = requireEnrolledKey(installation, input.confirmation.keyId, now);
   const digest = confirmationDigest(binding);
   const receiptId = await claim(ctx, { installationId: binding.installationId, nonce: binding.nonce, confirmationDigest: digest, step: 'PLAN', workId: '',
-    subject: binding.subject, keyId: input.confirmation.keyId, signature: input.confirmation.signature, connectionId: binding.connectionId });
+    subject: binding.subject, keyId: input.confirmation.keyId, signature: input.confirmation.signature, connectionId: binding.connectionId, ...evidence(binding, key) });
   const { connection, enrollment } = await liveOwnConfirmation(ctx, binding, installation);
   const proposal: any = await ctx.db.get(binding.proposalId as any);
   if (!proposal || proposal.connectionId !== connection._id || proposal.digest !== binding.proposalDigest || proposal.missionId !== undefined) return refuse('PROPOSAL_NOT_CONFIRMED');
@@ -77,7 +83,7 @@ export async function applyPlanConfirmation(ctx: MutationCtx, input: { confirmat
     ...(mission.constraints ? { constraints: mission.constraints } : {}) });
   // 3 Owner decision: delegate authorship of this Mission's Plan to the enrolled Sofie planner (time-boxed CONTRIBUTOR; never an approver).
   await h.assignMissionMember(owner, { tenantId: connection.tenantId, projectId, missionId, memberId: installation.planner.memberId, teamId: connection.owningTeamId,
-    role: 'CONTRIBUTOR', expiresAt: Math.min(now + CONFIRMED_JOURNEY_MS, connection.expiresAt) });
+    role: 'CONTRIBUTOR', expiresAt: Math.min(binding.permitsExpiresAt, connection.expiresAt) });
   // The planner authors and submits exactly the confirmed specification; a PROPOSED Plan is immutable in MissionControl.
   const draft = await h.savePlanDraft(planner, { projectId, missionId, idempotencyKey: `${tag}:plan`, ...binding.plan });
   const planId = draft?.plan?._id ?? refuse('PLAN_NOT_AUTHORED');
@@ -112,16 +118,19 @@ export async function applyPlanConfirmation(ctx: MutationCtx, input: { confirmat
 
 export async function approveConfirmedPermit(ctx: MutationCtx, input: { confirmation: SignedConfirmationInput; requestId: string; workId: string }, h: ConfirmationHandlers) {
   const now = Date.now(), binding = parseConfirmationBinding(input.confirmation.binding);
+  // Only while the person's SIGNED permit authorization is open; MissionControl substitutes no window of its own.
+  requirePermitsOpen(binding, now);
   const installation = confirmationInstallation(binding.installationId);
-  requireEnrolledKey(installation, input.confirmation.keyId, now);
+  const key = requireEnrolledKey(installation, input.confirmation.keyId, now);
   const digest = confirmationDigest(binding);
-  // Only Work of an ACCEPTED confirmation, within its journey window (MissionControl permits themselves live at most 5 minutes).
-  const plan: any = await ctx.db.query('sofieConfirmationReceipts' as any).withIndex('by_digest_step_work', (q: any) => q.eq('confirmationDigest', digest).eq('step', 'PLAN').eq('workId', '')).first();
-  if (!plan || plan.status !== 'APPLIED' || plan.installationId !== binding.installationId || plan.nonce !== binding.nonce) return refuse('CONFIRMATION_NOT_ACCEPTED');
-  if (now > plan.createdAt + CONFIRMED_JOURNEY_MS || now > binding.issuedAt + CONFIRMED_JOURNEY_MS) return refuse('CONFIRMATION_EXPIRED');
+  // Only Work of an ACCEPTED confirmation.
+  const plan: any = (await ctx.db.query('sofieConfirmationReceipts' as any).withIndex('by_digest_step_work', (q: any) => q.eq('confirmationDigest', digest).eq('step', 'PLAN').eq('workId', '')).collect())
+    .find((r: any) => r.status === 'APPLIED');
+  if (!plan || plan.installationId !== binding.installationId || plan.nonce !== binding.nonce || plan.signedBinding !== confirmationSigningText(binding)) return refuse('CONFIRMATION_NOT_ACCEPTED');
+  // Exactly the enumerated stage Work tuples of the confirmed request, each at most once.
   const work = binding.works.find(w => w.id === input.workId) ?? refuse('WORK_NOT_CONFIRMED');
   const receiptId = await claim(ctx, { installationId: binding.installationId, nonce: binding.nonce, confirmationDigest: digest, step: 'PERMIT', workId: work.id,
-    subject: binding.subject, keyId: input.confirmation.keyId, signature: input.confirmation.signature, connectionId: binding.connectionId });
+    subject: binding.subject, keyId: input.confirmation.keyId, signature: input.confirmation.signature, connectionId: binding.connectionId, ...evidence(binding, key) });
   const { connection, enrollment } = await liveOwnConfirmation(ctx, binding, installation);
   const accepted = plan.result, wo = accepted.workOrders.find((w: any) => w.workId === work.id && w.stage === work.stage);
   const row: any = await ctx.db.get(input.requestId as any);
@@ -144,16 +153,20 @@ export async function approveConfirmedPermit(ctx: MutationCtx, input: { confirma
   return result;
 }
 
-/** Audits a refused, signature-verified submission and burns its nonce/Work step (fail closed: a refused confirmation is never retried). */
+/**
+ * Audits a refused, signature-verified submission. It consumes NOTHING: a refusal (e.g. an absent request id or a transient failure) never blocks the
+ * correct later call, which still has to pass every check, within the signed windows, at most once per step. Bounded per step to limit audit growth.
+ */
 export async function recordConfirmationRefusal(ctx: MutationCtx, input: { confirmation: SignedConfirmationInput; step: 'PLAN' | 'PERMIT'; workId: string; reason: string }) {
   let binding: ConfirmationBinding; try { binding = parseConfirmationBinding(input.confirmation.binding); } catch { return { recorded: false }; }
-  const digest = confirmationDigest(binding), workId = input.step === 'PLAN' ? '' : input.workId;
-  const prior = await ctx.db.query('sofieConfirmationReceipts' as any).withIndex('by_digest_step_work', (q: any) => q.eq('confirmationDigest', digest).eq('step', input.step).eq('workId', workId)).first();
-  const sameNonce = input.step === 'PLAN' ? await ctx.db.query('sofieConfirmationReceipts' as any).withIndex('by_installation_nonce', (q: any) => q.eq('installationId', binding.installationId).eq('nonce', binding.nonce)).first() : null;
-  if (prior || sameNonce) return { recorded: false };
+  const digest = confirmationDigest(binding), workId = input.step === 'PLAN' ? '' : input.workId.slice(0, 200);
+  const prior = await ctx.db.query('sofieConfirmationReceipts' as any).withIndex('by_digest_step_work', (q: any) => q.eq('confirmationDigest', digest).eq('step', input.step).eq('workId', workId)).take(20);
+  if (prior.filter((r: any) => r.status === 'REFUSED').length >= 16) return { recorded: false };
+  let signerPublicKey = '';
+  try { signerPublicKey = confirmationInstallation(binding.installationId).keys.find(k => k.keyId === input.confirmation.keyId)?.publicKey ?? ''; } catch { /* audit only */ }
   const now = Date.now();
   await ctx.db.insert('sofieConfirmationReceipts' as any, { installationId: binding.installationId, nonce: binding.nonce, confirmationDigest: digest, step: input.step, workId,
     subject: binding.subject, keyId: input.confirmation.keyId, signature: input.confirmation.signature, connectionId: binding.connectionId, status: 'REFUSED',
-    reason: input.reason.slice(0, 300), createdAt: now, updatedAt: now } as any);
+    signedBinding: confirmationSigningText(binding), signerPublicKey, reason: input.reason.slice(0, 300), createdAt: now, updatedAt: now } as any);
   return { recorded: true };
 }
