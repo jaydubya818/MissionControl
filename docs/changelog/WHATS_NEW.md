@@ -176,11 +176,11 @@ This will:
 - **Vercel:** https://vercel.com/jaydubya818/mission-control-ui
 
 ### Documentation
-- **Getting Started:** [GETTING_STARTED.md](GETTING_STARTED.md)
-- **Deployment:** [DEPLOY_NOW.md](DEPLOY_NOW.md)
-- **Integration:** [docs/OPENCLAW_INTEGRATION.md](docs/OPENCLAW_INTEGRATION.md)
-- **Telegram:** [docs/TELEGRAM_COMMANDS.md](docs/TELEGRAM_COMMANDS.md)
-- **All Phases:** [docs/ALL_PHASES_COMPLETE.md](docs/ALL_PHASES_COMPLETE.md)
+- **Getting Started:** [GETTING_STARTED.md](../guides/GETTING_STARTED.md)
+- **Deployment:** [DEPLOY_NOW.md](../guides/DEPLOY_NOW.md)
+- **Integration:** [docs/OPENCLAW_INTEGRATION.md](../architecture/OPENCLAW_INTEGRATION.md)
+- **Telegram:** [docs/TELEGRAM_COMMANDS.md](../guides/TELEGRAM_COMMANDS.md)
+- **All Phases:** [docs/ALL_PHASES_COMPLETE.md](ALL_PHASES_COMPLETE.md)
 
 ---
 

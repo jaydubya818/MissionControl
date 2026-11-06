@@ -557,21 +557,21 @@ pnpm dev
 
 ### Getting Started
 1. [README.md](../README.md) - Project overview
-2. [GETTING_STARTED.md](../GETTING_STARTED.md) - Setup and development
-3. [RUN.md](../RUN.md) - Quick start commands
+2. [GETTING_STARTED.md](../guides/GETTING_STARTED.md) - Setup and development
+3. [RUN.md](../guides/RUN.md) - Quick start commands
 
 ### Operations
-4. [RUNBOOK.md](RUNBOOK.md) - Operational procedures
+4. [RUNBOOK.md](../runbook/RUNBOOK.md) - Operational procedures
 5. [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) - Current deployment
-6. [TELEGRAM_COMMANDS.md](TELEGRAM_COMMANDS.md) - Command reference
+6. [TELEGRAM_COMMANDS.md](../guides/TELEGRAM_COMMANDS.md) - Command reference
 
 ### Architecture
-7. [MULTI_PROJECT_MODEL.md](MULTI_PROJECT_MODEL.md) - Multi-project design
-8. [OPENCLAW_INTEGRATION.md](OPENCLAW_INTEGRATION.md) - Agent integration
-9. [EPIC_2_8_IMPLEMENTATION.md](EPIC_2_8_IMPLEMENTATION.md) - Implementation guide
+7. [MULTI_PROJECT_MODEL.md](../architecture/MULTI_PROJECT_MODEL.md) - Multi-project design
+8. [OPENCLAW_INTEGRATION.md](../architecture/OPENCLAW_INTEGRATION.md) - Agent integration
+9. [EPIC_2_8_IMPLEMENTATION.md](../planning/EPIC_2_8_IMPLEMENTATION.md) - Implementation guide
 
 ### Deployment
-10. [packages/telegram-bot/DEPLOY.md](../packages/telegram-bot/DEPLOY.md) - Bot deployment
+10. [packages/telegram-bot/DEPLOY.md](../../packages/telegram-bot/DEPLOY.md) - Bot deployment
 11. [ALL_PHASES_COMPLETE.md](ALL_PHASES_COMPLETE.md) - This document
 
 ---
