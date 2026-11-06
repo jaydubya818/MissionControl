@@ -1,4 +1,5 @@
 import { configuredConnectionSecret } from './lib/installedSofieConnection';
+import { connectionLifetimeCap } from './lib/sofieConfirmation';
 import { projectEnterpriseResult, resultMissionScope } from './lib/sofieEnterpriseResult';
 import { v } from 'convex/values';
 import { sofieApplicationAction as action, sofieApplicationMutation as internalMutation, mutation } from './lib/missionScopedFunctions';
@@ -17,7 +18,8 @@ const envelope = v.object({ serviceId: v.string(), capability: v.string(), proje
 const denied = () => { throw Error('ENTERPRISE_ACCESS_DENIED'); };
 
 export const connect = mutation({
-  args: { missionId: v.optional(v.id('missions')), projectId: v.id('projects'), ownerMemberId: v.id('orgMembers'), owningTeamId: v.id('scrumTeams'), expiresAt: v.number() },
+  args: { missionId: v.optional(v.id('missions')), projectId: v.id('projects'), ownerMemberId: v.id('orgMembers'), owningTeamId: v.id('scrumTeams'), expiresAt: v.number(),
+    kind: v.optional(v.literal('PRIVATE_BETA_SOFIE')) },
   handler: async (ctx, args) => {
     const project = await readiness(ctx, args.projectId);
     const access = await requireWorkspaceAccess(ctx, project.tenantId!, project._id, { permission: COMPANY_PERMISSIONS.ASSIGN_DELIVERY });
@@ -25,8 +27,10 @@ export const connect = mutation({
     const member = await ctx.db.get(args.ownerMemberId);
     if (!member || member.operatorId !== access.membership.operatorId || member.projectId !== project._id) return denied();
     const keyId = process.env.MC_SOFIE_APPLICATION_KEY_ID;
-    if (!keyId || !Number.isSafeInteger(args.expiresAt) || args.expiresAt <= Date.now() || args.expiresAt > Date.now() + 3600000) return denied();
-    const { missionId, ...connectionArgs } = args;
+    // Option A (private beta): an enrolled confirmation installation's owner may hold one connection up to 7 days; owner-renewed.
+    const cap = connectionLifetimeCap(args.kind, access.membership.operatorId);
+    if (!keyId || cap === null || !Number.isSafeInteger(args.expiresAt) || args.expiresAt <= Date.now() || args.expiresAt > Date.now() + cap) return denied();
+    const { missionId, kind: _kind, ...connectionArgs } = args;
     const resultScope = missionId ? (await resultMissionScope(ctx, { projectId:project._id, tenantId:project.tenantId!, ownerId:access.membership.operatorId }, missionId)).scope : undefined;
     const id = await ctx.db.insert('enterpriseAppConnections', { ...connectionArgs, ...(resultScope ? {resultScope} : {}), tenantId: project.tenantId!, ownerId: access.membership.operatorId,
       applicationId: SOFIE_APPLICATION, keyId, createdAt: Date.now() });

@@ -135,6 +135,28 @@ export function confirmationInstallation(installationId: string, raw: string | u
   }
   return { installationId, ...i } as ConfirmationInstallation;
 }
+/** Default `sofieEnterprise:connect` lifetime cap. */
+export const SOFIE_CONNECTION_MAX_MS = 3_600_000;
+/**
+ * Private beta, connection option A: ONE long-lived connection per person, renewed by the owner (re-run `connect` before expiry).
+ * Only the owner of an operator-enrolled confirmation installation may request it; everyone else keeps the 1 h cap. The connection still
+ * approves nothing; every approval needs a fresh signed per-Work confirmation, and `decide REVOKE` ends it immediately.
+ */
+export const PRIVATE_BETA_SOFIE_CONNECTION_MAX_MS = 7 * 24 * 3_600_000;
+export type SofieConnectionKind = 'PRIVATE_BETA_SOFIE';
+/** Max allowed `expiresAt - now` for a new connection, or null when the requested kind is not allowed for this owner. */
+export function connectionLifetimeCap(kind: SofieConnectionKind | undefined, missionControlOwnerId: string,
+  raw: string | undefined = process.env.MC_SOFIE_CONFIRMATION_INSTALLATIONS): number | null {
+  if (kind === undefined) return SOFIE_CONNECTION_MAX_MS;
+  if (kind !== 'PRIVATE_BETA_SOFIE') return null;
+  let all: unknown; try { all = JSON.parse(raw ?? 'null'); } catch { return null; }
+  if (!all || typeof all !== 'object' || Array.isArray(all)) return null;
+  for (const installationId of Object.keys(all)) {
+    try { if (confirmationInstallation(installationId, raw).missionControlOwnerId === missionControlOwnerId) return PRIVATE_BETA_SOFIE_CONNECTION_MAX_MS; }
+    catch { return null; }
+  }
+  return null;
+}
 /** The narrowly scoped server credential: per installation, usable only for the two confirmation submissions. */
 export function submitterSecret(installationId: string, raw: string | undefined = process.env.MC_SOFIE_CONFIRMATION_SUBMITTER_SECRETS): string {
   let all: any; try { all = JSON.parse(raw ?? 'null'); } catch { return refuse('SUBMITTER_CONFIG'); }
