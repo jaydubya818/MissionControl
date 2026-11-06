@@ -1,4 +1,4 @@
-import "./support/domainFunctions";
+import "./support/domainFunctions.support";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { inferencePriceBook, canonicalDigest } from "@mission-control/shared";
 import { claimIntentInternal, persistIntentInternal } from "../inferenceGateway";

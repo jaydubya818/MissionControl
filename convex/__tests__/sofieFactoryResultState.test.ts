@@ -3,7 +3,7 @@ import {read,retain,currentFactoryObservation} from '../sofieFactoryResultState'
 import {permitLifecycleOwner} from '../lib/executionPermitAuthority';
 import {resultMissionScope} from '../lib/sofieEnterpriseResult';
 import {installedServiceSecret} from '../lib/installedSofieConnection';
-import {ownerResultFixture} from './ownerFactoryReadbackFixture';
+import {ownerResultFixture} from './ownerFactoryReadbackFixture.fixture';
 import {permitDigest} from '../../packages/shared/src/executionPermit';
 vi.mock('../lib/executionPermitAuthority',()=>({permitLifecycleOwner:vi.fn()}));
 vi.mock('../lib/sofieEnterpriseResult',()=>({resultMissionScope:vi.fn()}));

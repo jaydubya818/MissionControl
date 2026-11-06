@@ -1,6 +1,5 @@
-'use node';
 import {parseOwnerFactoryResultPins,verifyOwnerFactoryResult,type OwnerFactoryResultPins,type OwnerAdmissionEvidence} from './ownerFactoryResult';
-import {createHash,createHmac,createPublicKey,timingSafeEqual,verify} from 'node:crypto';
+import {constantTimeEqual,ed25519Verify,fromBase64,hmacSha256,parsePublicKey,sha256Hex,toBase64Url,toHex,utf8} from '../../packages/shared/src/pureCrypto';
 import {canonicalPermitJson,permitDigest,type ExecutionPermit} from '../../packages/shared/src/executionPermit';
 import {workSpendV2Schema,validateSpendBinding} from '../../packages/shared/src/factoryResult/factory-spend';
 import {digest,verifyResult,type ResultKey,MAX_RESULT_BYTES} from '../../packages/shared/src/factoryResult/factory-producer-protocol';
@@ -23,16 +22,16 @@ export function parseFactoryResultPins(value:unknown):FactoryResultPins|OwnerFac
  for(const name of ['sourceDigest','configurationDigest','verifierPolicySha256'])hex(p[name]);
  for(const name of ['checkCommands','allowedFiles']){if(!Array.isArray(p[name])||!p[name].length||p[name].length>100||new Set(p[name]).size!==p[name].length)deny();p[name].forEach(text);}
  for(const name of ['resultKeys','receiptKeys'])if(!Array.isArray(p[name])||!p[name].length||p[name].length>8||new Set(p[name].map((k:any)=>k.keyId)).size!==p[name].length)deny();
- for(const key of p.receiptKeys){exact(key,['keyId','publicKey']);hex(key.keyId);text(key.publicKey);const parsed=createPublicKey(key.publicKey);if(parsed.asymmetricKeyType!=='ed25519'||createHash('sha256').update(parsed.export({type:'spki',format:'der'})).digest('hex')!==key.keyId)deny();}
- for(const key of p.resultKeys){exact(key,['factoryId','keyId','publicKey','activeFrom','notAfter',...(key.retiredAt!==undefined?['retiredAt']:[]),...(key.revokedAt!==undefined?['revokedAt']:[])]);if(key.factoryId!==p.factoryId||key.keyId!=='external-alpha-result-v1'||createPublicKey(key.publicKey).asymmetricKeyType!=='ed25519')deny();}
+ for(const key of p.receiptKeys){exact(key,['keyId','publicKey']);hex(key.keyId);text(key.publicKey);const parsed=parsePublicKey(key.publicKey);if(parsed.asymmetricKeyType!=='ed25519'||sha256Hex(parsed.spki)!==key.keyId)deny();}
+ for(const key of p.resultKeys){exact(key,['factoryId','keyId','publicKey','activeFrom','notAfter',...(key.retiredAt!==undefined?['retiredAt']:[]),...(key.revokedAt!==undefined?['revokedAt']:[])]);if(key.factoryId!==p.factoryId||key.keyId!=='external-alpha-result-v1'||parsePublicKey(key.publicKey).asymmetricKeyType!=='ed25519')deny();}
  return p as FactoryResultPins;
 }
 export type ResultRequest={schema:'mc-result-request/v1';connectionId:string;installationId:string;ownerId:string;projectId:string;permitId:string;commandId:string;challenge:string;issuer:string;audience:string;issuedAt:number;expiresAt:number};
-export const resultSignature=(document:unknown,domain:string,secret:string)=>'sha256='+createHmac('sha256',secret).update(domain+'\n'+canonicalPermitJson(document)).digest('hex');
+export const resultSignature=(document:unknown,domain:string,secret:string)=>'sha256='+toHex(hmacSha256(secret,domain+'\n'+canonicalPermitJson(document)));
 export function verifyResultReadbackPacket(packet:unknown,request:ResultRequest,permit:ExecutionPermit,secret:string,now=Date.now()) {
  const p=object(packet);exact(p,['document','signature']);const d=object(p.document);
  if(secret.length<32||typeof p.signature!=='string'||!/^sha256=[a-f0-9]{64}$/.test(p.signature)
-   ||!timingSafeEqual(Buffer.from(p.signature),Buffer.from(resultSignature(d,'mc-result-readback/v1',secret))))deny();
+   ||!(()=>{const a=utf8(p.signature),b=utf8(resultSignature(d,'mc-result-readback/v1',secret));if(a.length!==b.length)throw new RangeError('Input buffers must have the same byte length');return constantTimeEqual(a,b);})())deny();
  exact(d,['schema','commandId','challenge','connectionId','installationId','ownerId','permitId','permitSha256','missionId','planId','workOrderId','workOrderRevisionId','work','observedAt','expiresAt','status','admission','result']);
  if(d.schema!=='mc-result-readback/v1'||!['PENDING','SETTLED','NO_RESULT'].includes(d.status))deny();
  for(const k of ['commandId','challenge','connectionId','installationId','ownerId','permitId'] as const)if(d[k]!==request[k])deny();
@@ -43,15 +42,15 @@ export function verifyResultReadbackPacket(packet:unknown,request:ResultRequest,
  return d;
 }
 function verifyFactorySignature(domain:string,document:unknown,signature:unknown,pins:FactoryResultPins){
- if(typeof signature!=='string'||!/^[A-Za-z0-9_-]{86}$/.test(signature)||Buffer.from(signature,'base64url').toString('base64url')!==signature)deny();
- const bytes=Buffer.from(domain+'\0'+digest(document));
- if(!pins.receiptKeys.some(k=>verify(null,bytes,k.publicKey,Buffer.from(signature,'base64url'))))deny();
+ if(typeof signature!=='string'||!/^[A-Za-z0-9_-]{86}$/.test(signature)||toBase64Url(fromBase64(signature))!==signature)deny();
+ const bytes=utf8(domain+'\0'+digest(document)),sig=fromBase64(signature);
+ if(!pins.receiptKeys.some(k=>{const key=parsePublicKey(k.publicKey);return key.asymmetricKeyType==='ed25519'&&ed25519Verify(sig,bytes,key.raw);}))deny();
 }
-const criterionId=(index:number)=>{const h=createHash('sha256').update('EXTERNAL_ALPHA_CRITERION_V1:'+index).digest('hex').slice(0,32);return `${h.slice(0,8)}-${h.slice(8,12)}-8${h.slice(13,16)}-a${h.slice(17,20)}-${h.slice(20,32)}`;};
+const criterionId=(index:number)=>{const h=sha256Hex('EXTERNAL_ALPHA_CRITERION_V1:'+index).slice(0,32);return `${h.slice(0,8)}-${h.slice(8,12)}-8${h.slice(13,16)}-a${h.slice(17,20)}-${h.slice(20,32)}`;};
 /** Read-only evidence assessment. It cannot grant execution or settle accounting. */
 export function verifyInstalledFactoryResult(document:Record<string,any>,permit:ExecutionPermit,pins:FactoryResultPins|OwnerFactoryResultPins,now=Date.now(),admissionEvidence?:OwnerAdmissionEvidence) {
  if('schema' in pins)return verifyOwnerFactoryResult(document,permit,pins,now,admissionEvidence);
- if(Buffer.byteLength(JSON.stringify(document))>MAX_RESULT_BYTES+512000)deny();
+ if(utf8(JSON.stringify(document)).length>MAX_RESULT_BYTES+512000)deny();
  if(digest({sourceDigest:pins.sourceDigest,configurationDigest:pins.configurationDigest})!==permit.admission.factoryVersion)deny();
  const base={permitId:permit.permitId,missionId:permit.missionId,workOrderId:permit.workOrderId,work:permit.work,observedAt:document.observedAt,expiresAt:document.expiresAt,enterpriseQualityGate:'NOT_ESTABLISHED',executionAuthority:'NONE',accountingAuthority:'MYEVE_FACTORY'} as const;
  if(document.result===null){if(document.status==='SETTLED')deny();return {...base,status:document.status,result:null};}

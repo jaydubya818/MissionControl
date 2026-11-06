@@ -1,6 +1,6 @@
 import {generateKeyPairSync,createHash,sign,randomUUID} from 'node:crypto';
-import {permitFixture} from './executionPermitFixture';
-import {buildSignedResult,fixtureResultKeys,fixtureConfigurationDigest,fixtureSourceDigest,fixtureVerifierPolicySha256,fixtureFactoryVersion,fixtureFiles,fixtureCommands} from './installedFactoryResultFixture';
+import {permitFixture} from './executionPermitFixture.fixture';
+import {buildSignedResult,fixtureResultKeys,fixtureConfigurationDigest,fixtureSourceDigest,fixtureVerifierPolicySha256,fixtureFactoryVersion,fixtureFiles,fixtureCommands} from './installedFactoryResultFixture.fixture';
 import {digest} from '../../packages/shared/src/factoryResult/factory-producer-protocol';
 import {permitDigest} from '../../packages/shared/src/executionPermit';
 import {parseFactoryResultPins,verifyInstalledFactoryResult,verifyResultReadbackPacket,resultSignature,type ResultRequest} from '../lib/installedFactoryResult';

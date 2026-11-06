@@ -1,4 +1,4 @@
-import "./support/domainFunctions";
+import "./support/domainFunctions.support";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { canonicalDigest, canonicalOutcomeSourceDigest, type PhysicalInferenceIntent,
   type PhysicalInferenceReceipt, type FactoryOutcomeProjection } from "@mission-control/shared";

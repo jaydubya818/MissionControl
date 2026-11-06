@@ -1,4 +1,4 @@
-import "./support/domainFunctions";
+import "./support/domainFunctions.support";
 import { describe, expect, it, vi } from "vitest";
 import { upsert } from "../workflows";
 import { start } from "../workflowRuns";

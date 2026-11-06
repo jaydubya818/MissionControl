@@ -1,24 +1,26 @@
-'use node';
-import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
+import { constantTimeEqual, ed25519Sign, ed25519Verify, fromBase64, parsePrivateKey, parsePublicKey, sha256Hex, toBase64Url } from '../../packages/shared/src/pureCrypto';
 import { permitDenied, permitSigningText, type PermitControlDelivery, type ExecutionPermit, type AdmissionReceipt, type OwnerEnrollment, type SignedPermit } from '../../packages/shared/src/executionPermit';
 
 export function signPermitDocument<T extends ExecutionPermit | AdmissionReceipt | PermitControlDelivery>(document: T, enrollment: OwnerEnrollment, privateKeyPem: string): SignedPermit<T> {
-  const privateKey = createPrivateKey(privateKeyPem), publicKey = createPublicKey(privateKey);
-  const keyId = createHash('sha256').update(publicKey.export({ type: 'spki', format: 'der' })).digest('hex');
+  const privateKey = parsePrivateKey(privateKeyPem);
+  if (privateKey.asymmetricKeyType !== 'ed25519') return permitDenied();
+  const publicKey = parsePublicKey(privateKeyPem) as { raw: Uint8Array; spki: Uint8Array };
+  const keyId = sha256Hex(publicKey.spki);
   const registered = enrollment.permitKeys.filter(k => k.keyId === keyId);
-  if (privateKey.asymmetricKeyType !== 'ed25519' || registered.length !== 1) return permitDenied();
+  if (registered.length !== 1) return permitDenied();
   const key = registered[0];
-  if (key.revokedAt !== null || key.activeFrom > document.issuedAt || key.notAfter < document.expiresAt
-    || !publicKey.export({ type: 'spki', format: 'der' }).equals(createPublicKey(key.publicKey).export({ type: 'spki', format: 'der' }))) return permitDenied();
-  return { document, keyId, signature: sign(null, Buffer.from(permitSigningText(document)), privateKey).toString('base64url') };
+  if (key.revokedAt !== null || key.activeFrom > document.issuedAt || key.notAfter < document.expiresAt) return permitDenied();
+  const enrolled = parsePublicKey(key.publicKey);
+  if (enrolled.asymmetricKeyType !== 'ed25519' || !constantTimeEqual(publicKey.spki, enrolled.spki)) return permitDenied();
+  return { document, keyId, signature: toBase64Url(ed25519Sign(permitSigningText(document), privateKey.seed)) };
 }
 export function verifyPermitSignature<T extends ExecutionPermit | AdmissionReceipt | PermitControlDelivery>(signed: SignedPermit<T>, enrollment: OwnerEnrollment) {
-  const keys = enrollment.permitKeys.filter(k => k.keyId === signed.keyId), signature = Buffer.from(signed.signature, 'base64url');
-  if (keys.length !== 1 || signature.length !== 64 || signature.toString('base64url') !== signed.signature) return permitDenied();
-  const key = keys[0], publicKey = createPublicKey(key.publicKey);
+  const keys = enrollment.permitKeys.filter(k => k.keyId === signed.keyId), signature = fromBase64(signed.signature);
+  if (keys.length !== 1 || signature.length !== 64 || toBase64Url(signature) !== signed.signature) return permitDenied();
+  const key = keys[0], publicKey = parsePublicKey(key.publicKey);
   if (publicKey.asymmetricKeyType !== 'ed25519' || key.revokedAt !== null || key.activeFrom > signed.document.issuedAt || key.notAfter < signed.document.expiresAt
-    || createHash('sha256').update(publicKey.export({ type:'spki', format:'der' })).digest('hex') !== key.keyId
-    || !verify(null, Buffer.from(permitSigningText(signed.document)), publicKey, signature)) return permitDenied();
+    || sha256Hex(publicKey.spki) !== key.keyId
+    || !ed25519Verify(signature, permitSigningText(signed.document), publicKey.raw)) return permitDenied();
 }
 
 export function signConfiguredPermitDocument(value:{document:ExecutionPermit|AdmissionReceipt|PermitControlDelivery;enrollment:OwnerEnrollment}) {

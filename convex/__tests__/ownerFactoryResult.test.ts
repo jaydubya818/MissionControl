@@ -1,7 +1,7 @@
 import {it,expect} from 'vitest';
 import {randomUUID} from 'node:crypto';
 import {digest} from '../../packages/shared/src/factoryResult/factory-producer-protocol';
-import {ownerResultFixture as fixture} from './ownerFactoryReadbackFixture';
+import {ownerResultFixture as fixture} from './ownerFactoryReadbackFixture.fixture';
 it('verifies owner Result under exact signed Mission and original Factory request without alpha authority',()=>{
  const f=fixture(),result=f.run();expect(result.status).toBe('RESULT_VERIFIED_SETTLEMENT_REPORTED');expect(result.result?.independentVerdict).toBe('PASS');
  expect(result.executionAuthority).toBe('NONE');expect(result.enterpriseQualityGate).toBe('NOT_ESTABLISHED');

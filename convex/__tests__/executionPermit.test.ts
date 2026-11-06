@@ -2,7 +2,7 @@ import { describe,it,expect } from 'vitest';
 import { generateKeyPairSync,createHash,verify } from 'node:crypto';
 import { admissionReceipt,canonicalPermitJson,parseExecutionPermit,parseOwnerEnrollment,parseAdmissionChallenge,permitDigest,permitSigningText,requirePermitEnrollment } from '../../packages/shared/src/executionPermit';
 import {signPermitDocument,verifyPermitSignature} from '../lib/executionPermitCrypto';
-import {permitFixture} from './executionPermitFixture';
+import {permitFixture} from './executionPermitFixture.fixture';
 describe('installed permit wire',()=>{
  it('signs exact consumer canonical bytes and validates pinned Ed25519',()=>{const f=permitFixture(),e=signPermitDocument(f.document,f.enrollment,f.privateKey);
  expect(verify(null,Buffer.from('mc-execution-permit/v1\n'+canonicalPermitJson(f.document)),f.publicKey,Buffer.from(e.signature,'base64url'))).toBe(true);

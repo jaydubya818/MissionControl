@@ -1,4 +1,4 @@
-import { createHash, type KeyObject } from 'node:crypto';
+import { fromBase64, fromUtf8, sha1Bytes, sha256Bytes, sha256Hex, toBase64, toBase64Url, toHex, utf8, type KeyLike } from '../pureCrypto';
 import { signProtocolPayload, verifyProtocolPayload } from './factory-producer-signature';
 
 export const RESULT_PROTOCOL = 'MYFACTORY_RESULT_V1';
@@ -13,7 +13,7 @@ export function canonical(value: unknown): string {
   }
   throw new Error('Non-canonical JSON value');
 }
-export function sha256(bytes: string | Uint8Array): string { return createHash('sha256').update(bytes).digest('hex'); }
+export function sha256(bytes: string | Uint8Array): string { return sha256Hex(bytes); }
 export function digest(value: unknown): string { return sha256(canonical(value)); }
 export interface CloudExecutionConfiguration {
   provider: 'vercel-sandbox'; providerVersion: string; region: 'iad1'; workerImage: string;
@@ -196,12 +196,12 @@ export function validateManifest(value: unknown): asserts value is ResultManifes
 
 function verifyArtifactBytes(m: ResultManifest, artifacts: SignedResult['artifacts']): void {
   requireValue(Array.isArray(artifacts) && artifacts.length === m.artifacts.length, 'Missing artifact bytes');
-  const bytes = new Map<string, Buffer>();
+  const bytes = new Map<string, Uint8Array>();
   for (const a of artifacts) {
     exact(a, ['id','base64']); text(a.id);
     requireValue(typeof a.base64 === 'string' && a.base64.length <= Math.ceil(MAX_ARTIFACT_BYTES / 3) * 4, 'Artifact size limit');
-    const content = Buffer.from(a.base64, 'base64');
-    requireValue(content.toString('base64') === a.base64 && !bytes.has(a.id), 'Invalid artifact encoding or duplicate');
+    const content = fromBase64(a.base64);
+    requireValue(toBase64(content) === a.base64 && !bytes.has(a.id), 'Invalid artifact encoding or duplicate');
     const meta = m.artifacts.find(item => item.id === a.id);
     requireValue(meta && meta.size === content.length && meta.sha256 === sha256(content), 'Artifact digest mismatch');
     bytes.set(a.id, content);
@@ -209,27 +209,27 @@ function verifyArtifactBytes(m: ResultManifest, artifacts: SignedResult['artifac
   const c = m.candidate;
   if (c) {
     const commit = bytes.get(c.commitArtifactId)!, tree = bytes.get(c.treeArtifactId)!;
-    const objectId = (type: string, b: Buffer, id: string) => createHash(id.length === 40 ? 'sha1' : 'sha256').update(`${type} ${b.length}\0`).update(b).digest('hex');
+    const objectId = (type: string, b: Uint8Array, id: string) => toHex((id.length === 40 ? sha1Bytes : sha256Bytes)(`${type} ${b.length}\0`, b));
     requireValue(objectId('commit',commit,c.commit) === c.commit && objectId('tree',tree,c.tree) === c.tree, 'Git object digest mismatch');
-    const headers = commit.toString('utf8').split('\n\n')[0].split('\n');
+    const headers = fromUtf8(commit).split('\n\n')[0].split('\n');
     requireValue(headers[0] === `tree ${c.tree}` && headers.filter(h => h.startsWith('parent ')).join('\n') === `parent ${c.base}`, 'Candidate tree/base mismatch');
   }
 }
-export function signResult(manifest: ResultManifest, artifacts: SignedResult['artifacts'], privateKey: string | KeyObject): SignedResult {
+export function signResult(manifest: ResultManifest, artifacts: SignedResult['artifacts'], privateKey: string | KeyLike): SignedResult {
   validateManifest(manifest); verifyArtifactBytes(manifest, artifacts);
-  const encoded = Buffer.from(canonical(manifest)).toString('base64url');
+  const encoded = toBase64Url(utf8(canonical(manifest)));
   const result: SignedResult = {protocol:RESULT_PROTOCOL, encoded, signature:signProtocolPayload(RESULT_PROTOCOL,encoded,privateKey), manifestDigest:digest(manifest), artifacts};
-  requireValue(Buffer.byteLength(JSON.stringify(result)) <= MAX_RESULT_BYTES, 'Result size limit'); return result;
+  requireValue(utf8(JSON.stringify(result)).length <= MAX_RESULT_BYTES, 'Result size limit'); return result;
 }
 export function verifyResult(input: unknown, options: {
   keys: ResultKey[]; factoryId: string; requestId: string; workOrderId: string; runId: string;
   factoryVersion: string; now?: number; historical?: boolean;
 }): {manifest: ResultManifest; keyValidForCurrentUse: boolean} {
-  requireValue(Buffer.byteLength(JSON.stringify(input) ?? '') <= MAX_RESULT_BYTES, 'Result size limit');
+  requireValue(utf8(JSON.stringify(input) ?? '').length <= MAX_RESULT_BYTES, 'Result size limit');
   exact(input, ['protocol','encoded','signature','manifestDigest','artifacts']);
   requireValue(input.protocol === RESULT_PROTOCOL && typeof input.encoded === 'string' && typeof input.signature === 'string', 'Unknown result protocol');
-  const raw = Buffer.from(input.encoded,'base64url').toString('utf8'); const manifest: unknown = JSON.parse(raw); validateManifest(manifest);
-  requireValue(canonical(manifest) === raw && Buffer.from(raw).toString('base64url') === input.encoded, 'Noncanonical result');
+  const raw = fromUtf8(fromBase64(input.encoded)); const manifest: unknown = JSON.parse(raw); validateManifest(manifest);
+  requireValue(canonical(manifest) === raw && toBase64Url(utf8(raw)) === input.encoded, 'Noncanonical result');
   const keys = options.keys.filter(k => k.factoryId === options.factoryId && k.keyId === manifest.keyId);
   requireValue(keys.length === 1, 'Unknown or ambiguous key'); const key = keys[0];
   requireValue(verifyProtocolPayload(RESULT_PROTOCOL,input.encoded,input.signature,key.publicKey), 'Invalid signature');
@@ -246,8 +246,8 @@ export function verifyResult(input: unknown, options: {
 }
 /** Both inputs must have passed verifyResult; comparison never grants authority. */
 export function compareResults(previous: SignedResult, next: SignedResult): 'DUPLICATE' | 'DIFFERENT_OPERATION' {
-  const a = JSON.parse(Buffer.from(previous.encoded,'base64url').toString('utf8')) as ResultManifest;
-  const b = JSON.parse(Buffer.from(next.encoded,'base64url').toString('utf8')) as ResultManifest;
+  const a = JSON.parse(fromUtf8(fromBase64(previous.encoded))) as ResultManifest;
+  const b = JSON.parse(fromUtf8(fromBase64(next.encoded))) as ResultManifest;
   if (a.operationId !== b.operationId) return 'DIFFERENT_OPERATION';
   if (previous.manifestDigest !== next.manifestDigest) throw new Error('Conflicting result operation');
   return 'DUPLICATE';

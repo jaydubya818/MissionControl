@@ -1,6 +1,6 @@
 import {afterEach,it,expect,vi} from 'vitest';
 import {refresh} from '../sofieFactoryResults';
-import {factoryReadbackFixture} from './installedFactoryReadbackFixture';
+import {factoryReadbackFixture} from './installedFactoryReadbackFixture.fixture';
 import {resultSignature} from '../lib/installedFactoryResult';
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();vi.restoreAllMocks();});
 it('owner action fetches only pinned readback origin and retains independently verified observation',async()=>{
@@ -25,7 +25,7 @@ it('does not make an external request without authenticated owner and current st
 });
 
 it('owner Result action resolves the exact stored admission before retaining reported settlement',async()=>{
- const {ownerResultFixture}=await import('./ownerFactoryReadbackFixture');
+ const {ownerResultFixture}=await import('./ownerFactoryReadbackFixture.fixture');
  const f=ownerResultFixture();vi.spyOn(Date,'now').mockReturnValue(f.now);
  vi.stubEnv('MC_SOFIE_CONNECTION_SECRETS',JSON.stringify({[f.permit.connectionId]:{keyId:'service',secret:f.secret}}));
  const state={document:f.permit,enrollment:{...f.admissionEvidence.enrollment,audience:f.permit.audience},keyId:'service',pins:f.pins,pinsDigest:'pins',serviceKeyDigest:'service',enrollmentDigest:'enrollment'};

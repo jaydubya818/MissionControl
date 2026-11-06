@@ -5,7 +5,7 @@ import {installedEnrollment} from '../lib/installedSofieConnection';
 import {requireWorkspaceAccess} from '../lib/companyAccess';
 import {enterpriseDigest} from '../../packages/shared/src/sofieEnterprise';
 import {canonicalPermitJson,permitDigest} from '../../packages/shared/src/executionPermit';
-import {permitFixture} from './executionPermitFixture';
+import {permitFixture} from './executionPermitFixture.fixture';
 vi.mock('../lib/sofieEnterpriseAuthority',()=>({currentConnection:vi.fn()}));
 vi.mock('../lib/installedSofieConnection',()=>({installedEnrollment:vi.fn(),installedServiceSecret:vi.fn()}));
 vi.mock('../lib/companyAccess',()=>({COMPANY_PERMISSIONS:{APPROVE_DELIVERY:'approve'},requireWorkspaceAccess:vi.fn()}));

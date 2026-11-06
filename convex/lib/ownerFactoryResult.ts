@@ -1,5 +1,4 @@
-'use node';
-import {createPublicKey} from 'node:crypto';
+import {parsePublicKey,utf8} from '../../packages/shared/src/pureCrypto';
 import {verifyPermitSignature} from './executionPermitCrypto';
 import {canonicalPermitJson,permitDigest,type ExecutionPermit,type AdmissionReceipt,type OwnerEnrollment} from '../../packages/shared/src/executionPermit';
 import {digest,verifyResult,type ResultKey,MAX_RESULT_BYTES} from '../../packages/shared/src/factoryResult/factory-producer-protocol';
@@ -27,7 +26,7 @@ export function parseOwnerFactoryResultPins(value:unknown):OwnerFactoryResultPin
  if(!Array.isArray(p.resultKeys)||!p.resultKeys.length||p.resultKeys.length>8||new Set(p.resultKeys.map((k:any)=>k.keyId)).size!==p.resultKeys.length)deny();
  for(const k of p.resultKeys){
   exact(k,['factoryId','keyId','publicKey','activeFrom','notAfter',...(k.revokedAt!==undefined?['revokedAt']:[]),...(k.retiredAt!==undefined?['retiredAt']:[])]);
-  text(k.keyId);if(k.factoryId!==p.factoryId||createPublicKey(k.publicKey).asymmetricKeyType!=='ed25519'
+  text(k.keyId);if(k.factoryId!==p.factoryId||parsePublicKey(k.publicKey).asymmetricKeyType!=='ed25519'
    ||!Number.isFinite(Date.parse(k.activeFrom))||!Number.isFinite(Date.parse(k.notAfter))||Date.parse(k.notAfter)<=Date.parse(k.activeFrom))deny();
  }
  return p as OwnerFactoryResultPins;
@@ -36,7 +35,7 @@ export function parseOwnerFactoryResultPins(value:unknown):OwnerFactoryResultPin
 /** Authenticated MyEve custody plus the original producer signature. No execution,
  * enterprise quality gate, owner acceptance or accounting settlement is granted here. */
 export function verifyOwnerFactoryResult(document:Record<string,any>,permit:ExecutionPermit,pins:OwnerFactoryResultPins,now=Date.now(),admissionEvidence?:OwnerAdmissionEvidence) {
- if(Buffer.byteLength(JSON.stringify(document))>MAX_RESULT_BYTES+512000
+ if(utf8(JSON.stringify(document)).length>MAX_RESULT_BYTES+512000
   ||digest({sourceDigest:pins.sourceDigest,configurationDigest:pins.configurationDigest})!==permit.admission.factoryVersion)deny();
  const base={permitId:permit.permitId,missionId:permit.missionId,workOrderId:permit.workOrderId,work:permit.work,
   observedAt:document.observedAt,expiresAt:document.expiresAt,enterpriseQualityGate:'NOT_ESTABLISHED',executionAuthority:'NONE',accountingAuthority:'MYEVE_FACTORY'} as const;

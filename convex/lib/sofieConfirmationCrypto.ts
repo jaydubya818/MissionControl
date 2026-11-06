@@ -1,5 +1,4 @@
-'use node';
-import { createHash, createHmac, createPublicKey, timingSafeEqual, verify } from 'node:crypto';
+import { constantTimeEqual, ed25519Verify, fromBase64, fromHex, hmacSha256, parsePublicKey, sha256Hex, toBase64Url } from '../../packages/shared/src/pureCrypto';
 import { canonicalServiceCommand, validateServiceCommandEnvelope, type ServiceCommandEnvelope } from './serviceCommandAuth';
 import {
   APPROVE_CONFIRMED_PERMIT, CONFIRM_PLAN, CONFIRMATION_SERVICE_ID, SUBMISSION_SCHEMA, confirmationInstallation, confirmationSigningText,
@@ -22,10 +21,10 @@ export async function authenticateSofieConfirmationSubmission(args: { envelope: 
     || typeof payload.installationId !== 'string') return refuse('SUBMISSION_SHAPE');
   const envelope = args.envelope;
   if (validateServiceCommandEnvelope(envelope, now, { serviceId: CONFIRMATION_SERVICE_ID, capability }) || envelope.issuedAt > now
-    || envelope.repositoryId !== `installation:${payload.installationId}` || envelope.payloadDigest !== `sha256=${createHash('sha256').update(args.payloadJson).digest('hex')}`) return refuse('SUBMITTER_ENVELOPE');
-  const expected = createHmac('sha256', submitterSecret(payload.installationId)).update(canonicalServiceCommand(envelope)).digest();
-  const presented = Buffer.from(envelope.signature.slice('sha256='.length), 'hex');
-  if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) return refuse('SUBMITTER_SIGNATURE');
+    || envelope.repositoryId !== `installation:${payload.installationId}` || envelope.payloadDigest !== `sha256=${sha256Hex(args.payloadJson)}`) return refuse('SUBMITTER_ENVELOPE');
+  const expected = hmacSha256(submitterSecret(payload.installationId), canonicalServiceCommand(envelope));
+  const presented = fromHex(envelope.signature.slice('sha256='.length));
+  if (presented.length !== expected.length || !constantTimeEqual(presented, expected)) return refuse('SUBMITTER_SIGNATURE');
   const c = payload.confirmation;
   if (!c || typeof c !== 'object' || Object.keys(c).sort().join(',') !== 'binding,keyId,signature' || typeof c.keyId !== 'string' || typeof c.signature !== 'string') return refuse('CONFIRMATION_SHAPE');
   const binding = parseConfirmationBinding(c.binding);
@@ -33,9 +32,9 @@ export async function authenticateSofieConfirmationSubmission(args: { envelope: 
   const installation = confirmationInstallation(binding.installationId);
   const key = installation.keys.find(k => k.keyId === c.keyId);
   if (!key || key.revokedAt !== null || key.activeFrom > now || key.notAfter <= now) return refuse('CONFIRMATION_KEY_NOT_ENROLLED');
-  const publicKey = createPublicKey(key.publicKey), signature = Buffer.from(c.signature, 'base64url');
-  if (publicKey.asymmetricKeyType !== 'ed25519' || createHash('sha256').update(publicKey.export({ type: 'spki', format: 'der' })).digest('hex') !== key.keyId
-    || signature.length !== 64 || signature.toString('base64url') !== c.signature
-    || !verify(null, Buffer.from(confirmationSigningText(binding)), publicKey, signature)) return refuse('CONFIRMATION_SIGNATURE');
+  const publicKey = parsePublicKey(key.publicKey), signature = fromBase64(c.signature);
+  if (publicKey.asymmetricKeyType !== 'ed25519' || sha256Hex(publicKey.spki) !== key.keyId
+    || signature.length !== 64 || toBase64Url(signature) !== c.signature
+    || !ed25519Verify(signature, confirmationSigningText(binding), publicKey.raw)) return refuse('CONFIRMATION_SIGNATURE');
   return { confirmation: { binding, keyId: c.keyId, signature: c.signature }, payload };
 }

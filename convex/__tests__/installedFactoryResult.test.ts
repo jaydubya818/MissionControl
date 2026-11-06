@@ -2,7 +2,7 @@ import {it,expect} from 'vitest';
 import {randomUUID} from 'node:crypto';
 import {digest} from '../../packages/shared/src/factoryResult/factory-producer-protocol';
 import {verifyResultReadbackPacket} from '../lib/installedFactoryResult';
-import {factoryReadbackFixture as fixture} from './installedFactoryReadbackFixture';
+import {factoryReadbackFixture as fixture} from './installedFactoryReadbackFixture.fixture';
 it('independently verifies signed receipt, current readback, Result artifacts and per-criterion Proof without promoting completion',()=>{const f=fixture(),r=f.run();expect(r.status).toBe('VERIFIED_SETTLED');expect(r.result?.independentVerdict).toBe('PASS');expect(r.result?.proofOutcome).toBe('PARTIAL');expect(r.enterpriseQualityGate).toBe('NOT_ESTABLISHED');expect(r.executionAuthority).toBe('NONE');});
 for(const [name,edit] of Object.entries({
  'foreign Mission':(f:any)=>f.document.missionId='foreign','foreign owner':(f:any)=>f.document.ownerId='foreign','foreign installation':(f:any)=>f.document.installationId='foreign',
