@@ -43,6 +43,8 @@ const AUTHORIZATION_MARKERS = [
   "authorizeServiceCommand",
   "authorizeSofieApplicationCommand",
   "authenticateInstalledSofieCommand",
+  // Hosted Sofie confirmation boundary (convex/lib/sofieConfirmationCrypto.ts): submitter credential + enrolled MyEve signature.
+  "authenticateSofieConfirmationSubmission",
   "claimScoped",
 ];
 

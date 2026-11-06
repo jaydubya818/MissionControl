@@ -2051,6 +2051,15 @@ export const schemaTablesPartOne = {
     missionId:v.id("missions"),workOrderId:v.id("workOrders"),proposalId:v.id("enterpriseMissionProposals"),intentKey:v.string(),
     requestDigest:v.string(),request:v.any(),createdAt:v.number(),
   }).index("by_connection_intent",["connectionId","intentKey"]),
+  // Hosted Sofie confirmations: single-use claim + audit receipt per (confirmation, step, Work). Written only by convex/lib/sofieConfirmationBridge.ts.
+  sofieConfirmationReceipts: defineTable({
+    installationId:v.string(), nonce:v.string(), confirmationDigest:v.string(),
+    step:v.union(v.literal("PLAN"),v.literal("PERMIT")), workId:v.string(),
+    status:v.union(v.literal("CLAIMED"),v.literal("APPLIED"),v.literal("REFUSED")),
+    subject:v.string(), keyId:v.string(), signature:v.string(), connectionId:v.string(),
+    ownerId:v.optional(v.id("operators")), result:v.optional(v.any()), reason:v.optional(v.string()),
+    createdAt:v.number(), updatedAt:v.number(),
+  }).index("by_installation_nonce",["installationId","nonce"]).index("by_digest_step_work",["confirmationDigest","step","workId"]),
   enterpriseExecutionPermits: defineTable({
     connectionId:v.id("enterpriseAppConnections"), proposalId:v.id("enterpriseMissionProposals"),
     tenantId:v.id("tenants"), projectId:v.id("projects"), ownerId:v.id("operators"), missionId:v.id("missions"),
