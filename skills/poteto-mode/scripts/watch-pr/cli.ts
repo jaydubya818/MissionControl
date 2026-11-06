@@ -13,6 +13,7 @@ import {
   resolveContext,
 } from "./github.ts";
 import {
+  NO_CHECKS_CONFIRM_SECONDS,
   runQueued,
   deadlineVerdict,
   runSimple,
@@ -37,6 +38,15 @@ function positiveNumber(value: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0)
     throw new InvalidArgumentError("must be greater than zero");
+  return parsed;
+}
+// A timer delay above 2^31 - 1 ms is replaced with 1 ms, so a longer sleep
+// would return at once and the loop would poll without pause.
+const MAX_SLEEP_SECONDS = (2 ** 31 - 1) / 1_000;
+function sleepSeconds(value: string): number {
+  const parsed = positiveNumber(value);
+  if (parsed > MAX_SLEEP_SECONDS)
+    throw new InvalidArgumentError(`must be at most ${MAX_SLEEP_SECONDS}`);
   return parsed;
 }
 function nonNegativeNumber(value: string): number {
@@ -83,11 +93,11 @@ interface RawOptions {
 }
 export function parseArgs(
   argv: readonly string[],
-  io: Pick<CliRuntime, "stdout" | "stderr">,
+  io: Pick<CliRuntime, "stdout" | "stderr">
 ): CliOptions {
   const program = new Command("watch-pr")
     .description(
-      "Watch one pull request, a connected stack, or an immutable queued stack.\nJSON (NDJSON while polling) is the default; --pretty renders human text.",
+      "Watch one pull request, a connected stack, or an immutable queued stack.\nJSON (NDJSON while polling) is the default; --pretty renders human text."
     )
     .configureOutput({ writeOut: io.stdout, writeErr: io.stderr })
     .exitOverride()
@@ -97,38 +107,47 @@ export function parseArgs(
     .addOption(
       new Option("--stack", "watch the connected open stack")
         .default(false)
-        .conflicts("queuedStack"),
+        .conflicts("queuedStack")
     )
     .option(
       "--queued-stack",
       "watch the captured stack until all PRs merge",
-      false,
+      false
     )
     .option(
       "--stack-prs <n,...>",
       "frozen bottom-to-top queue (queued mode only)",
-      stackPrList,
+      stackPrList
     )
-    .option("--interval <seconds>", "poll interval", positiveNumber, 60)
+    .option(
+      "--interval <seconds>",
+      `poll interval; a PR with no checks takes ${NO_CHECKS_CONFIRM_SECONDS} seconds to confirm whatever this is`,
+      sleepSeconds,
+      60
+    )
     .option(
       "--sweep-interval <seconds>",
       "whole-stack sweep interval",
       positiveNumber,
-      300,
+      300
     )
     .option(
       "--timeout <seconds>",
       "deadline; 0 disables it",
       nonNegativeNumber,
-      0,
+      0
     )
     .option(
       "--max-query-errors <count>",
       "consecutive query-error budget",
       positiveInteger,
-      5,
+      5
     )
-    .option("--status-only", "print one status table and exit 0", false)
+    .option(
+      "--status-only",
+      "print one status table and exit; exit 0 means the table was read, not that the PR is ready",
+      false
+    )
     .option("--allow-draft", "do not treat a draft as a merge gate", false)
     .option("--pretty", "render human text instead of JSON", false);
   program.parse(argv, { from: "user" });
@@ -153,7 +172,7 @@ export function parseArgs(
   };
 }
 export interface CliRuntime {
-  readonly deadline?: WatchDeadline;
+  readonly deadline: WatchDeadline;
   readonly reader: T.GitHubReader;
   readonly clock: WatchClock;
   readonly stdout: (value: string) => void;
@@ -177,7 +196,7 @@ function realRuntime(timeout: number): CliRuntime {
 }
 export async function main(
   argv: readonly string[],
-  supplied?: CliRuntime,
+  supplied?: CliRuntime
 ): Promise<number> {
   let options: CliOptions;
   try {
@@ -186,16 +205,13 @@ export async function main(
       supplied ?? {
         stdout: (value) => process.stdout.write(value),
         stderr: (value) => process.stderr.write(value),
-      },
+      }
     );
   } catch (error) {
     if (!(error instanceof CommanderError)) throw error;
     return error.exitCode === 0 ? 0 : 64;
   }
   const runtime = supplied ?? realRuntime(options.polling.timeout);
-  const deadline =
-    runtime.deadline ??
-    new WatchDeadline(options.polling.timeout, () => runtime.clock.now());
   const render = options.pretty ? renderPretty : renderJson;
   const emit = (verdict: T.ProgressVerdict): void =>
     runtime.stdout(render(verdict));
@@ -224,7 +240,7 @@ export async function main(
         : statusQueryVerdict(
             verdictFactory(runtime.clock, options.mode),
             1,
-            error.failure,
+            error.failure
           );
     runtime.stdout(render(verdict));
     return verdict.exitCode;
@@ -233,7 +249,7 @@ export async function main(
     reader: runtime.reader,
     clock: runtime.clock,
     emit,
-    deadline,
+    deadline: runtime.deadline,
   };
   const verdict =
     options.mode === "queued-stack" && !options.statusOnly

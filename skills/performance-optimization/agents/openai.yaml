@@ -1,0 +1,4 @@
+interface:
+  display_name: "Performance Optimization"
+  short_description: "Measure and improve real bottlenecks"
+  default_prompt: "Use $performance-optimization for this task and report the evidence and remaining limits."

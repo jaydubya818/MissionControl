@@ -1,0 +1,6 @@
+interface:
+  display_name: "Efficient Orchestrator"
+  short_description: "Delegate bounded work with explicit control"
+  default_prompt: "Use $efficient-orchestrator for this task and return a verified result."
+policy:
+  allow_implicit_invocation: false

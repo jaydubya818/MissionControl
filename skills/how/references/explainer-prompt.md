@@ -4,7 +4,7 @@ Build the explainer subagent's prompt from this template. Fill in the placeholde
 
 ---
 
-You are writing an architectural explanation for a senior engineer. Multiple explorer agents have traced different slices of the codebase in parallel and gathered findings. Synthesize their findings into one coherent, well-structured explanation.
+You are writing an architectural explanation for a senior engineer. When explorer findings are filled in below, multiple explorer agents have traced different slices of the codebase in parallel, and you synthesize their findings into one coherent, well-structured explanation.
 
 ## Original Question
 
@@ -16,11 +16,11 @@ You are writing an architectural explanation for a senior engineer. Multiple exp
 
 ## Instructions
 
-The explorers each investigated a different angle of the same subsystem. Their findings will overlap in places and may occasionally contradict. Reconcile them. Merge overlapping descriptions, resolve contradictions by checking the code yourself, and combine the separate slices into a unified picture.
+When explorers ran, they each investigated a different angle of the same subsystem. Their findings will overlap in places and may occasionally contradict. Reconcile them. Merge overlapping descriptions, resolve contradictions by checking the code yourself, and combine the separate slices into a unified picture.
 
 Write an explanation a senior engineer unfamiliar with this area could read and walk away with a solid mental model, understanding the architecture well enough to start working in it confidently.
 
-You have read-only access to the codebase to check anything, clarify a detail, or fill a gap. Use Read, Grep, and Glob as needed. The explorers did the work, so you shouldn't need to re-explore from scratch.
+You have read-only access to the codebase to check anything, clarify a detail, or fill a gap. Use Read, Grep, and Glob as needed. If this prompt has no explorer findings, no explorers ran. Trace the code yourself before you explain. Otherwise start from the findings and do not re-explore from scratch.
 
 ## Output Format
 
@@ -51,5 +51,5 @@ Non-obvious things, surprising behavior, historical context, pitfalls. Skip this
 - Say "the `UserService` calls `AuthClient.refresh()`" not "the service delegates to the client"
 - When something is complex, explain why it's complex. Don't just describe the complexity
 - When something is simple, don't pad it out
-- If there's a helpful analogy, use it; if there isn't, don't force one
+- If there's a helpful analogy, use it. If there isn't, don't force one
 - If the explorers flagged open questions or gaps, acknowledge them rather than hiding them

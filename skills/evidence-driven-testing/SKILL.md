@@ -1,8 +1,9 @@
 ---
 name: evidence-driven-testing
-description: Capture observable runtime proof with video, screenshots, or measured output. Use when a change needs evidence beyond test reports.
+description: Capture runtime evidence with video, screenshots, or measured output.
 compatibility: Requires Python 3 and FFmpeg for recording, or Node.js 20+ and Chromium for headless capture. Desktop capture also needs OS screen-recording access. Publishing evidence requires network access and authorized destination tooling.
 metadata:
+  source-commit: 69558ea1f5328da7b40ba171dfe2171f00ff4884
   author: michaelshimeles
   version: "1.3.0"
   owner: software-factory
@@ -19,6 +20,11 @@ flows, scripted captures for headless UI checks, and output pairs for CLI or
 API changes. Documentation-only edits need content checks and verification of
 runnable examples, not a recording. Reuse suitable evidence already captured
 in the task. Publish only to destinations included in the requested work.
+
+For crash and rollback claims, exercise the actual boundary in an isolated
+fixture. A thrown exception does not prove process-termination recovery, and a
+mocked transaction call does not prove database rollback. Keep mutation and
+external side effects within the test environment's authority.
 
 The recording is the capture of you testing the app via computer use: start the
 recorder, then drive the app yourself — click, type, navigate — through each
@@ -67,7 +73,8 @@ Python 3 and FFmpeg.
   the recorder is killed hard or crashes, what was captured still probes and
   renders. `stop` remuxes or re-encodes it into a standard `evidence.mp4`.
 - **How stopping works**: on Linux the recorder is signalled through a pidfd.
-  On macOS and Windows `start` launches a small supervisor process that owns
+  On macOS and Windows, and on Linux when the kernel or a seccomp policy
+  refuses pidfds, `start` launches a small supervisor process that owns
   the ffmpeg child, and `stop` asks it (via `stop.request` in the session
   folder) to interrupt, then terminate, then kill; it writes
   `recorder-exit.json` when done. Nothing ever signals a bare PID, so a

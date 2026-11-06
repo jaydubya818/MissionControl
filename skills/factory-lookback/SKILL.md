@@ -1,11 +1,16 @@
 ---
 name: factory-lookback
+description: "Audit signal history for recurring problems and systemic fixes."
+license: MIT
+compatibility: "Works in Claude Code, Codex, Cursor, and Agent Skills-compatible harnesses when the required host tools are available."
 metadata:
+  author: Builder.io
+  source: BuilderIO/skills
+  source-commit: f4f10b8d513476c24bd995ceac5294bcdd6ee15c
+  owner: software-factory
+  risk: medium
+  capabilities: builderio,factory-systemic-review
   installer-group: factory
-description: >-
-  Experimental workflow for auditing recurring feedback, telemetry, errors,
-  and brittle delivery paths to find systemic fixes. Use for periodic or
-  requested cross-source lookbacks, not routine single-item intake.
 ---
 
 # Factory Lookback

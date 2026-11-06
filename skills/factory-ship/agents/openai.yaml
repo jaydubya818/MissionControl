@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory Ship"
+  short_description: "Ship authorized work through explicit gates"
+  default_prompt: "Use $factory-ship for this task and return a verified result."

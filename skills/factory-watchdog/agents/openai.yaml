@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory Watchdog"
+  short_description: "Report verified stalls in delivery work"
+  default_prompt: "Use $factory-watchdog for this task and return a verified result."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "In Your Own Words"
+  short_description: "Restate the user's goal and problem"
+  default_prompt: "Use $in-your-own-words to handle this task with the Jstack workflow and return a verified result."

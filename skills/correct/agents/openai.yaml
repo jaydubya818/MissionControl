@@ -1,0 +1,4 @@
+interface:
+  display_name: "Correct"
+  short_description: "Prevent repeated repository mistakes"
+  default_prompt: "Use $correct to handle this task with the Jstack workflow and return a verified result."

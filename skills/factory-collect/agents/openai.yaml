@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory Collect"
+  short_description: "Collect and triage configured product signals"
+  default_prompt: "Use $factory-collect for this task and return a verified result."

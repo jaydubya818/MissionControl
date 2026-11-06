@@ -107,6 +107,23 @@ body`;
     expect(fm.compatibility).toBeUndefined();
   });
 
+  it.each([true, false])("preserves disable-model-invocation: %s independently of user-invocable", (disabled) => {
+    const markdown = `---\nname: explicit-skill\ndescription: Run bounded orchestration when explicitly requested.\ndisable-model-invocation: ${disabled}\nuser-invocable: false\n---\n`;
+    const frontmatter = parseSkillFrontmatter(markdown);
+    expect(frontmatter.disableModelInvocation).toBe(disabled);
+    expect(frontmatter.userInvocable).toBe(false);
+    expect(parseSkillFrontmatter(serializeSkillFrontmatter(frontmatter))).toEqual(frontmatter);
+  });
+
+  it.each(["yes", "TRUE", "", "\n  - true", "\n  nested: true"])("rejects invalid invocation control: %j", (value) => {
+    const markdown = `---\nname: explicit-skill\ndescription: Run bounded orchestration when explicitly requested.\ndisable-model-invocation: ${value}\n---\n`;
+    expect(() => parseSkillFrontmatter(markdown)).toThrow(SkillFrontmatterError);
+  });
+
+  it("leaves absent invocation control unspecified", () => {
+    expect(parseSkillFrontmatter("---\nname: demo\ndescription: Review repository changes.\n---\n").disableModelInvocation).toBeUndefined();
+  });
+
   it("normalizes portable Agent Skills metadata", () => {
     const md = `---
 name: portable-skill

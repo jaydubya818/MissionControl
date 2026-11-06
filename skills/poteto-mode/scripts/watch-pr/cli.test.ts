@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { type CliRuntime, main, parseArgs } from "./cli.ts";
+import { WatchDeadline } from "./deadline.ts";
 import { fakeReader, passingCheck } from "./fakes.test-helper.ts";
 import { renderJson, renderPretty } from "./render.ts";
-import type { GitHubReader, WatcherVerdict } from "./types.ts";
+import type { GitHubReader, QueryFailure, WatcherVerdict } from "./types.ts";
 import { parsePrNumber } from "./types.ts";
 
 const silentIo = { stdout: () => {}, stderr: () => {} };
@@ -19,6 +20,7 @@ function testRuntime(reader: GitHubReader): {
     stderr,
     runtime: {
       reader,
+      deadline: new WatchDeadline(0, () => 0),
       clock: {
         now: () => 0,
         observedAt: () => "2026-07-26T00:00:00.000Z",
@@ -128,6 +130,7 @@ describe("rendering", () => {
           mergeStateStatus: "CLEAN",
           reviewDecision: "APPROVED",
           headRefOid: "head",
+          baseRefOid: "base",
           headRefName: "feature",
           baseRefName: "main",
           state: "MERGED",
@@ -151,6 +154,57 @@ describe("rendering", () => {
       "| [#1](https://github.com/owner/repo/pull/1) | \u2014 | \u2014 | ✅ merged |"
     );
   });
+
+  const envelope = {
+    schemaVersion: 1,
+    sequence: 1,
+    observedAt: "2026-07-26T00:00:00.000Z",
+    mode: "single",
+  } as const;
+
+  it("does not call a PR that changed mid-read a failed query", () => {
+    const retry = (failure: QueryFailure) =>
+      renderPretty({
+        ...envelope,
+        kind: "RETRY",
+        terminal: false,
+        failure,
+        consecutiveFailures: 1,
+        retryInSeconds: 60,
+      });
+    expect(
+      retry({ kind: "snapshot-changed", retryable: true, detail: "moved" })
+    ).toBe(
+      "RETRY: the PR changed while its status was being read; retrying in 60s\ndetail=moved\n"
+    );
+    expect(
+      retry({ kind: "command-exit", retryable: true, detail: "502", code: 1 })
+    ).toBe("RETRY: GitHub status query failed; retrying in 60s\ndetail=502\n");
+  });
+
+  it("tells a caller whose command could not run to install it, not to check authentication", () => {
+    const action = (failure: QueryFailure) =>
+      renderPretty({
+        ...envelope,
+        kind: "BLOCKER",
+        terminal: true,
+        exitCode: 7,
+        blocker: { kind: "status-query", failures: 1, failure },
+      })
+        .trimEnd()
+        .split("\n")
+        .at(-1);
+    expect(
+      action({ kind: "spawn-failed", retryable: false, detail: "no gh" })
+    ).toBe(
+      "action=install the command that could not run, or put it on PATH, then rearm"
+    );
+    expect(
+      action({ kind: "command-exit", retryable: true, detail: "401", code: 1 })
+    ).toBe(
+      "action=verify current PR context, GitHub authentication, and API availability, then rearm"
+    );
+  });
 });
 
 describe("main", () => {
@@ -161,6 +215,18 @@ describe("main", () => {
     expect(harness.stderr.join("")).toContain(
       "option '--interval <seconds>' argument '0' is invalid"
     );
+  });
+
+  it("rejects an interval longer than one timer can sleep, and accepts the longest one", async () => {
+    const harness = testRuntime(fakeReader());
+    expect(await main(["--interval", "2147484"], harness.runtime)).toBe(64);
+    expect(harness.stdout).toEqual([]);
+    expect(harness.stderr.join("")).toContain(
+      "option '--interval <seconds>' argument '2147484' is invalid. must be at most 2147483.647"
+    );
+    expect(
+      parseArgs(["--interval", "2147483.647"], silentIo).polling.interval
+    ).toBe(2147483.647);
   });
 
   it("bypasses the queue machine for queued-stack status-only", async () => {
@@ -214,11 +280,104 @@ describe("main", () => {
     });
   });
 
+  it("names the absence of checks in the status table and the READY verdict", async () => {
+    const argv = [
+      "--owner",
+      "owner",
+      "--repo",
+      "repo",
+      "--pr",
+      "1",
+      "--pretty",
+    ];
+    const noChecks = () =>
+      testRuntime(
+        fakeReader({
+          facts: { reviewDecision: null },
+          fastPath: { kind: "none-reported" },
+          rollupPages: [{ kind: "no-rollup" }],
+          commitRollups: [{ oid: "head", state: null }],
+        })
+      );
+    const status = noChecks();
+    expect(await main([...argv, "--status-only"], status.runtime)).toBe(0);
+    expect(status.stdout.join("")).toContain(
+      "| [#1](https://github.com/owner/repo/pull/1) | ⏳ no checks reported yet | ✅ | ✅ |"
+    );
+    const ready = noChecks();
+    let now = 0;
+    const runtime = {
+      ...ready.runtime,
+      clock: {
+        ...ready.runtime.clock,
+        now: () => now,
+        async sleep(seconds: number) {
+          now += seconds;
+          if (now > 3600) throw new Error("no verdict within an hour");
+        },
+      },
+    };
+    expect(await main(argv, runtime)).toBe(0);
+    expect(ready.stdout).toEqual([
+      "WAITING: frontier=#1; no checks have reported on the head commit yet\n",
+      "READY: no merge conflicts, no unresolved review threads, no failing or pending checks\nmergeStateStatus=CLEAN\nreviewDecision=null\nisDraft=false\nchecks=none reported on the head commit\n",
+    ]);
+  });
+
+  it("says that mergeability is unknown in the status table, the WAITING line, and the TIMEOUT line", async () => {
+    const argv = [
+      "--owner",
+      "owner",
+      "--repo",
+      "repo",
+      "--pr",
+      "1",
+      "--pretty",
+    ];
+    const unknown = () =>
+      testRuntime(
+        fakeReader({
+          facts: { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" },
+        })
+      );
+    const status = unknown();
+    expect(await main([...argv, "--status-only"], status.runtime)).toBe(0);
+    expect(status.stdout.join("")).toContain(
+      "| [#1](https://github.com/owner/repo/pull/1) | ✅ | ✅ | ⏳ mergeability unknown |"
+    );
+    const waiting = unknown();
+    let now = 0;
+    const runtime = {
+      ...waiting.runtime,
+      deadline: new WatchDeadline(90, () => now),
+      clock: {
+        ...waiting.runtime.clock,
+        now: () => now,
+        async sleep(seconds: number) {
+          now += seconds;
+        },
+      },
+    };
+    expect(await main(argv, runtime)).toBe(5);
+    expect(waiting.stdout).toEqual([
+      "WAITING: frontier=#1; GitHub has not computed mergeability yet\n",
+      "WAITING: frontier=#1; GitHub has not computed mergeability yet\n",
+      "TIMEOUT: GitHub has not computed mergeability yet\n",
+    ]);
+  });
+
   it("shows help without touching the reader", async () => {
     const reader = fakeReader();
     const harness = testRuntime(reader);
     expect(await main(["--help"], harness.runtime)).toBe(0);
-    expect(harness.stdout.join("")).toContain("JSON (NDJSON while polling)");
+    const help = harness.stdout.join("").replace(/\s+/g, " ");
+    expect(help).toContain("JSON (NDJSON while polling)");
+    expect(help).toContain(
+      "print one status table and exit; exit 0 means the table was read, not that the PR is ready"
+    );
+    expect(help).toContain(
+      "poll interval; a PR with no checks takes 60 seconds to confirm whatever this is"
+    );
     expect(reader.calls).toEqual([]);
   });
 });

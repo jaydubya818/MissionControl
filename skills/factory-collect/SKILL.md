@@ -1,11 +1,16 @@
 ---
 name: factory-collect
+description: "Triage configured product signals under separate fix, reply, and close policies."
+license: MIT
+compatibility: "Works in Claude Code, Codex, Cursor, and Agent Skills-compatible harnesses when the required host tools are available."
 metadata:
+  author: Builder.io
+  source: BuilderIO/skills
+  source-commit: f4f10b8d513476c24bd995ceac5294bcdd6ee15c
+  owner: software-factory
+  risk: medium
+  capabilities: builderio,factory-signal-intake
   installer-group: factory
-description: >-
-  Experimental workflow for collecting and triaging product feedback,
-  product telemetry, runtime errors, and issue reports. Use when scanning
-  configured signal sources and applying separate fix, reply, or close rules.
 ---
 
 # Factory Collect

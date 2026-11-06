@@ -1,0 +1,4 @@
+interface:
+  display_name: "Poteto Help"
+  short_description: "Explain the available Jstack workflows"
+  default_prompt: "Use $poteto-help to handle this task with the Jstack workflow and return a verified result."

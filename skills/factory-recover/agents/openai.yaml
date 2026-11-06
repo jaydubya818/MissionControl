@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory Recover"
+  short_description: "Resume eligible interrupted coding runs"
+  default_prompt: "Use $factory-recover for this task and return a verified result."

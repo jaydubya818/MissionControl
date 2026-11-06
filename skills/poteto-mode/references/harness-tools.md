@@ -11,7 +11,7 @@ or companion agent that the active runtime does not expose.
   requirements.
 - Map an action to a native capability. Never pretend that an unavailable tool
   ran.
-- Run independent steps sequentially when the runtime cannot delegate work.
+- Run independent steps sequentially when delegation is unavailable or not authorized.
 - Keep each writing worker on a separate branch or worktree when parallel work
   is available.
 - Use the active runtime's model identifiers. A Claude model slug is a role
@@ -23,7 +23,8 @@ or companion agent that the active runtime does not expose.
 
 Claude Code runs the skills as written. Plugin installs namespace the companion
 agents as `software-factory-skills:poteto-agent` and
-`software-factory-skills:comment-sicko`. Direct installs place the same agents
+`software-factory-skills:comment-sicko`, plus the two `thermo-nuclear-*-subagent`
+reviewers. Direct installs place the same agents
 under `.claude/agents/` and use the bare names.
 
 ## Codex
@@ -48,10 +49,10 @@ worker to read `poteto-mode` in full before starting. For `no-comments`,
 instruct the worker to read `references/agents/comment-sicko.md` first. If the
 session does not expose workers, perform the same review passes sequentially.
 
-Substitute models by role. Use the primary Codex model for ordinary work and
-the strongest available model for difficult judgment. If a review calls for a
-diverse panel, use distinct available models. If only one model is available,
-vary reasoning effort and state that the panel had less diversity.
+Use the session's model and reasoning settings unless the user or applicable
+repository instructions authorize an override. Upstream Claude role defaults
+do not themselves authorize changing a Codex model. If a review cannot use a
+diverse panel, report that limitation.
 
 Codex stores user skills in `~/.agents/skills/` and project skills in
 `.agents/skills/`. Each Jstack skill includes `agents/openai.yaml` for Codex
@@ -126,6 +127,12 @@ verification, invent worker results, or claim that an unsupported action ran.
 - `create-verification-skill` and `maintain-verification-skill` use
   `.claude/skills/` for a Claude-only project and `.agents/skills/` for a
   shared project definition.
+- The formal verification create and maintenance skills use the same roots.
+  A passing bounded model is not proof of the entire application. Keep tool
+  versions, assumptions, code mappings, and a demonstrated failing control.
+- `thermos` reads both reviewer definitions in `references/agents/` and
+  combines their findings. Use native workers only when authorized; otherwise
+  perform the passes sequentially without claiming independence.
 - `babysit` needs a real recurring mechanism. If the runtime cannot schedule a
   recheck, return the last observed state and a command the user can rerun.
 - `recall`, `reflect`, `show-me-your-work`, and transcript-based playbooks must
@@ -134,8 +141,10 @@ verification, invent worker results, or claim that an unsupported action ran.
 
 ## Vendored scripts
 
-`skills/poteto-mode/scripts/` contains plain Bun and shell programs. Run them
-through the active runtime's command tool. They may require `bun`, `gh`, `gt`,
-`jq`, or `rg`. `worktree-audit.sh` expects a transcript directory. Point it at
-the active runtime's workspace-scoped history instead of assuming that
-`~/.claude/projects/` exists.
+`skills/poteto-mode/scripts/` contains Bun, Node.js, and shell programs. The
+orchestration and PR-watching tools require Bun and their pinned dependencies.
+Review that tool's bootstrap before invoking it; installing dependencies needs
+the session's normal authorization. Other helpers may need `gh`, `jq`, or `rg`.
+`worktree-audit.mjs` reads Claude transcripts by default. Use the active
+runtime's workspace-scoped history and do not scan unrelated chats. No hooks,
+Pi extensions, or automatic routing are installed by this collection.

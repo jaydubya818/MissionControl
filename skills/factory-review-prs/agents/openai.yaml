@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory Review Prs"
+  short_description: "Review configured pull-request queues"
+  default_prompt: "Use $factory-review-prs for this task and return a verified result."
