@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync, createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { LOCAL_ISSUER, newSecret, MC_URL, MC_DIR, CONFIG, OWNER_ID, PLANNER_SUBJECT, MC_ISSUER_LABEL, MYEVE_AUDIENCE_LABEL, readSecret, ensureSecret, writeSecret, mintToken } from './common.mjs';
+import { LOCAL_ISSUER, newSecret, MC_URL, MC_DIR, CONFIG, KEYS, OWNER_ID, PLANNER_SUBJECT, MC_ISSUER_LABEL, MYEVE_AUDIENCE_LABEL, readSecret, ensureSecret, writeSecret, mintToken } from './common.mjs';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname), cli = join(ROOT, 'node_modules/convex/bin/main.js');
 const admin = readSecret('mc-admin-key');
@@ -51,8 +51,10 @@ ensureSecret('mc-receiver.private.json', () => JSON.stringify(generateKeyPairSyn
 const receiverJwk = JSON.parse(readSecret('mc-receiver.private.json'));
 const connectionSecret = ensureSecret('mc-sofie-connection-secret', newSecret);
 const pub = n => JSON.parse(readFileSync(join(CONFIG, n), 'utf8'));
+// The receiver binding names the disposable Relay seed's Agent (MyEve's primary Agent is bound to the same id in operator setup).
+const relayAgentId = () => { const id = JSON.parse(readFileSync(join(KEYS, 'relay-local-state.json'), 'utf8')).agentId; if (!/^agt_[a-f0-9]{32}$/.test(id)) throw Error('RELAY_AGENT_ID'); return id; };
 const binding = { tenantId, projectId, ownerMemberId, ownerId: OWNER_ID, organizationId: 'org-owner-local', installationId: 'install-owner-local',
-  backendId: 'missioncontrol-owner-local', incarnation: 'mc-owner-local-20261104', enrollmentVersion: 1, agentId: 'agt_eacef4755e89426b8396702e8ba8d8f2',
+  backendId: 'missioncontrol-owner-local', incarnation: 'mc-owner-local-20261104', enrollmentVersion: 1, agentId: relayAgentId(),
   registryVersion: '1', sourceKeys: { myeve: pub('myeve-source.public.json'), relay: pub('relay-permit.public.json') },
   acknowledgmentKey: { keyId: 'mc-receiver-owner-local-20261104', jwk: receiverJwk } };
 envSet('MC_SOFIE_INSTALLED_ORIGINS', JSON.stringify({ environment: 'APPROVED_NONPRODUCTION', issuer: MC_ISSUER_LABEL, audience: MYEVE_AUDIENCE_LABEL }));
