@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory Human Digest"
+  short_description: "Build a read-only human decision queue"
+  default_prompt: "Use $factory-human-digest for this task and return a verified result."

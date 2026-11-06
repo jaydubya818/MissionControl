@@ -1,0 +1,4 @@
+interface:
+  display_name: "WebMCP"
+  short_description: "Use a web app through its page tools"
+  default_prompt: "Use $webmcp for this task and return a verified result."

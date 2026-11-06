@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sharpen"
+  short_description: "Clarify a task's goal and approach"
+  default_prompt: "Use $sharpen to handle this task with the Jstack workflow and return a verified result."

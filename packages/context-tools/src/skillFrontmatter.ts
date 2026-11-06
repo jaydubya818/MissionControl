@@ -48,6 +48,7 @@ export interface SkillFrontmatter {
   readonly license?: string;
   readonly allowedTools?: string;
   readonly userInvocable?: boolean;
+  readonly disableModelInvocation?: boolean;
   readonly metadata?: Readonly<Record<string, string>>;
 }
 
@@ -64,6 +65,7 @@ const OPTIONAL_SKILL_FIELDS = [
   "license",
   "allowed-tools",
   "user-invocable",
+  "disable-model-invocation",
   "metadata",
 ] as const;
 
@@ -438,6 +440,7 @@ export function validateRawFrontmatter(raw: RawFrontmatter): {
     license?: string;
     allowedTools?: string;
     userInvocable?: boolean;
+    disableModelInvocation?: boolean;
     metadata?: Readonly<Record<string, string>>;
   } = {};
 
@@ -572,20 +575,24 @@ export function validateRawFrontmatter(raw: RawFrontmatter): {
     }
   }
 
-  const userInvocable = raw.entries["user-invocable"];
-  if (userInvocable !== undefined) {
-    const scalar = expectScalar(userInvocable, "user-invocable");
+  for (const [field, resultField] of [
+    ["user-invocable", "userInvocable"],
+    ["disable-model-invocation", "disableModelInvocation"],
+  ] as const) {
+    const entry = raw.entries[field];
+    if (entry === undefined) continue;
+    const scalar = expectScalar(entry, field);
     if (typeof scalar !== "string") {
       issues.push(scalar);
     } else if (scalar !== "true" && scalar !== "false") {
       issues.push({
-        field: "user-invocable",
+        field,
         kind: "invalid",
-        message: `"user-invocable" must be "true" or "false", got "${scalar}"`,
-        line: userInvocable.line,
+        message: `"${field}" must be "true" or "false", got "${scalar}"`,
+        line: entry.line,
       });
     } else {
-      result.userInvocable = scalar === "true";
+      result[resultField] = scalar === "true";
     }
   }
 
@@ -681,6 +688,9 @@ export function serializeSkillFrontmatter(fm: SkillFrontmatter): string {
   }
   if (fm.userInvocable !== undefined) {
     lines.push(`user-invocable: ${fm.userInvocable}`);
+  }
+  if (fm.disableModelInvocation !== undefined) {
+    lines.push(`disable-model-invocation: ${fm.disableModelInvocation}`);
   }
   lines.push("---");
   const block = lines.join("\n") + "\n";

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stay Within Limits"
+  short_description: "Throttle long work around usage limits"
+  default_prompt: "Use $stay-within-limits for this task and return a verified result."

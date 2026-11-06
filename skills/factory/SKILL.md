@@ -1,16 +1,21 @@
 ---
 name: factory
+description: "Configure governed delivery sources, schedules, isolation, and action gates."
+license: MIT
+compatibility: "Works in Agent Skills runtimes with the configured integrations and scheduler capabilities used by the selected workflow."
 metadata:
+  author: Builder.io
+  source: BuilderIO/skills
+  source-commit: f4f10b8d513476c24bd995ceac5294bcdd6ee15c
+  owner: software-factory
+  risk: medium
+  capabilities: builderio,factory-configuration
   installer-group: factory
-description: >-
-  Experimental workflow for configuring an autonomous software delivery
-  factory. Use when choosing feedback sources, schedules, worktree behavior,
-  autonomy gates, or host automations.
 ---
 
 # Factory
 
-> Start with the [Factory guide](../../docs/factory/README.md) for workflow
+> Start with the [Factory guide](../factory/references/factory-guide.md) for workflow
 > setup and configuration.
 
 Read `.agent-factory/config.yaml` and apply the optional
@@ -21,7 +26,7 @@ does not assume a provider, repository, schedule, or autonomy level.
 
 ## Set up
 
-Use the [Factory configuration reference](https://github.com/BuilderIO/skills/blob/main/docs/factory/configuration.md) for field meanings, examples, and host limitations.
+Use the [Factory configuration reference](../factory/references/factory-configuration.md) for field meanings, examples, and host limitations.
 
 1. Read `.agent-factory/config.yaml` if it exists. Preserve explicit choices.
 2. Show the read-capable integrations this host exposes. There is no built-in

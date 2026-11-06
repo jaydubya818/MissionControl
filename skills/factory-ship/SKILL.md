@@ -1,20 +1,26 @@
 ---
 name: factory-ship
+description: "Ship authorized work under separate publish, merge, deploy, and notification gates."
+license: MIT
+compatibility: "Works in Claude Code, Codex, Cursor, and Agent Skills-compatible harnesses when the required host tools are available."
 metadata:
+  author: Builder.io
+  source: BuilderIO/skills
+  source-commit: f4f10b8d513476c24bd995ceac5294bcdd6ee15c
+  owner: software-factory
+  risk: high
+  capabilities: builderio,factory-delivery
   installer-group: factory
-description: >-
-  Experimental workflow for publishing and completing configured software
-  delivery work. Use when the user or an enabled factory policy asks to ship.
 ---
 
 # Factory Ship
 
-> Start with the [Factory guide](../../docs/factory/README.md) for workflow
+> Start with the [Factory guide](../factory/references/factory-guide.md) for workflow
 > setup and configuration.
 
 Read `.agent-factory/config.yaml`, the optional
 `skill_prompts.factory-ship` entry, and the repository's instructions before
-publishing. See the [Factory configuration reference](https://github.com/BuilderIO/skills/blob/main/docs/factory/configuration.md). The prompt adds project guidance; editing code does not by itself authorize a PR update, approval, merge, or deployment.
+publishing. See the [Factory configuration reference](../factory/references/factory-configuration.md). The prompt adds project guidance; editing code does not by itself authorize a PR update, approval, merge, or deployment.
 
 ## Delivery steps
 

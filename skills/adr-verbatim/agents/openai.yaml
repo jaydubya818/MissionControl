@@ -1,0 +1,4 @@
+interface:
+  display_name: "Record a decision"
+  short_description: "Record approved architecture decisions"
+  default_prompt: "Use $adr-verbatim to record this approved decision in the project's ADR format."

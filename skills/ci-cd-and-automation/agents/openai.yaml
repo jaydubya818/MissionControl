@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ci Cd And Automation"
+  short_description: "Build verified CI and delivery pipelines"
+  default_prompt: "Use $ci-cd-and-automation for this task and report the evidence and remaining limits."

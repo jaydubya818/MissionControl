@@ -63,6 +63,10 @@ const DESCRIPTION_MAX_CHARS = 500;
 const BODY_MAX_LINES = 500;
 
 const ACTIVATION_RE = /\b(use (this skill )?when|use (this skill )?before|use for|invoke when|apply when|trigger|activates? when)\b/i;
+const TASK_DESCRIPTION_RE = /^(?:add|audit|build|capture|check|compare|configure|create|design|edit|investigate|isolate|monitor|prepare|preserve|proceed|read|record|resume|retire|retrieve|review|separate|ship|triage|validate|write),?\s+\S/i;
+const READ_ONLY_DESCRIPTION_RE = /^read-only summary (?:of|for)\s+\S/i;
+const USE_DESCRIPTION_RE = /^use (?:\/[a-z][a-z0-9-]*|an?|the)\s+\S/i;
+const ROUTING_PATTERNS = [ACTIVATION_RE, TASK_DESCRIPTION_RE, READ_ONLY_DESCRIPTION_RE, USE_DESCRIPTION_RE];
 
 const DANGEROUS_RE = /rm -rf|curl[^|]*\|\s*(ba)?sh|sudo\s|chmod 777/;
 
@@ -147,12 +151,12 @@ function lintFrontmatter(raw: RawFrontmatter, opts: SkillLintOptions, findings: 
   const description = raw.entries.description;
   if (description !== undefined && typeof description.value === "string" && description.value.trim() !== "") {
     const text = description.value;
-    if (!ACTIVATION_RE.test(text)) {
+    if (!ROUTING_PATTERNS.some((pattern) => pattern.test(text.trim()))) {
       findings.push({
         rule: "activation-language-missing",
         severity: "error",
         message:
-          'description must state when to activate the skill (e.g. "Use this skill when ...", "Apply when ...")',
+          'description must state an activation condition, a task (e.g. "Review API contracts"), or a slash command',
         line: description.line,
       });
     }

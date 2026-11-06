@@ -1,6 +1,15 @@
 ---
 name: agent-watchdog
-description: Use when asked to watch, babysit, audit, review, compare, or fix another agent's work from a Codex session ID, Claude Code session/transcript, chat/thread link, PR, branch, log, or pasted run summary. Monitor until the other agent is done or blocked, reconstruct what the user asked, independently investigate the same problem to form your own hypotheses and approach, inspect what the agent actually changed and verified, compare the two investigations, report gaps and add-on directions, and optionally make scoped fixes when the user authorizes repair.
+description: "Audit, monitor, compare, or repair another agent's session or PR when asked."
+license: MIT
+compatibility: "Works in Claude Code, Codex, Cursor, and Agent Skills-compatible harnesses when the required host tools are available."
+metadata:
+  author: Builder.io
+  source: BuilderIO/skills
+  source-commit: f4f10b8d513476c24bd995ceac5294bcdd6ee15c
+  owner: software-factory
+  risk: medium
+  capabilities: builderio,agent-review
 ---
 
 # Agent Watchdog

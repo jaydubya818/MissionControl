@@ -1,8 +1,9 @@
 ---
 name: new-feature
-description: Create or use a task-owned Git worktree for repository edits. Use for features, fixes, or documentation changes; skip read-only work.
+description: Isolate repository edits in a task-owned Git worktree. Skip read-only work.
 compatibility: Requires Git. Pull-request overlap checks also require authenticated repository-host tooling such as gh or glab.
 metadata:
+  source-commit: 69558ea1f5328da7b40ba171dfe2171f00ff4884
   author: michaelshimeles
   version: "2.0.0"
   owner: software-factory

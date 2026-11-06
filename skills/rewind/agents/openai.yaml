@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rewind"
+  short_description: "Retrieve bounded local Rewind context"
+  default_prompt: "Use $rewind for this task and return a verified result."

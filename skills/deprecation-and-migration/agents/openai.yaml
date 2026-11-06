@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deprecation And Migration"
+  short_description: "Migrate consumers and data safely"
+  default_prompt: "Use $deprecation-and-migration for this task and report the evidence and remaining limits."

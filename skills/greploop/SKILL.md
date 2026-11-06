@@ -4,6 +4,7 @@ description: Run bounded Greptile review-and-fix cycles on a PR, MR, or shelved 
 license: MIT
 compatibility: GitHub automation requires Python 3.10+ and authenticated gh. GitLab requires glab; Perforce requires p4 and the site's review integration. Greptile must be installed.
 metadata:
+  source-commit: 941290ad67b4de2a143dfc80e15b2773ed4855d0
   author: greptileai
   version: "2.1.0"
   owner: software-factory

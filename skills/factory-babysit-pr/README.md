@@ -9,7 +9,7 @@ delivery work that needs a verified reminder.
 
 Configure the exact host, repository, PR, authorization, cadence, worktree, and
 action policies with `/factory` in `.agent-factory/config.yaml`. See the
-[Factory configuration reference](../../docs/factory/configuration.md#workflowspr-babysitting).
+[Factory configuration reference](../factory/references/factory-configuration.md#workflowspr-babysitting).
 
 ## Install
 

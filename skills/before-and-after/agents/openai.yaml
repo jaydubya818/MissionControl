@@ -1,4 +1,4 @@
 interface:
   display_name: "Before and After"
-  short_description: "Capture PR-ready visual comparisons"
-  default_prompt: "Use $before-and-after to capture a matched before-and-after comparison for this UI change."
+  short_description: "Attach visual evidence to a GitHub PR"
+  default_prompt: "Use $before-and-after to format and attach existing visual evidence to this GitHub PR."
