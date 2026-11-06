@@ -88,7 +88,8 @@ export async function applyPlanConfirmation(ctx: MutationCtx, input: { confirmat
   const approved = await h.approvePlan(owner, { projectId, missionId, planId, idempotencyKey: `${tag}:approve`,
     decisionReason: `${CONFIRMED_BY_SOFIE}: confirmation ${digest}; Sofie plan ${binding.planSha256}; verified MissionControl Plan ${verifiedPlanDigest}` });
   const approvedPlan: any = await ctx.db.get(planId);
-  if (verifyConfirmedPlan(approvedPlan, binding.plan, { ...at, status: 'APPROVED' }) !== verifiedPlanDigest || approvedPlan.approvedBy !== connection.ownerId
+  // approvePlan records the authenticated actor (the identity subject), so the approval must name exactly the confirmed person.
+  if (verifyConfirmedPlan(approvedPlan, binding.plan, { ...at, status: 'APPROVED' }) !== verifiedPlanDigest || approvedPlan.approvedBy !== binding.subject
     || approved?.workOrders?.length !== binding.works.length) return refuse('PLAN_APPROVAL_MISMATCH');
   const workOrders = binding.works.map((work, index) => {
     const blueprintId = binding.plan.workOrderBlueprints[index]?.id;

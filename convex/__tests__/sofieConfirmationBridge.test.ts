@@ -103,7 +103,8 @@ function handlers(d: ReturnType<typeof database>, opts: { tamperPlan?: (plan: an
       const id = await ctx.db.insert('missionPlans', plan); return { plan: await ctx.db.get(id) }; },
     submitPlan: async (ctx, args) => { await who('submitPlan', ctx, args); await ctx.db.patch(args.planId, { status: 'PROPOSED' }); return {}; },
     approvePlan: async (ctx, args) => { await who('approvePlan', ctx, args); const plan = await ctx.db.get(args.planId);
-      await ctx.db.patch(args.planId, { status: 'APPROVED', approvedBy: 'op-' + (await ctx.auth.getUserIdentity()).subject.slice(5), decisionReason: args.decisionReason });
+      // Like missions:approvePlan: approvedBy is the authenticated actor id (the identity subject), as observed on the live backend.
+      await ctx.db.patch(args.planId, { status: 'APPROVED', approvedBy: (await ctx.auth.getUserIdentity()).subject, decisionReason: args.decisionReason });
       const workOrders = []; for (const bp of plan.workOrderBlueprints) { const id = await ctx.db.insert('workOrders', { metadata: { missionBlueprintId: bp.id }, currentRevisionId: `rev-${bp.id}` });
         workOrders.push(await ctx.db.get(id)); } return { workOrders }; },
     approvePrepared: async (ctx, args) => { await who('approvePrepared', ctx, args); const permitId = await ctx.db.insert('enterpriseExecutionPermits', { requestId: args.requestId });
