@@ -206,8 +206,9 @@ export async function approvePermitsStep(body, deps = {}) {
   // One request per call: a batch can never be half-approved.
   if (!Array.isArray(body.requestIds) || body.requestIds.length !== 1 || typeof body.requestIds[0] !== 'string') throw Error('PERMIT_REQUEST_EXACTLY_ONE');
   const [requestId] = body.requestIds;
-  const pending = await owner.query(ref('sofieExecutionPermitState:pending'), { projectId: s.projectId, connectionId: a.connectionId });
-  const r = pending?.requests?.find(x => x.requestId === requestId), w = r && binding.works.find(x => x.id === r.work?.id);
+  // Exact lookup of the named request (never a scan of the capped pending list, which other prepared requests could flood).
+  const found = await owner.query(ref('sofieExecutionPermitState:pendingRequest'), { projectId: s.projectId, connectionId: a.connectionId, requestId });
+  const r = found?.request?.requestId === requestId ? found.request : null, w = r && binding.works.find(x => x.id === r.work?.id);
   const stageWorkOrder = w && a.workOrders.find(x => x.stage === w.stage);
   if (!r || !w || r.work.version !== w.version || r.work.generation !== w.generation || !SHA.test(r.work.tupleSha256 ?? '') || r.work.tupleSha256 !== tuples.get(w.id)
     || r.planDigest !== a.planDigest || r.workOrderId !== stageWorkOrder?.workOrderId

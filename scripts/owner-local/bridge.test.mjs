@@ -41,7 +41,7 @@ function stepADone(c) {
 }
 function owner(requests) {
   const calls = [];
-  return { calls, query: async () => ({ requests }), mutation: async (_ref, args) => { calls.push(args); await new Promise(r => setTimeout(r, 20));
+  return { calls, query: async (_ref, args) => { if (requests.length > 100) throw Error('capped scan used'); return { request: requests.find(r => r.requestId === args.requestId) ?? null }; }, mutation: async (_ref, args) => { calls.push(args); await new Promise(r => setTimeout(r, 20));
     return { document: { permitId: 'permit-' + args.requestId, approvalId: 'approval-' + args.requestId } }; } };
 }
 const request = (c, stage, over = {}) => ({ requestId: `r${stage}-${c.digest.slice(0, 6)}`, workOrderId: `wo${stage}`, planDigest: 'pd',
@@ -166,4 +166,14 @@ test('a fourth blueprint, a changed blueprint or changed assertions added by the
 test('an approval whose approved Plan differs from the verified digest is refused before any permit step', async () => {
   const mc = fakeMissionControl(p => p, p => ({ ...p, summary: 'other' }));
   await assert.rejects(confirmStep(confirmation({ enrollmentPins: PINS }), mc.deps), /PLAN_APPROVED_MISMATCH/);
+});
+
+test('step B finds the confirmed request by exact id even when other prepared requests flood the pending list', async () => {
+  const c = confirmation(); stepADone(c);
+  const good = request(c, 1), flood = Array.from({ length: 150 }, (_, i) => request(c, 1, { requestId: `flood-${i}`, work: { ...good.work, tupleSha256: 'e'.repeat(64) } }));
+  const o = owner([...flood, good]);
+  o.query = async (_ref, args) => ({ request: [...flood, good].find(r => r.requestId === args.requestId) ?? null });
+  const out = await approvePermitsStep({ ...c, tuples: tuples(c), requestIds: [good.requestId] }, { setup: SETUP, owner: o });
+  assert.equal(out.permits[0].workId, good.work.id);
+  assert.deepEqual(o.calls, [{ projectId: 'p', requestId: good.requestId }]);
 });
