@@ -25,7 +25,7 @@ test("navigate to Tasks and back to Home", async ({ page }) => {
   await expectShellLoaded(page);
 
   await page.goto("/v2/tasks");
-  await expect(page.getByRole("heading", { name: "Tasks" })).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole("heading", { name: "Tasks", exact: true })).toBeVisible({ timeout: 8000 });
 
   await page.goto("/v2/home");
   await expect(page.getByRole("heading", { name: "Command Center" })).toBeVisible({ timeout: 8000 });

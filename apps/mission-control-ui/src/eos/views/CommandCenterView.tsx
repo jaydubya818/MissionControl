@@ -523,7 +523,7 @@ function StartHerePanel({
             <ArrowRight size={14} strokeWidth={1.75} aria-hidden />
           </button>
         </div>
-        <dl className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {stats.map(([label, value, view]) => (
             <button
               key={label}
@@ -531,11 +531,11 @@ function StartHerePanel({
               onClick={() => onNavigate(view)}
               className="rounded-lg border border-line px-4 py-3 text-left transition-colors duration-150 hover:border-line-strong"
             >
-              <dd className="text-[24px] font-semibold tabular-nums text-ink">{value}</dd>
-              <dt className="text-[12px] text-ink-secondary">{label}</dt>
+              <span className="block text-[24px] font-semibold tabular-nums text-ink">{value}</span>
+              <span className="block text-[12px] text-ink-secondary">{label}</span>
             </button>
           ))}
-        </dl>
+        </div>
       </div>
       <ol className="grid grid-cols-1 gap-2 sm:grid-cols-4" aria-label="How work flows through the factory">
         {FLOW_STEPS.map((step, index) => (
