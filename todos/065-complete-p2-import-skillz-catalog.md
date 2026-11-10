@@ -76,7 +76,7 @@ No database changes are required.
 
 ## Resources
 
-- [Implementation plan](../../docs/plans/2026-09-12-feat-import-skillz-catalog-plan.md)
+- [Implementation plan](../docs/plans/2026-09-12-feat-import-skillz-catalog-plan.md)
 - [Skillz repository](https://github.com/jaydubya818/skillz)
 
 ## Acceptance Criteria

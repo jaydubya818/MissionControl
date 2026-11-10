@@ -25,7 +25,7 @@ pnpm start
 
 ## Commands
 
-See [docs/TELEGRAM_COMMANDS.md](../../docs/TELEGRAM_COMMANDS.md) for full command reference.
+See [docs/TELEGRAM_COMMANDS.md](../../docs/guides/TELEGRAM_COMMANDS.md) for full command reference.
 
 ## Architecture
 

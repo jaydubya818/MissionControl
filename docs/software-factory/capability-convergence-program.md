@@ -45,7 +45,7 @@ Canonical sources: [convergence plan](../plans/2026-08-25-feat-software-factory-
 [inference plan](../plans/2026-09-05-feat-inference-gateway-outcome-economics-qualification-plan.md),
 [maturity ledger](../product/software-factory-capability-maturity.md), and todos
 [059](../../todos/059-in-progress-p1-real-product-repository-pilot.md),
-[060](../../todos/060-ready-p1-factory-incident-command.md),
+[060](../../todos/060-complete-p1-factory-incident-command.md),
 [062](../../todos/062-complete-p1-shared-builder-intent.md),
 [063](../../todos/063-in-progress-p1-outcome-economics-routing.md), and
 [064](../../todos/064-ready-p2-production-feedback-learning.md).
