@@ -5,6 +5,21 @@ import type { MutationCtx } from '../_generated/server';
 import { v } from 'convex/values';
 import { capabilityBindings, capabilityPolicyScope } from '../capabilityPolicy';
 import { admissionActionDigest, assertPolicyIdentity, verifyPolicyMessage, policyMessageHash, type SignedPolicyMessage } from './capabilityOrderingWire';
+import { confirmationInstallation } from './sofieConfirmation';
+
+/**
+ * Capability policy owner id for an installed owner enrollment. A hosted Sofie installation (an operator-enrolled confirmation
+ * installation whose owner subject and MissionControl owner equal the enrollment's) presents its capability identity as the hosted
+ * per-person scope `myeve.hosted:<installationId>:<ownerId>` (MyEve hostedOwnerScope), derived here only from the enrollment.
+ * Every other installation keeps the plain enrollment owner id. MC enrollments, permits and receipts stay keyed on the owner id.
+ */
+export function capabilityPolicyOwnerId(enrollment: { installationId: string; ownerId: string; ownerSubject: string; missionControlOwnerId: string },
+  raw: string | undefined = process.env.MC_SOFIE_CONFIRMATION_INSTALLATIONS): string {
+  let installation;
+  try { installation = confirmationInstallation(enrollment.installationId, raw); } catch { return enrollment.ownerId; }
+  if (installation.ownerSubject !== enrollment.ownerSubject || installation.missionControlOwnerId !== enrollment.missionControlOwnerId) return enrollment.ownerId;
+  return `myeve.hosted:${enrollment.installationId}:${enrollment.ownerId}`;
+}
 
 type AdmissionRecord = Pick<Doc<'missions'>, 'tenantId' | 'projectId' | 'ownerMemberId'> & { _id?: string; updatedAt?: number };
 const envelope = v.object({ message: v.string(), keyId: v.string(), signature: v.string() });

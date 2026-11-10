@@ -4,7 +4,7 @@ import { capabilityBindings, capabilityPolicyScope } from './capabilityPolicy';
 import { admissionActionDigest, type AdmissionChallenge as PolicyAdmissionChallenge } from './lib/capabilityOrderingWire';
 import { requireCapabilityReceiverRecovery } from './lib/capabilityReceiverRecovery';
 import { sha256Hex } from '../packages/shared/src/canonicalDigest';
-import { requireCapabilityAdmission } from './lib/capabilityAdmission';
+import { capabilityPolicyOwnerId, requireCapabilityAdmission } from './lib/capabilityAdmission';
 import { v } from 'convex/values';
 import { mutation, query } from './lib/missionScopedFunctions';
 import { internalMutation } from './_generated/server';
@@ -91,7 +91,7 @@ export const authorizeAdmission = internalMutation({args:{envelope:commandEnvelo
     workId:live.document.work.id,missionId:live.mission._id,generation:live.document.work.generation,capabilityId:'enterprise.fleet',
     args:{operation:'enterprise.authorizeAdmission',permitId:live.row._id,challenge:request.challenge,commandId:args.envelope.commandId},
     nativeSnapshot:{permitSha256:live.row.permitSha256},permits:request.capabilityPermits,
-  },{authenticatedOwnerId:live.owner._id,policyOwnerId:live.enrollment.ownerId,installationId:live.enrollment.installationId,replay:!!prior});
+  },{authenticatedOwnerId:live.owner._id,policyOwnerId:capabilityPolicyOwnerId(live.enrollment),installationId:live.enrollment.installationId,replay:!!prior});
   if(!policy||policy.budgetMicros<live.document.admission.maxCostMicrousd) return permitDenied();
   proposed.expiresAt=Math.min(proposed.expiresAt,policy.expiresAt);
   if(proposed.expiresAt<=Date.now())return permitDenied();
@@ -119,7 +119,7 @@ export const readApproved = internalMutation({args:{envelope:commandEnvelope,pay
   if(rows.length!==1) return permitDenied();
   const live=await currentPermit(ctx,rows[0]._id,false);
   const binding=capabilityBindings().find(b=>b.ownerMemberId===live.connection.ownerMemberId&&b.tenantId===live.connection.tenantId&&b.projectId===live.project._id
-    &&b.ownerId===live.enrollment.ownerId&&b.installationId===live.enrollment.installationId);
+    &&b.ownerId===capabilityPolicyOwnerId(live.enrollment)&&b.installationId===live.enrollment.installationId);
   if(!binding||binding.installationId!==process.env.MC_CAPABILITY_INSTALLATION_ID) return permitDenied();
   requireCapabilityReceiverRecovery(binding.incarnation);
   const enrollment=await ctx.db.query('capabilityEnrolledOwners').withIndex('by_owner',q=>q.eq('memberId',binding.ownerMemberId).eq('projectId',binding.projectId)).unique();
