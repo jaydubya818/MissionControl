@@ -560,11 +560,11 @@ pnpm dev
 ## Documentation Index
 
 1. [README.md](../README.md) - Project overview
-2. [GETTING_STARTED.md](../GETTING_STARTED.md) - Setup and development
-3. [RUNBOOK.md](RUNBOOK.md) - Operational procedures
-4. [MULTI_PROJECT_MODEL.md](MULTI_PROJECT_MODEL.md) - Multi-project architecture
-5. [TELEGRAM_COMMANDS.md](TELEGRAM_COMMANDS.md) - Telegram bot commands
-6. [EPIC_2_8_IMPLEMENTATION.md](EPIC_2_8_IMPLEMENTATION.md) - Implementation guide
+2. [GETTING_STARTED.md](../guides/GETTING_STARTED.md) - Setup and development
+3. [RUNBOOK.md](../runbook/RUNBOOK.md) - Operational procedures
+4. [MULTI_PROJECT_MODEL.md](../architecture/MULTI_PROJECT_MODEL.md) - Multi-project architecture
+5. [TELEGRAM_COMMANDS.md](../guides/TELEGRAM_COMMANDS.md) - Telegram bot commands
+6. [EPIC_2_8_IMPLEMENTATION.md](../planning/EPIC_2_8_IMPLEMENTATION.md) - Implementation guide
 7. [IMPLEMENTATION_COMPLETE.md](IMPLEMENTATION_COMPLETE.md) - This file
 
 ---

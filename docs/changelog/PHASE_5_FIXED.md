@@ -209,8 +209,8 @@ When Convex bundler is resolved:
 
 **Docs:**
 - [WHATS_NEW.md](WHATS_NEW.md) - Feature showcase
-- [PHASE_5_COMPLETE.md](docs/PHASE_5_COMPLETE.md) - Phase 5 details
-- [ALL_PHASES_COMPLETE.md](docs/ALL_PHASES_COMPLETE.md) - Full summary
+- [PHASE_5_COMPLETE.md](PHASE_5_COMPLETE.md) - Phase 5 details
+- [ALL_PHASES_COMPLETE.md](ALL_PHASES_COMPLETE.md) - Full summary
 
 ---
 

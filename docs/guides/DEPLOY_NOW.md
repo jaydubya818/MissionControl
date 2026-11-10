@@ -322,10 +322,10 @@ When exposing the Mission Control UI or the orchestration server (e.g. Gateway W
 
 ## 📚 Documentation
 
-- **Full Guide:** [docs/ALL_PHASES_COMPLETE.md](docs/ALL_PHASES_COMPLETE.md)
-- **Agent Integration:** [docs/OPENCLAW_INTEGRATION.md](docs/OPENCLAW_INTEGRATION.md)
-- **Telegram Commands:** [docs/TELEGRAM_COMMANDS.md](docs/TELEGRAM_COMMANDS.md)
-- **Bot Deployment:** [packages/telegram-bot/DEPLOY.md](packages/telegram-bot/DEPLOY.md)
+- **Full Guide:** [docs/ALL_PHASES_COMPLETE.md](../changelog/ALL_PHASES_COMPLETE.md)
+- **Agent Integration:** [docs/OPENCLAW_INTEGRATION.md](../architecture/OPENCLAW_INTEGRATION.md)
+- **Telegram Commands:** [docs/TELEGRAM_COMMANDS.md](TELEGRAM_COMMANDS.md)
+- **Bot Deployment:** [packages/telegram-bot/DEPLOY.md](../../packages/telegram-bot/DEPLOY.md)
 
 ---
 
