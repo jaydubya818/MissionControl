@@ -2,7 +2,7 @@ import type { MutationCtx } from '../_generated/server';
 import type { Id } from '../_generated/dataModel';
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from './companyAccess';
 import { currentConnection } from './sofieEnterpriseAuthority';
-import { installedEnrollment, installedServiceSecret, installedOrigins } from './installedSofieConnection';
+import { installedEnrollment, installedServiceSecret, installedOrigins, installedAudienceFor } from './installedSofieConnection';
 import { enterpriseDigest, SOFIE_APPLICATION } from '../../packages/shared/src/sofieEnterprise';
 import { canonicalServiceCommand, validateServiceCommandEnvelope, type ServiceCommandEnvelope } from './serviceCommandAuth';
 import { sha256Hex } from '../../packages/shared/src/canonicalDigest';
@@ -98,7 +98,7 @@ export async function controlConnection(ctx:MutationCtx,id:Id<'enterpriseAppConn
   const owner=await ctx.db.get(connection.ownerId),project=await ctx.db.get(connection.projectId);
   if(!owner||!project||owner.authId!==enrollment.ownerSubject||owner._id!==enrollment.missionControlOwnerId||enrollment.connectionId!==id
     ||enrollment.projectId!==project._id||enrollment.tenantId!==connection.tenantId||owner.tenantId!==connection.tenantId||project.tenantId!==connection.tenantId
-    ||origins.issuer!==enrollment.issuer||origins.audience!==enrollment.audience||project.metadata?.sofieMode!=='INSTALLED_NONPRODUCTION'||project.metadata.productionAuthority!==false)return permitDenied();
+    ||origins.issuer!==enrollment.issuer||installedAudienceFor(origins,enrollment.installationId)!==enrollment.audience||project.metadata?.sofieMode!=='INSTALLED_NONPRODUCTION'||project.metadata.productionAuthority!==false)return permitDenied();
   return {connection,enrollment,owner,project};
 }
 

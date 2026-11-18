@@ -10,7 +10,7 @@ export async function capabilityLifecycleInventory(ctx: Pick<QueryCtx, 'db'>, bi
     q.eq('projectId', binding.projectId as Id<'projects'>)).collect();
   const inventory = [];
   let inventoryComplete = true;
-  try { requireCapabilityReceiverRecovery(binding.incarnation); } catch { inventoryComplete = false; }
+  try { requireCapabilityReceiverRecovery(binding.installationId, binding.incarnation); } catch { inventoryComplete = false; }
   let resourcesAbsent = true;
   for (const run of runs) {
     const order = run.workOrderId ? await ctx.db.get(run.workOrderId) : null;

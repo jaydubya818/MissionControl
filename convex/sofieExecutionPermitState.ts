@@ -3,6 +3,7 @@ import { revokePermit, permitControlDocument, permitControlDigest } from './lib/
 import { capabilityBindings, capabilityPolicyScope } from './capabilityPolicy';
 import { admissionActionDigest, type AdmissionChallenge as PolicyAdmissionChallenge } from './lib/capabilityOrderingWire';
 import { requireCapabilityReceiverRecovery } from './lib/capabilityReceiverRecovery';
+import { capabilityReceiverConfigured } from './lib/capabilityReceivers';
 import { sha256Hex } from '../packages/shared/src/canonicalDigest';
 import { capabilityPolicyOwnerId, requireCapabilityAdmission } from './lib/capabilityAdmission';
 import { v } from 'convex/values';
@@ -120,8 +121,8 @@ export const readApproved = internalMutation({args:{envelope:commandEnvelope,pay
   const live=await currentPermit(ctx,rows[0]._id,false);
   const binding=capabilityBindings().find(b=>b.ownerMemberId===live.connection.ownerMemberId&&b.tenantId===live.connection.tenantId&&b.projectId===live.project._id
     &&b.ownerId===capabilityPolicyOwnerId(live.enrollment)&&b.installationId===live.enrollment.installationId);
-  if(!binding||binding.installationId!==process.env.MC_CAPABILITY_INSTALLATION_ID) return permitDenied();
-  requireCapabilityReceiverRecovery(binding.incarnation);
+  if(!binding||!capabilityReceiverConfigured(binding.installationId)) return permitDenied();
+  requireCapabilityReceiverRecovery(binding.installationId,binding.incarnation);
   const enrollment=await ctx.db.query('capabilityEnrolledOwners').withIndex('by_owner',q=>q.eq('memberId',binding.ownerMemberId).eq('projectId',binding.projectId)).unique();
   if(!enrollment||enrollment.incarnation!==binding.incarnation||enrollment.installationId!==binding.installationId) return permitDenied();
   const fence=await ctx.db.query('capabilityPolicyFences').withIndex('by_scope',q=>q.eq('scope',capabilityPolicyScope({...binding,authority:'myeve'}))).unique();
