@@ -30,7 +30,7 @@ export async function capabilityWorkRestriction(ctx: Pick<QueryCtx, 'db'>,
     try {
       const identity = JSON.parse(authority.scope);
       if (!Array.isArray(identity) || identity.length !== 6) throw Error('CAPABILITY_SCOPE_INVALID');
-      requireCapabilityReceiverRecovery(identity[5]);
+      requireCapabilityReceiverRecovery(identity[3], identity[5]);
     } catch { return 'CAPABILITY_RECOVERY_PENDING_BACKEND' as const; }
   }
   let paused = false;

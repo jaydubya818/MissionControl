@@ -152,8 +152,9 @@ export function connectionLifetimeCap(kind: SofieConnectionKind | undefined, mis
   let all: unknown; try { all = JSON.parse(raw ?? 'null'); } catch { return null; }
   if (!all || typeof all !== 'object' || Array.isArray(all)) return null;
   for (const installationId of Object.keys(all)) {
+    // A malformed entry for one installation is skipped; it must not deny another installation's owner.
     try { if (confirmationInstallation(installationId, raw).missionControlOwnerId === missionControlOwnerId) return PRIVATE_BETA_SOFIE_CONNECTION_MAX_MS; }
-    catch { return null; }
+    catch { continue; }
   }
   return null;
 }

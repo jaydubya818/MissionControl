@@ -1,4 +1,5 @@
 import { requireCapabilityReceiverRecovery } from './capabilityReceiverRecovery';
+import { capabilityReceiverConfigured, capabilityReceiversConfigured } from './capabilityReceivers';
 import { assertCapabilityWorkAuthority } from './capabilityWorkControl';
 import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
@@ -33,7 +34,7 @@ export async function requireCapabilityAdmission(ctx: MutationCtx, record: Admis
     .withIndex('by_owner', q => q.eq('memberId', record.ownerMemberId!).eq('projectId', record.projectId!)).unique() : null;
   if (process.env.MC_CAPABILITY_CONTROL_ENABLED !== 'true' && !configured && !enrollment && !application) return;
   if (process.env.MC_CAPABILITY_ENVIRONMENT !== 'qualification'
-    || !process.env.MC_CAPABILITY_INSTALLATION_ID?.trim())
+    || !capabilityReceiversConfigured())
     throw new Error('CAPABILITY_INSTALLATION_UNQUALIFIED');
   const identity = await ctx.auth.getUserIdentity();
   const owner = record.ownerMemberId ? await ctx.db.get(record.ownerMemberId) : null;
@@ -48,10 +49,10 @@ export async function requireCapabilityAdmission(ctx: MutationCtx, record: Admis
   if (!input?.permits) throw new Error('CAPABILITY_POLICY_REVALIDATION_UNAVAILABLE');
   const binding = capabilityBindings().find(item => item.tenantId === record.tenantId
     && item.projectId === record.projectId && item.ownerMemberId === record.ownerMemberId);
-  if (!binding || binding.installationId !== process.env.MC_CAPABILITY_INSTALLATION_ID)
+  if (!binding || !capabilityReceiverConfigured(binding.installationId))
     throw new Error('CAPABILITY_INSTALLATION_UNQUALIFIED');
   if (application && (binding.ownerId !== application.policyOwnerId || binding.installationId !== application.installationId)) throw Error('CAPABILITY_ADMISSION_SCOPE');
-  requireCapabilityReceiverRecovery(binding.incarnation);
+  requireCapabilityReceiverRecovery(binding.installationId, binding.incarnation);
   if (!enrollment || enrollment.installationId !== binding.installationId || enrollment.incarnation !== binding.incarnation)
     throw Error('CAPABILITY_ENROLLMENT_CHANGED');
   const { capabilityPermits: _permits, ...nativeArgs } = input.args;
