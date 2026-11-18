@@ -7,7 +7,7 @@
  *
  * Legacy (variable absent): the singleton `MC_CAPABILITY_INSTALLATION_ID` / `MC_CAPABILITY_RECEIVER_EPOCH` /
  * `MC_CAPABILITY_RECEIVER_RECOVERY_STATE` keep their exact pre-map semantics (see `requireCapabilityReceiverRecovery`).
- * A malformed map configures no receiver at all (every installation is unqualified and quarantined).
+ * A malformed entry leaves that installation unqualified. Invalid top-level JSON configures no receiver.
  */
 export type CapabilityReceiver = { epoch: string; recoveryState: string };
 
@@ -22,7 +22,7 @@ export function capabilityReceivers(raw: string | undefined = process.env.MC_CAP
   for (const [installationId, value] of Object.entries(all)) {
     if (!installationId.trim() || !value || typeof value !== 'object' || Array.isArray(value)
       || Object.keys(value).sort().join(',') !== 'epoch,recoveryState'
-      || typeof (value as any).epoch !== 'string' || !(value as any).epoch.trim() || typeof (value as any).recoveryState !== 'string') return {};
+      || typeof (value as any).epoch !== 'string' || !(value as any).epoch.trim() || typeof (value as any).recoveryState !== 'string') continue;
     receivers[installationId] = { epoch: (value as any).epoch, recoveryState: (value as any).recoveryState };
   }
   return receivers;

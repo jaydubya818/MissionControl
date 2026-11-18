@@ -2,10 +2,10 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
 import type { Doc } from '../_generated/dataModel';
 import { installedMaxDurationSeconds, parseOwnerEnrollment, permitDenied, permitOrigin } from '../../packages/shared/src/executionPermit';
 
-export type InstalledOrigins = { environment: 'APPROVED_NONPRODUCTION'; issuer: string; audience: string; audiences?: Record<string, string> };
+export type InstalledOrigins = { environment: 'APPROVED_NONPRODUCTION'; issuer: string; audience: string; audiences?: Record<string, unknown> };
 /**
- * `{environment, issuer, audience, audiences?}`. `audience` is the default for installations without an `audiences` entry;
- * the optional `audiences` map pins an installation to its own origin. A malformed `audiences` map denies everything.
+ * Without `audiences`, every installation keeps the legacy audience.
+ * With `audiences`, each installation must have its own valid entry.
  */
 export function installedOrigins(): InstalledOrigins {
   const raw = process.env.MC_SOFIE_INSTALLED_ORIGINS;
@@ -14,17 +14,19 @@ export function installedOrigins(): InstalledOrigins {
     || config.issuer === config.audience) return permitDenied();
   if (config.audiences !== undefined) {
     const audiences = config.audiences;
-    if (!audiences || typeof audiences !== 'object' || Array.isArray(audiences)
-      || !Object.entries(audiences).every(([id, origin]) => !!id.trim() && typeof origin === 'string' && !!permitOrigin(origin) && origin !== config.issuer))
-      return permitDenied();
+    if (!audiences || typeof audiences !== 'object' || Array.isArray(audiences)) return permitDenied();
   }
   return config as InstalledOrigins;
 }
 /** The audience an installation's enrollment must carry. */
 export function installedAudienceFor(origins: InstalledOrigins, installationId: unknown): string {
   const audiences = origins.audiences;
-  return audiences && typeof installationId === 'string' && Object.prototype.hasOwnProperty.call(audiences, installationId)
-    ? audiences[installationId] : origins.audience;
+  if (audiences === undefined) return origins.audience;
+  if (typeof installationId !== 'string' || !installationId.trim()
+    || !Object.prototype.hasOwnProperty.call(audiences, installationId)) return permitDenied();
+  const audience = audiences[installationId];
+  if (typeof audience !== 'string' || !permitOrigin(audience) || audience === origins.issuer) return permitDenied();
+  return audience;
 }
 export async function installedEnrollment(ctx: Pick<MutationCtx | QueryCtx, 'db'>, connection: Doc<'enterpriseAppConnections'>) {
   const enrollment = parseOwnerEnrollment(connection.installedEnrollment), origins = installedOrigins(), now = Date.now();

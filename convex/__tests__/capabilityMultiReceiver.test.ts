@@ -109,8 +109,7 @@ describe('multi-installation receivers', () => {
     expect(() => requireCapabilityReceiverRecovery('tester-2', T2_EPOCH)).toThrow('QUARANTINED');
   });
   it('a malformed or empty map configures no receiver at all', async () => {
-    for (const bad of ['{not json', '[]', 'null', JSON.stringify({ jay: { epoch: JAY_EPOCH } }), JSON.stringify({ ...both, 'tester-1': { epoch: '', recoveryState: 'ACTIVE' } }),
-      JSON.stringify({ ...both, 'tester-1': { epoch: T1_EPOCH, recoveryState: 'ACTIVE', extra: 1 } }), '{}']) {
+    for (const bad of ['{not json', '[]', 'null', JSON.stringify({ jay: { epoch: JAY_EPOCH } }), '{}']) {
       mapEnv(bad);
       expect(capabilityReceiversConfigured()).toBe(false);
       await expect((await admission('jay', JAY_EPOCH)).run()).rejects.toThrow('CAPABILITY_INSTALLATION_UNQUALIFIED');
@@ -132,21 +131,46 @@ describe('per-installation audiences', () => {
     return installedEnrollment(ctx as never, connection as never);
   }
   it('admits each installation only with its own audience; tester cannot use jay\'s audience', async () => {
-    origins({ 'tester-1': 'https://tester-1.example.test' });
+    origins({ installation: 'https://eve.example.test', 'tester-1': 'https://tester-1.example.test' });
     await expect(enrolled('installation', 'https://eve.example.test')).resolves.toBeTruthy();
     await expect(enrolled('tester-1', 'https://tester-1.example.test')).resolves.toBeTruthy();
     await expect(enrolled('tester-1', 'https://eve.example.test')).rejects.toThrow();
     await expect(enrolled('installation', 'https://tester-1.example.test')).rejects.toThrow();
+  });
+  it('keeps all three installation audiences isolated', async () => {
+    const audienceByInstallation = {
+      jay: 'https://eve.example.test',
+      'tester-1': 'https://tester-1.example.test',
+      'tester-2': 'https://tester-2.example.test',
+    };
+    origins(audienceByInstallation);
+    for (const [installation, audience] of Object.entries(audienceByInstallation)) {
+      await expect(enrolled(installation, audience)).resolves.toMatchObject({
+        enrollment: { installationId: installation, audience },
+      });
+      for (const foreign of Object.values(audienceByInstallation).filter(value => value !== audience)) {
+        await expect(enrolled(installation, foreign)).rejects.toThrow('MISSIONCONTROL_PERMIT_DENIED');
+      }
+    }
   });
   it('legacy single audience still governs every installation', async () => {
     origins();
     await expect(enrolled('installation', 'https://eve.example.test')).resolves.toBeTruthy();
     await expect(enrolled('installation', 'https://tester-1.example.test')).rejects.toThrow();
   });
-  it('a malformed audiences map denies everything', () => {
-    for (const bad of [[], 'x', { 'tester-1': 'not-an-origin' }, { 'tester-1': 'https://mc.example.test' }, { ' ': T1_ORIGIN }]) {
+  it('invalid top-level audiences deny every installation', () => {
+    for (const bad of [[], 'x', null]) {
       origins(bad);
-      expect(() => installedOrigins()).toThrow();
+      expect(() => installedOrigins()).toThrow('MISSIONCONTROL_PERMIT_DENIED');
+    }
+  });
+  it('a malformed audience entry denies only that installation', async () => {
+    for (const bad of ['not-an-origin', 'https://mc.example.test', null]) {
+      origins({ installation: 'https://eve.example.test', 'tester-1': bad });
+      await expect(enrolled('installation', 'https://eve.example.test')).resolves.toMatchObject({
+        enrollment: { installationId: 'installation', audience: 'https://eve.example.test' },
+      });
+      await expect(enrolled('tester-1', 'https://eve.example.test')).rejects.toThrow('MISSIONCONTROL_PERMIT_DENIED');
     }
   });
 });
@@ -202,5 +226,48 @@ async function admission(installationId: string, incarnation: string) {
   };
   const run = () => requireCapabilityAdmission(ctx as never, record as never, false, input,
     { authenticatedOwnerId: 'operator-a', policyOwnerId: ownerId, installationId, replay: false });
-  return { run };
+  return { run, input, binding };
 }
+
+describe('review regressions for per-installation isolation', () => {
+  it.each(['jay', 'tester-2'])('refuses tester-1 policy receipts replayed as %s', async target => {
+    mapEnv({ ...both, 'tester-2': { epoch: T2_EPOCH, recoveryState: 'ACTIVE' } });
+    const source = await admission('tester-1', T1_EPOCH);
+    await expect(source.run()).resolves.toMatchObject({ budgetMicros: 5_000_000 });
+    const destination = await admission(target, target === 'jay' ? JAY_EPOCH : T2_EPOCH);
+    destination.binding.sourceKeys = source.binding.sourceKeys;
+    vi.stubEnv('MC_CAPABILITY_BINDINGS_JSON', JSON.stringify([destination.binding]));
+    destination.input.permits = source.input.permits;
+    await expect(destination.run()).rejects.toThrow('CAPABILITY_POLICY_IDENTITY_MISMATCH');
+  });
+
+  it('keeps valid receivers active when another receiver entry is malformed', async () => {
+    for (const bad of [null, [], { epoch: '' }, { epoch: T1_EPOCH, recoveryState: 'ACTIVE', extra: true }]) {
+      mapEnv({ jay: both.jay, 'tester-1': bad, 'tester-2': { epoch: T2_EPOCH, recoveryState: 'ACTIVE' } });
+      await expect((await admission('jay', JAY_EPOCH)).run()).resolves.toMatchObject({ budgetMicros: 5_000_000 });
+      await expect((await admission('tester-2', T2_EPOCH)).run()).resolves.toMatchObject({ budgetMicros: 5_000_000 });
+      await expect((await admission('tester-1', T1_EPOCH)).run()).rejects.toThrow('CAPABILITY_INSTALLATION_UNQUALIFIED');
+    }
+  });
+
+  it('keeps the owner audience usable and refuses the malformed tester entry', () => {
+    vi.stubEnv('MC_SOFIE_INSTALLED_ORIGINS', JSON.stringify({
+      environment: 'APPROVED_NONPRODUCTION', issuer: ISSUER, audience: JAY_ORIGIN,
+      audiences: { jay: JAY_ORIGIN, 'tester-1': 'broken', 'tester-2': 'https://myeve-alpha-tester-2.vercel.app' },
+    }));
+    const origins = installedOrigins();
+    expect(installedAudienceFor(origins, 'jay')).toBe(JAY_ORIGIN);
+    expect(installedAudienceFor(origins, 'tester-2')).toBe('https://myeve-alpha-tester-2.vercel.app');
+    expect(() => installedAudienceFor(origins, 'tester-1')).toThrow('MISSIONCONTROL_PERMIT_DENIED');
+  });
+
+  it('refuses a missing installation audience when the audience map is enabled', () => {
+    vi.stubEnv('MC_SOFIE_INSTALLED_ORIGINS', JSON.stringify({
+      environment: 'APPROVED_NONPRODUCTION', issuer: ISSUER, audience: JAY_ORIGIN,
+      audiences: { jay: JAY_ORIGIN },
+    }));
+    const origins = installedOrigins();
+    expect(installedAudienceFor(origins, 'jay')).toBe(JAY_ORIGIN);
+    expect(() => installedAudienceFor(origins, 'tester-1')).toThrow('MISSIONCONTROL_PERMIT_DENIED');
+  });
+});

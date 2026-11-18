@@ -26,6 +26,7 @@
       "codex/mc-hosted-auth-20261105": false,
       "codex/mc-hosted-confirm-bridge-20261105": false,
       "main": false,
+      "codex/mc-250-review-fixes-20261117": false,
       "codex/unified-capability-control-plane": false,
       "codex/factory-turn-budget-test": false,
       "codex/live-retry-runbook-20261003": false,
