@@ -125,7 +125,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
         mission: (await db.owner.query("missions:get", { missionId })).mission,
         created: false,
       };
-    if(options.ownerUi) await options.ownerUi.authorize(binding);
+    if(options.ownerUi) await options.ownerUi.authorize(binding,options.applicationOwnerHandoff?.());
     else await mutate("sofieEnterprise:decide", {
       ...binding,
       connectionId: connection.connectionId,
