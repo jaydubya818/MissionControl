@@ -140,6 +140,10 @@ jobs:
         run: |
           pnpm run ci:test
 
+      - name: Run qualification receipt regressions
+        if: success() || failure()
+        run: pnpm exec vitest run scripts/system-factory-e2e-qualification.test.mjs
+
   eval-integrity:
     name: Eval Integrity
     runs-on: ubuntu-latest
@@ -259,7 +263,23 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Run factory operator preview gates
+        id: factory_preview
+        run: pnpm run test:e2e:factory-review
+        env:
+          CI: true
+
+      - name: Retain factory operator browser evidence
+        if: always() && steps.factory_preview.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: factory-operator-preview-${{ github.run_attempt }}
+          path: test-results/factory-review/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Run deterministic browser and accessibility gates
+        if: success() || failure()
         run: pnpm run test:e2e:critical
         env:
           CI: true
