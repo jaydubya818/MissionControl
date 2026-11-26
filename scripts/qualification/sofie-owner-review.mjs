@@ -106,7 +106,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
         operation: "enterprise.submit",
         proposalId: proposal.proposalId,
         proposalDigest: proposal.digest,
-      }),
+      },{application:!options.ownerUi}),
       error => error.status === 'denied' || /ENTERPRISE_ACCESS_DENIED|ENTERPRISE_COMMAND_DENIED/.test(error.message),
     );
     assert.equal(
