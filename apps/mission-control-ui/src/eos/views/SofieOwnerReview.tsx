@@ -210,7 +210,7 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
       )}
       {checkedAt !== null && (
         <p className="text-xs text-ink-muted">
-          Last checked: <time aria-label="Last owner review check" data-inspection-version={generation.current} dateTime={new Date(checkedAt).toISOString()}>{new Date(checkedAt).toLocaleTimeString()}</time>
+          Last checked: <time data-inspection-version={generation.current} dateTime={new Date(checkedAt).toISOString()}>{new Date(checkedAt).toLocaleTimeString()}</time>
         </p>
       )}
       {proposalId && !review && !error && (

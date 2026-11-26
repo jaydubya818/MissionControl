@@ -91,18 +91,19 @@ beforeEach(() => {
 });
 describe("Sofie owner review", () => {
   it("clears the old inspection until a requested refresh completes", async () => {
-    mount();
+    const view = mount();
+    const inspection = () => view.container.querySelector('time[data-inspection-version]');
     await screen.findByRole("button", { name: "Authorize Mission creation" });
-    const before = Number(screen.getByLabelText("Last owner review check").getAttribute("data-inspection-version"));
+    const before = Number(inspection()!.getAttribute("data-inspection-version"));
     let finish: ((value: typeof proposal) => void) | undefined;
     state.inspect.mockReturnValueOnce(new Promise<typeof proposal>(resolve => { finish = resolve; }));
     fireEvent.click(screen.getByRole("button", { name: "Refresh owner review" }));
-    expect(screen.queryByLabelText("Last owner review check")).toBeNull();
+    expect(inspection()).toBeNull();
     expect(screen.queryByRole("button", { name: "Authorize Mission creation" })).toBeNull();
     expect(screen.getByText("Loading owner review…")).toBeTruthy();
     await act(async () => { finish!(proposal); });
     await screen.findByRole("button", { name: "Authorize Mission creation" });
-    expect(Number(screen.getByLabelText("Last owner review check").getAttribute("data-inspection-version"))).toBeGreaterThan(before);
+    expect(Number(inspection()!.getAttribute("data-inspection-version"))).toBeGreaterThan(before);
   });
   it("requires canonical Clerk mode before requesting owner data", () => {
     state.mode = "demo";

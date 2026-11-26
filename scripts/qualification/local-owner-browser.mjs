@@ -42,7 +42,7 @@ export async function startLocalOwnerBrowser(db,output){
   async approvePlan(missionId){await open('/v2/missions/'+missionId+'?workspace='+credentials.projectId);await wait(t=>t.includes('Overview')&&t.includes('Plan')&&t.includes('Execution'));await cli('find','role','tab','click','--name','Plan','--exact');await wait(t=>t.includes('Decision rationale'));await cli('find','label','Decision rationale','fill','Approve the exact disposable local Plan. No production or publication authority.');await click('Approve and release 3 WorkOrders');await wait(t=>t.includes('Plan approved. WorkOrders were released'));await shot('plan-approved');checks.push('exact-Plan-approved-in-owner-UI');},
   async authorizeRead(binding){await open(reviewPath(binding));await wait(t=>t.includes('Accept enterprise Result'));await click('Allow Sofie to read this Result');await wait(t=>t.includes('Sofie may read this exact Mission and Plan.'));checks.push('current-Result-read-authorized-in-owner-UI');},
   async accept(){
-    const inspectionVersion=async()=>Number(JSON.parse(await cli('eval','document.querySelector(\'time[aria-label="Last owner review check"]\')?.getAttribute("data-inspection-version") ?? null')));
+    const inspectionVersion=async()=>Number(JSON.parse(await cli('eval','document.querySelector("time[data-inspection-version]")?.getAttribute("data-inspection-version") ?? null')));
     const before=await inspectionVersion();await click('Refresh owner review');let after=0;
     for(let n=0;n<120;n++){after=await inspectionVersion();if(after>before)break;await new Promise(r=>setTimeout(r,250));}
     assert.ok(after>before,'Owner refresh must complete a new inspection');
