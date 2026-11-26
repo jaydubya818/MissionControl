@@ -17,3 +17,11 @@ for (const decision of ['ACCEPT', 'REJECT']) {
     assert.throws(() => validateOwnerReview(report(decision), decision === 'ACCEPT' ? 'REJECT' : 'ACCEPT', 'mission'), /manifest/);
   });
 }
+
+test('local browser evidence requires actual loopback transport and never qualifies hosted Clerk', () => {
+ const local={status:'PASS',authentication:'LOCAL_SYNTHETIC_ADMIN_IMPERSONATION',transport:'REAL_LOOPBACK_CONVEX',hostedClerk:'NOT_RUN',checks:['actual-dashboard-and-owner-navigation','proposal-authorized-in-owner-UI','exact-Plan-approved-in-owner-UI','current-Result-read-authorized-in-owner-UI','current-Result-accepted-in-owner-UI']};
+ const candidate={...report('ACCEPT'),browserOwnerJourney:'LOCAL_SYNTHETIC_UI',localOwnerUi:local};
+ assert.equal(validateOwnerReview(candidate,'ACCEPT','mission').releaseGate,'ADVISORY');
+ for(const patch of [{transport:'MOCK'},{hostedClerk:'PASS'},{checks:local.checks.slice(1)},{authentication:'UNVERIFIED'}])
+  assert.throws(()=>validateOwnerReview({...candidate,localOwnerUi:{...local,...patch}},'ACCEPT','mission'));
+});
