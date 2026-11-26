@@ -27,6 +27,12 @@ import { ISOLATED_CONTAINER_POLICY, SUCCESSOR_ISOLATED_RUNTIME_ARTIFACT, SUCCESS
 
 const [buildArgument, dockerExecutable, outputArgument, mode] = process.argv.slice(2);
 if (!buildArgument || !dockerExecutable || !outputArgument || !['prepare', 'execute', 'recovery', 'unknown', 'cancel', 'hybrid'].includes(mode)) throw Error('Build directory, exact Docker executable, fresh output directory and qualified mode required');
+if (process.env.MC_LOCAL_OWNER_UI === '1') {
+  assert.equal(mode, 'hybrid');
+  assert.equal(process.env.MC_OWNER_REVIEW_QUALIFICATION, '1');
+  assert.equal(process.env.MYEVE_CHECKPOINT_H_BROWSER, '1');
+  assert.ok(process.env.MC_SOFIE_RESULT_CONSUMER_ROOT, 'Owner UI requires its authenticated MyEve consumer');
+}
 const build = resolve(buildArgument), output = resolve(outputArgument), repo = process.cwd();
 await mkdir(output);
 const digest = (value: unknown) => `sha256:${sha256Hex(canonicalJson(value))}`;
@@ -289,9 +295,18 @@ try {
     const planResult = await step('plan', () => mutate('missions:savePlanDraft', planDraft, author));
     const planId = planResult.plan._id;
     await step('submittedPlan', () => mutate('missions:submitPlan', { projectId: s.projectId, missionId, planId, idempotencyKey: 'native-successor-submit' }, author));
-    const release = await step('approvedPlan', async () => ownerUi ? (await ownerUi.approvePlan(missionId), {workOrders:(await query('missions:get',{missionId})).workOrders}) : mutate('missions:approvePlan', { projectId: s.projectId, missionId, planId,
-      decisionReason: 'Approve this exact synthetic plan and its explicit zero-charge native engineering tariff. No paid, publication or production authority.', idempotencyKey: 'native-successor-approve' }));
-    const workOrder = release.workOrders[0]; state.workOrderId = workOrder._id;
+    const release = await step('approvedPlan', async () => {
+      if (!ownerUi) return mutate('missions:approvePlan', { projectId: s.projectId, missionId, planId,
+        decisionReason: 'Approve this exact synthetic plan and its explicit zero-charge native engineering tariff. No paid, publication or production authority.', idempotencyKey: 'native-successor-approve' });
+      await ownerUi.approvePlan(missionId);
+      const current = await query('missions:get', {missionId});
+      assert.equal(current.mission.currentPlanId, planId);
+      assert.equal(current.plans.find((plan: any) => plan._id === planId)?.status, 'APPROVED');
+      return {workOrders: current.workOrders};
+    });
+    const workOrder = release.workOrders.find((work: any) => work.metadata?.missionBlueprintId === 'native-document');
+    assert.ok(workOrder, 'Approved Plan must release its exact native-document WorkOrder');
+    assert.equal(workOrder.missionPlanId, planId); state.workOrderId = workOrder._id;
     await step('nonAdminMissionPrincipal', () => mutate('isolationFixture:nonAdminMissionPrincipal', { scope:s }));
     await step('startedMission', () => mutate('missions:start', { missionId, idempotencyKey: 'native-successor-start' }));
     const taskResult = await step('task', () => mutate('tasks:create', { projectId: s.projectId, workOrderId: workOrder._id, title: 'Render exact native document', type: 'DOCS', priority: 3,

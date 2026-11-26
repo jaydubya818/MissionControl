@@ -309,6 +309,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
       missionId,
       authentication: "SYNTHETIC_API_FIXTURE",
       intakeTransport: options.applicationCommand ? "MYEVE_ACTION_GATEWAY" : "SIGNED_FIXTURE_ONLY",
+      concurrencyCoverage: options.ownerUi ? "CONCURRENT_REPLAY_AFTER_UI_MUTATIONS; CREATION_RACES_REQUIRE_THE_PAIRED_NON_UI_COHORTS" : "CONCURRENT_CREATION_AND_OWNER_DECISION_RACES",
       setup: { deliveryScopeBudgetAndEnvironment: "CANONICAL_OWNER_UPDATE_DRAFT", workloadTag: "DISPOSABLE_FIXTURE_METADATA_PATCH_ONLY", proposalDigestScope: "INTAKE_IDENTITY;_OWNER_AMENDS_SCOPE_AND_BUDGET_BEFORE_PLAN" },
       browserOwnerJourney: options.ownerUi ? "LOCAL_SYNTHETIC_UI" : "NOT_RUN",
       ...(options.ownerUi ? {localOwnerUi:options.ownerUi.report()} : {}),

@@ -1,5 +1,7 @@
 # Skillz catalog
 
+The parser preserves `user-invocable` and `disable-model-invocation` as portable metadata. Catalog import and round-trip validation do not themselves invoke skills or implement a model-selection engine. The consuming host must enforce these flags; this catalog refresh does not certify every host's enforcement. The existing verb-based description lint policy is retained from the reviewed catalog refresh.
+
 Mission Control vendors the complete 109-skill catalog from the
 [`jaydubya818/skillz` 2.7.0 source snapshot](https://github.com/jaydubya818/skillz/tree/44df27bc06f11d76d9f490c76578f222e254be6f)
 at commit `44df27bc06f11d76d9f490c76578f222e254be6f`.
