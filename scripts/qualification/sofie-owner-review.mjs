@@ -23,8 +23,8 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
     owningTeamId: s.teamId,
     expiresAt: Date.now() + 600000,
   });
-  async function command(input) {
-    if (options.applicationCommand && ["enterprise.propose", "enterprise.submit"].includes(input.operation)) {
+  async function command(input, {application=true}={}) {
+    if (application && options.applicationCommand && ["enterprise.propose", "enterprise.submit"].includes(input.operation)) {
       return options.applicationCommand(input, { secret, connectionId: connection.connectionId });
     }
     const payloadJson = JSON.stringify({
@@ -131,16 +131,19 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
       connectionId: connection.connectionId,
       decision: "AUTHORIZE_DRAFT",
     });
+    const submitInput={operation:"enterprise.submit",proposalId:proposal.proposalId,proposalDigest:proposal.digest};
+    // One actual browser Send, followed by independent concurrent backend retry controls.
+    const browserReceipts=options.ownerUi?[await command(submitInput)]:[];
     const attempts = await Promise.allSettled(
       Array.from({ length: 3 }, () =>
         command({
           operation: "enterprise.submit",
           proposalId: proposal.proposalId,
           proposalDigest: proposal.digest,
-        }),
+        },{application:!options.ownerUi}),
       ),
     );
-    const receipts = attempts.filter((attempt) => attempt.status === "fulfilled").map((attempt) => attempt.value);
+    const receipts = [...browserReceipts,...attempts.filter((attempt) => attempt.status === "fulfilled").map((attempt) => attempt.value)];
     assert.ok(receipts.length >= 1, "At least one submission must have a confirmed receipt");
     for (const attempt of attempts.filter((attempt) => attempt.status === "rejected")) {
       assert.ok(["denied", "result_unknown"].includes(attempt.reason.status));
