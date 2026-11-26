@@ -23,7 +23,7 @@ export async function startLocalOwnerBrowser(db,output){
   define:{'import.meta.env.VITE_FLAG_MISSIONS_PLAN_RELEASE_V1':'"true"'},
   server:{host:'127.0.0.1',port:5188,strictPort:true,fs:{allow:[root]}}});
  const base='http://127.0.0.1:5188';
- const wait=async(test)=>{let text;for(let n=0;n<120;n++){text=await cli('get','text','body');if(test(text))return text;await new Promise(r=>setTimeout(r,250));}await writeFile(join(output,'failure.txt'),text);await writeFile(join(output,'browser-errors.txt'),await cli('errors'));await cli('screenshot',join(output,'failure.png'),'--full');throw Error('Owner UI did not reach expected state');};
+ const wait=async(test)=>{let text='';for(let n=0;n<120;n++){try{text=await cli('get','text','body');}catch(error){if(!/Element not found: body\b/.test(String(error.stderr??error.message)))throw error;text='';}if(test(text))return text;await new Promise(r=>setTimeout(r,250));}await writeFile(join(output,'failure.txt'),text);await writeFile(join(output,'browser-errors.txt'),await cli('errors'));await cli('screenshot',join(output,'failure.png'),'--full');throw Error('Owner UI did not reach expected state');};
  const click=async name=>cli('find','role','button','click','--name',name,'--exact');
  const shot=async name=>{await writeFile(join(output,name+'.txt'),await cli('snapshot','-c'));await cli('screenshot',join(output,name+'.png'),'--full');};
  const open=async path=>cli('open',base+path);
