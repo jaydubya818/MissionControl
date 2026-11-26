@@ -1,0 +1,4 @@
+interface:
+  display_name: "Visual Plan"
+  short_description: "Publish an interactive visual plan"
+  default_prompt: "Use $visual-plan for this task and return a verified result."

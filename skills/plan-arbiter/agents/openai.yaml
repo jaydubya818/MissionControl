@@ -1,4 +1,4 @@
 interface:
   display_name: "Plan Arbiter"
-  short_description: "Compare competing agent plans and pick one."
-  default_prompt: "Use $plan-arbiter to compare competing plans, cross-review them, and choose an execution plan."
+  short_description: "Choose one executable plan from alternatives"
+  default_prompt: "Use $plan-arbiter for this task and return a verified result."

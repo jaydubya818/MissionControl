@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plow Ahead"
+  short_description: "Keep moving through routine ambiguity"
+  default_prompt: "Use $plow-ahead for this task and return a verified result."

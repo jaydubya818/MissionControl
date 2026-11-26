@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory Babysit Pr"
+  short_description: "Follow one authorized PR through its gates"
+  default_prompt: "Use $factory-babysit-pr for this task and return a verified result."

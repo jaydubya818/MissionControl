@@ -1,0 +1,6 @@
+interface:
+  display_name: "Read-only database access"
+  short_description: "Prepare scoped PostgreSQL agent access"
+  default_prompt: "Use $create-readonly-db-role to prepare a least-privilege access plan and verification steps for this database."
+policy:
+  allow_implicit_invocation: false

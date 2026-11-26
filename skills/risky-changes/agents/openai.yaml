@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify risky changes"
+  short_description: "Check product assumptions before release"
+  default_prompt: "Use $risky-changes to check the evidence behind this billing, API, or default change."

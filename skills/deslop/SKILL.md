@@ -5,8 +5,8 @@ license: MIT
 metadata:
   author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.30"
-  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
+  source-version: "0.9.130"
+  source-commit: d88063f3355a5ecff0e6dbb890a11bab4b08bc2e
   owner: software-factory
   risk: medium
   capabilities: jstack,engineering-workflow
@@ -14,7 +14,7 @@ metadata:
 
 # Remove AI code slop
 
-Check the diff against main and remove AI-generated slop introduced in the branch.
+Check the diff against the branch's base and remove AI-generated slop introduced in the branch. The base is the PR's base branch, else the branch this one was cut from, else the repository's default branch. Include uncommitted changes.
 
 ## Focus Areas
 
@@ -28,4 +28,6 @@ Check the diff against main and remove AI-generated slop introduced in the branc
 
 - Keep behavior unchanged unless fixing a clear bug.
 - Prefer minimal, focused edits over broad rewrites.
+- After editing, rerun the checks that verified the change (tests, type check, and the driver skill for UI work) and report their results.
+- Revert any edit whose check fails.
 - Keep the final summary concise (1-3 sentences).

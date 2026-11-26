@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory"
+  short_description: "Configure governed delivery automation"
+  default_prompt: "Use $factory for this task and return a verified result."

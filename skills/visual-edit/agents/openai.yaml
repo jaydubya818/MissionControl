@@ -1,0 +1,4 @@
+interface:
+  display_name: "Visual Edit"
+  short_description: "Edit a running local app in Design"
+  default_prompt: "Use $visual-edit for this task and return a verified result."

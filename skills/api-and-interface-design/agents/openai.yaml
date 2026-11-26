@@ -1,0 +1,4 @@
+interface:
+  display_name: "Api And Interface Design"
+  short_description: "Design contracts and safe retries"
+  default_prompt: "Use $api-and-interface-design for this task and report the evidence and remaining limits."

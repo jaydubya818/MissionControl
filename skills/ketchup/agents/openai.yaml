@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ketchup"
+  short_description: "Catch up on progress and pending decisions"
+  default_prompt: "Use $ketchup to handle this task with the Jstack workflow and return a verified result."

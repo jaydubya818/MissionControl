@@ -1,0 +1,4 @@
+interface:
+  display_name: "Thermo Nuclear Review"
+  short_description: "Audit a diff for security and correctness"
+  default_prompt: "Use $thermo-nuclear-review to handle this task with the Jstack workflow and return a verified result."

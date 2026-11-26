@@ -1,0 +1,4 @@
+interface:
+  display_name: "Thermos"
+  short_description: "Combine correctness and maintainability reviews"
+  default_prompt: "Use $thermos to handle this task with the Jstack workflow and return a verified result."

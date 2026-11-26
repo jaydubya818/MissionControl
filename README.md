@@ -244,8 +244,8 @@ acceptance; they do not accept it.
 
 ### Context and Skills admission
 
-Mission Control includes 70 repository-local skills: nine native control-plane
-integration skills and 61 vendored from
+Mission Control includes 118 repository-local skills: nine native Mission Control
+skills and 109 vendored from
 [`jaydubya818/skillz`](https://github.com/jaydubya818/skillz) at a pinned source
 revision. For non-trivial work, agents start with `mission-control-delivery`;
 `poteto-mode` then selects the smallest applicable workflow and specialist set.

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Prompt for a teammate"
+  short_description: "Write verified instructions for a teammate"
+  default_prompt: "Use $prompt-for-others to turn this verified fix into instructions for a teammate's agent."
+policy:
+  allow_implicit_invocation: false

@@ -1,20 +1,26 @@
 ---
 name: factory-review-prs
+description: "Triage PR queues under separate reply, approval, and merge gates."
+license: MIT
+compatibility: "Works in Claude Code, Codex, Cursor, and Agent Skills-compatible harnesses when the required host tools are available."
 metadata:
+  author: Builder.io
+  source: BuilderIO/skills
+  source-commit: f4f10b8d513476c24bd995ceac5294bcdd6ee15c
+  owner: software-factory
+  risk: high
+  capabilities: builderio,factory-pr-review
   installer-group: factory
-description: >-
-  Experimental workflow for reviewing configured repositories' pull requests.
-  Use for manual or scheduled PR triage, approval, or merge decisions.
 ---
 
 # Factory Review PRs
 
-> Start with the [Factory guide](../../docs/factory/README.md) for workflow
+> Start with the [Factory guide](../factory/references/factory-guide.md) for workflow
 > setup and configuration.
 
 This skill reviews a filtered queue. For one long-lived, explicitly authorized
 PR, use `factory-babysit-pr`. Read the filters and independent action policies
-from `.agent-factory/config.yaml`; see the [configuration reference](https://github.com/BuilderIO/skills/blob/main/docs/factory/configuration.md).
+from `.agent-factory/config.yaml`; see the [configuration reference](../factory/references/factory-configuration.md).
 Apply the optional `skill_prompts.factory-review-prs` entry as additional
 project guidance; it does not replace this skill or authorize an action
 disabled by policy.

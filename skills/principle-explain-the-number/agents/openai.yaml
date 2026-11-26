@@ -1,0 +1,4 @@
+interface:
+  display_name: "Principle Explain The Number"
+  short_description: "Apply explain the number with discipline"
+  default_prompt: "Use $principle-explain-the-number to apply this engineering principle to the current decision."

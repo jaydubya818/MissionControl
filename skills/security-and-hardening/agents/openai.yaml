@@ -1,0 +1,4 @@
+interface:
+  display_name: "Security And Hardening"
+  short_description: "Harden and verify trust boundaries"
+  default_prompt: "Use $security-and-hardening for this task and report the evidence and remaining limits."
