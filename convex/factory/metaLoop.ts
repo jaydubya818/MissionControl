@@ -542,6 +542,7 @@ export const recordMeasurement = mutation({
     baseline: v.number(),
     result: v.number(),
     target: v.number(),
+    targetDirection: v.optional(v.union(v.literal("HIGHER_IS_BETTER"), v.literal("LOWER_IS_BETTER"))),
     unit: v.string(),
     evidenceRefs: v.array(v.string()),
   },
@@ -588,7 +589,7 @@ export const recordMeasurement = mutation({
       description: `Measured ${row.title}: ${args.result}${args.unit} against ${args.target}${args.unit}`,
       targetType: "META_LOOP_SUGGESTION",
       targetId: row._id,
-      metadata: { verdict, baseline: args.baseline, result: args.result, target: args.target },
+      metadata: { verdict, baseline: args.baseline, result: args.result, target: args.target, targetDirection: measurement.targetDirection },
     });
     return { verdict };
   },

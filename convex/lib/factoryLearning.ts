@@ -555,6 +555,7 @@ export function buildImprovementCandidate(
 export interface ImprovementMetrics {
   sampleSize: number;
   successRate?: number;
+  averageScore?: number | null;
   firstPassVerificationRate?: number;
   averageRetries?: number;
   humanInterventionRate?: number;
@@ -577,6 +578,7 @@ export function recommendImprovementPromotion(input: {
   autoPromote: false;
   improvements: string[];
   regressions: string[];
+  comparisonWarnings: string[];
 } {
   const minimumSample = Math.min(
     input.baseline.sampleSize,
@@ -584,6 +586,7 @@ export function recommendImprovementPromotion(input: {
   );
   const improvements: string[] = [];
   const regressions: string[] = [];
+  const comparisonWarnings: string[] = [];
   const compareHigher = (
     label: string,
     baseline: number | undefined,
@@ -602,6 +605,17 @@ export function recommendImprovementPromotion(input: {
   };
 
   compareHigher("success rate", input.baseline.successRate, input.candidate.successRate);
+  const baselineScore = input.baseline.averageScore;
+  const candidateScore = input.candidate.averageScore;
+  const scores = [baselineScore, candidateScore];
+  if (scores.some((score) => score !== undefined
+    && (typeof score !== "number" || !Number.isFinite(score) || score < 0 || score > 1))) {
+    comparisonWarnings.push("Quality scores must be finite numbers between 0 and 1.");
+  } else if ((baselineScore === undefined) !== (candidateScore === undefined)) {
+    comparisonWarnings.push("Quality score is missing for one variant.");
+  } else if (typeof baselineScore === "number" && typeof candidateScore === "number") {
+    compareHigher("quality score", baselineScore, candidateScore);
+  }
   compareHigher(
     "first-pass verification",
     input.baseline.firstPassVerificationRate,
@@ -625,13 +639,16 @@ export function recommendImprovementPromotion(input: {
   return {
     recommendation: regressions.length
       ? "REJECT_RECOMMENDED"
-      : improvements.length
-        ? "PROMOTION_RECOMMENDED"
-        : "HOLD_RECOMMENDED",
+      : comparisonWarnings.length
+        ? "HOLD_RECOMMENDED"
+        : improvements.length
+          ? "PROMOTION_RECOMMENDED"
+          : "HOLD_RECOMMENDED",
     sampleLabel: minimumSample < 30 ? "LOW_SAMPLE" : "OBSERVED_COMPARISON",
     statisticallySignificant: false,
     autoPromote: false,
     improvements,
     regressions,
+    comparisonWarnings,
   };
 }

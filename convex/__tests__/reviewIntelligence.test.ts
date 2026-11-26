@@ -8,6 +8,27 @@ import {
 import { aggregateLearningSignals } from "../lib/factoryLearning";
 
 describe("Review Intelligence V1 domain", () => {
+  it.each([
+    ["apps/orchestration-server/src/factoryGitRuntime.ts", "Other"],
+    ["apps/orchestration-server/src/factoryAttemptWorker.ts", "Other"],
+    ["apps/api/src/server.ts", "Other"],
+    ["apps/mission-control-ui/src/App.tsx", "UI"],
+    ["apps/web/src/components/Button.ts", "UI"],
+    ["apps/ui/src/styles/theme.css", "UI"],
+    ["apps/orchestration-server/src/auth.ts", "Authentication"],
+  ])("classifies %s from specific evidence rather than an arbitrary app root", (path, name) => {
+    const file = { path, diffLocation: "artifact:exact-diff", artifactId: "artifact-1" };
+    expect(buildSemanticChangeGroups([file])).toEqual([
+      {
+        id: name.toLowerCase(),
+        name,
+        method: "DETERMINISTIC",
+        authority: "ADVISORY",
+        files: [file],
+      },
+    ]);
+  });
+
   it("groups exact file lineage deterministically and preserves a raw-diff path", () => {
     const groups = buildSemanticChangeGroups([
       { path: "apps/ui/src/AuthPanel.tsx", diffLocation: "artifact:diff#L1" },

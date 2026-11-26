@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -15,16 +15,28 @@ if (!/^[a-z0-9][a-z0-9-]*$/.test(evidenceSlug)) {
 const evidenceDirectory = path.join(repoRoot, "docs/testing/evidence", evidenceSlug);
 const scenarioEvidencePath = path.join(evidenceDirectory, "scenario-evidence.json");
 const automatedChecksPath = path.join(evidenceDirectory, "automated-checks.json");
-const baseSha =
-  process.env.MC_QUALIFICATION_BASE_SHA ??
-  gitValue(["merge-base", "HEAD", "origin/main"]);
-const startedHead = gitValue(["rev-parse", "HEAD"]);
+let baseSha = process.env.MC_QUALIFICATION_BASE_SHA ?? null;
+let startedHead = null;
 const startedAt = new Date().toISOString();
 const checks = [];
+const steps = [];
+let runResult = "RUNNING";
+let completedAt = null;
+let setupError = null;
 
 mkdirSync(evidenceDirectory, { recursive: true });
+writeAutomatedChecks();
+try {
+  baseSha ??= gitValue(["merge-base", "HEAD", "origin/main"]);
+  startedHead = gitValue(["rev-parse", "HEAD"]);
+} catch (error) {
+  runResult = "FAIL";
+  setupError = String(error.message ?? error);
+  writeAutomatedChecks();
+  throw error;
+}
 
-const steps = [
+steps.push(
   {
     name: "profile-bound governed read-only MCP transport and negative controls",
     command: "node",
@@ -207,34 +219,45 @@ const steps = [
     command: "git",
     args: ["diff", "--check"],
   },
-];
+);
 
-let failed = false;
+writeAutomatedChecks();
 for (const step of steps) {
   const stepStartedAt = Date.now();
   process.stdout.write(`\n=== ${step.name} ===\n`);
-  const result = spawnSync(step.command, step.args, {
-    cwd: repoRoot,
-    env: { ...process.env, ...(step.env ?? {}) },
-    stdio: "inherit",
-  });
-  const status = result.status ?? 1;
+  let result;
+  try {
+    result = spawnSync(step.command, step.args, {
+      cwd: repoRoot,
+      env: { ...process.env, ...(step.env ?? {}) },
+      stdio: "inherit",
+    });
+  } catch (error) {
+    result = { status: 1, error };
+  }
+  const status = result.error || result.signal ? 1 : result.status ?? 1;
   checks.push({
     name: step.name,
     command: [step.command, ...step.args].join(" "),
     status: status === 0 ? "PASS" : "FAIL",
     exitCode: status,
     durationMs: Date.now() - stepStartedAt,
+    ...(result.signal ? { signal: result.signal } : {}),
+    ...(result.error ? { error: String(result.error.message ?? result.error) } : {}),
   });
+  if (status !== 0) runResult = "FAIL";
   writeAutomatedChecks();
-  if (status !== 0) {
-    failed = true;
-    break;
-  }
+  if (status !== 0) break;
 }
 
+if (runResult === "RUNNING") {
+  runResult = steps.length > 0 && checks.length === steps.length && checks.every((check, index) =>
+    check.status === "PASS" && check.name === steps[index].name
+    && check.command === [steps[index].command, ...steps[index].args].join(" ")
+  ) ? "PASS" : "FAIL";
+}
 writeAutomatedChecks();
-process.exitCode = failed ? 1 : 0;
+process.exitCode = runResult === "PASS" ? 0 : 1;
 
 function gitValue(args) {
   const result = spawnSync("git", args, { cwd: repoRoot, encoding: "utf8" });
@@ -245,13 +268,24 @@ function gitValue(args) {
 }
 
 function writeAutomatedChecks() {
-  writeFileSync(automatedChecksPath, JSON.stringify({
-    schemaVersion: "system-factory-e2e-automated-checks/v2",
+  if (runResult !== "RUNNING") completedAt ??= new Date().toISOString();
+  const temporaryPath = `${automatedChecksPath}.${process.pid}.tmp`;
+  const receipt = {
+    schemaVersion: "system-factory-e2e-automated-checks/v3",
     baseSha,
     startedHead,
     startedAt,
-    completedAt: new Date().toISOString(),
-    result: failed || checks.some((check) => check.status === "FAIL") ? "FAIL" : "PASS",
+    completedAt,
+    result: runResult,
+    expectedChecks: steps.length > 0 ? steps.length : null,
+    completedChecks: checks.length,
     checks,
-  }, null, 2) + "\n");
+    ...(setupError ? { setupError } : {}),
+  };
+  try {
+    writeFileSync(temporaryPath, JSON.stringify(receipt, null, 2) + "\n");
+    renameSync(temporaryPath, automatedChecksPath);
+  } finally {
+    rmSync(temporaryPath, { force: true });
+  }
 }

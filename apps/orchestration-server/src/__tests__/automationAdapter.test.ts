@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -171,6 +171,42 @@ describe("Automation adapter safety", () => {
         expect(result.redactedLogs.join("")).toContain("passed");
       }
     } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the host TypeScript runtime outside its workspace despite candidate loaders and PATH", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "mc automation runtime "));
+    const workingDirectory = "work space";
+    const bin = path.join(root, "bin");
+    const candidateLoader = path.join(root, "node_modules/tsx");
+    const marker = path.join(root, "untrusted-runtime");
+    const originalPath = process.env.PATH;
+    const content = "import { value } from './value.ts';\nconsole.log(JSON.stringify({ status: 'passed', value, cwd: process.cwd() }));\n";
+    try {
+      await mkdir(path.join(root, workingDirectory), { recursive: true });
+      await mkdir(path.join(root, "automations"));
+      await mkdir(bin);
+      await mkdir(candidateLoader, { recursive: true });
+      await writeFile(path.join(root, "package.json"), JSON.stringify({ type: "module" }));
+      await writeFile(path.join(root, "automations/value.ts"), "enum Value { Expected = 42 }\nexport const value: number = Value.Expected;\n");
+      await writeFile(path.join(candidateLoader, "package.json"), JSON.stringify({ name: "tsx", type: "module", exports: "./index.mjs" }));
+      await writeFile(path.join(candidateLoader, "index.mjs"), `import { writeFileSync } from 'node:fs';\nwriteFileSync(${JSON.stringify(marker)}, 'candidate loader');\nthrow new Error('Candidate loader selected');\n`);
+      for (const executable of ["node", "pnpm", "tsx"]) {
+        await writeFile(path.join(bin, executable), "#!/bin/sh\nprintf 'candidate executable' > ../untrusted-runtime\nexit 97\n", { mode: 0o755 });
+      }
+      process.env.PATH = bin;
+      const result = await executeAutomation({
+        adapterType: "TYPESCRIPT", repository: "test/repo", repositoryRoot: root, workingDirectory,
+        artifactPath: "automations/check.ts", artifactContent: content, artifactContentHash: hash(content),
+        timeoutMs: 10_000, secretReferences: [], configuration: {},
+      });
+      expect(result.status, result.error ?? result.redactedLogs.join("\n")).toBe("passed");
+      expect(JSON.parse(result.redactedLogs[0])).toEqual({ status: "passed", value: 42, cwd: await realpath(path.join(root, workingDirectory)) });
+      await expect(readFile(marker)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      if (originalPath === undefined) delete process.env.PATH;
+      else process.env.PATH = originalPath;
       await rm(root, { recursive: true, force: true });
     }
   });

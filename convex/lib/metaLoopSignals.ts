@@ -15,14 +15,23 @@ export function buildMetaMeasurement(input: {
   baseline: number;
   result: number;
   target: number;
+  targetDirection?: "HIGHER_IS_BETTER" | "LOWER_IS_BETTER";
   unit: string;
   evidenceRefs: string[];
 }, measuredAt = Date.now()) {
-  const verdict = input.result >= input.target ? "MET" as const : "MISSED" as const;
+  if (![input.baseline, input.result, input.target].every(Number.isFinite)) {
+    throw new Error("Measurement baseline, result, and target must be finite numbers.");
+  }
+  const targetDirection = input.targetDirection ?? "HIGHER_IS_BETTER";
+  const targetMet = targetDirection === "LOWER_IS_BETTER"
+    ? input.result <= input.target
+    : input.result >= input.target;
+  const verdict = targetMet ? "MET" as const : "MISSED" as const;
   return {
     baseline: input.baseline,
     result: input.result,
     target: input.target,
+    targetDirection,
     unit: input.unit,
     evidenceRefs: input.evidenceRefs,
     verdict,

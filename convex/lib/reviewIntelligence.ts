@@ -41,7 +41,7 @@ const GROUP_RULES: Array<{ name: SemanticChangeGroupName; matches: (path: string
   { name: "Authentication", matches: (path) => /(^|\/)(auth|authentication|authorization|session|identity|permissions?)/i.test(path) },
   { name: "Verification", matches: (path) => /(^|\/)(verification|evidence|qualityGate|qualif|harness|evals?)(\/|\.|-)/i.test(path) },
   { name: "Configuration", matches: (path) => /(^|\/)(config|\.github|\.env|vite\.config|tsconfig|tailwind|eslint)(\/|\.|-)|\.(ya?ml|toml)$/i.test(path) },
-  { name: "UI", matches: (path) => /(^|\/)(apps?\/[^/]+\/src|components?|views?|pages?|ui|styles?)(\/|$)|\.(tsx|jsx|css|scss)$/i.test(path) },
+  { name: "UI", matches: (path) => /(^|\/)(components?|views?|pages?|ui|styles?)(\/|$)|\.(tsx|jsx|css|scss)$/i.test(path) },
   { name: "Persistence", matches: (path) => /(^|\/)(db|database|storage|models?|repositories|convex)(\/|\.|-)/i.test(path) },
 ];
 

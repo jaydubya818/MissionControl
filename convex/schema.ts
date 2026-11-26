@@ -8413,6 +8413,7 @@ export const schemaTablesPartTwo = {
       baseline: v.number(),
       result: v.number(),
       target: v.number(),
+      targetDirection: v.optional(v.union(v.literal("HIGHER_IS_BETTER"), v.literal("LOWER_IS_BETTER"))),
       unit: v.string(),
       verdict: v.union(v.literal("MET"), v.literal("MISSED")),
       evidenceRefs: v.array(v.string()),

@@ -7,8 +7,10 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { canonicalHash } from "@mission-control/shared";
 import {
@@ -1152,7 +1154,8 @@ function typecheckScript() {
 }
 
 function testScript() {
-  return `import { spawnSync } from "node:child_process";\nconst result = spawnSync("tsx", ["--test", "tests/listingFee.test.ts"], { cwd: process.cwd(), encoding: "utf8" });\nprocess.stdout.write(result.stdout ?? "");\nprocess.stderr.write(result.stderr ?? "");\nprocess.exit(result.status ?? 1);\n`;
+  const loaderUrl = pathToFileURL(createRequire(import.meta.url).resolve("tsx")).href;
+  return `import { spawnSync } from "node:child_process";\nconst result = spawnSync(process.execPath, ["--import", ${JSON.stringify(loaderUrl)}, "--test", "tests/listingFee.test.ts"], { cwd: process.cwd(), encoding: "utf8" });\nprocess.stdout.write(result.stdout ?? "");\nprocess.stderr.write(result.stderr ?? "");\nprocess.exit(result.status ?? 1);\n`;
 }
 
 function verifyScript() {

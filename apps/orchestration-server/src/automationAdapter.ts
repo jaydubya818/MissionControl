@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 export type AdapterType = "PLAYWRIGHT" | "API" | "TYPESCRIPT" | "PYTHON" | "SHELL" | "WORKFLOW" | "SKILL_PIPELINE";
 
@@ -87,9 +89,10 @@ function adapterCommand(manifest: ExecutionManifest, artifact: string): string[]
   if (manifest.adapterType === "PLAYWRIGHT") {
     return ["pnpm", "exec", "playwright", "test", "-c", "tests/automations/playwright.config.ts", relativeArtifact, "--reporter=json"];
   }
-  // pnpm may resolve the workspace root before invoking tsx, so use the
-  // already root-validated absolute artifact path for typed process adapters.
-  if (manifest.adapterType === "TYPESCRIPT") return ["pnpm", "exec", "tsx", artifact];
+  if (manifest.adapterType === "TYPESCRIPT") {
+    const loader = createRequire(import.meta.url).resolve("tsx");
+    return [process.execPath, "--import", pathToFileURL(loader).href, artifact];
+  }
   if (manifest.adapterType === "PYTHON") return ["python3", artifact];
   if (manifest.adapterType === "SHELL") return ["bash", artifact];
   if (manifest.adapterType === "WORKFLOW") {
