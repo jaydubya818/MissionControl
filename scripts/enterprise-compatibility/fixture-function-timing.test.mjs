@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { completedResultFunctionTiming, readFixtureFunctionLogPage, captureCompletedResultFunctionTiming } from './fixture-function-timing.mjs';
+import { completedResultFunctionTiming, readFixtureFunctionLogPage, captureCompletedResultFunctionTiming, createOwnerResultFunctionTimingCapture } from './fixture-function-timing.mjs';
 const pair = n => [{ kind: 'Completion', identifier: 'sofieEnterprise:apply', udfType: 'Mutation', executionId: `private-mutation-${n}`,
   parentExecutionId: `private-action-${n}`, requestId: `private-request-${n}`, componentPath: null,
   executionTime: 0.48, userExecutionTime: 0.31, cachedResult: false, willRetry: false, error: null,
@@ -84,4 +84,39 @@ it('preserves the original consumer error on dual failure and rejects retention 
   const read = async () => ({ entries: entries(), newCursor: 10 }), retain = async () => { throw retention; };
   await expect(captureCompletedResultFunctionTiming(read, async () => { throw original; }, retain)).rejects.toBe(original);
   await expect(captureCompletedResultFunctionTiming(read, async () => 'proof', retain)).rejects.toBe(retention);
+});
+
+it('qualifies the same six distinct reads across the real owner decision without counting owner API calls', async () => {
+  const before = Array.from({length:5},(_,n)=>pair(n)).flat(), retained=[];
+  const pages=[{entries:pair(90),newCursor:10},{entries:before,newCursor:20},{entries:[...pair(91),...pair(92)],newCursor:30},{entries:pair(5),newCursor:40}];
+  const read=vi.fn(async()=>pages.shift()),capture=createOwnerResultFunctionTimingCapture(read,(e,phase)=>retained.push({e,phase}));
+  const proof={signedProof:'UNCHANGED'};
+  expect(await capture(async()=>proof)).toBe(proof);
+  expect(retained[0].e.status).toBe('AWAITING_ACCEPTED_READBACK');
+  expect(await capture(async()=>proof)).toBe(proof);
+  const final=retained[1].e;expect(final.status).toBe('COMPLETE');expect(final.commandSamples).toBe(6);expect(final.applySamples).toBe(6);
+  expect(final.consumerWindowCommands).toEqual([5,1]);expect(final.mutationUserExecutionLimitMs).toBe(1000);
+  expect(read.mock.calls.map(call=>call[0])).toEqual([0,10,0,30]);
+  expect(JSON.stringify(retained)).not.toMatch(/private-|PRIVATE_|requestId|executionId|logLines|success|usageStats/);
+  const unexpected=vi.fn();await expect(capture(unexpected)).rejects.toThrow('OWNER_RESULT_TIMING_ALREADY_COMPLETE');expect(unexpected).not.toHaveBeenCalled();
+});
+it.each(['missing-before','extra-before','extra-after','duplicate-across-windows'])('keeps phased timing unqualified for %s', async fault=>{
+  let before=Array.from({length:5},(_,n)=>pair(n)).flat(),after=pair(5);
+  if(fault==='missing-before')before=before.slice(2);
+  if(fault==='extra-before')before.push(...pair(8));
+  if(fault==='extra-after')after.push(...pair(9));
+  if(fault==='duplicate-across-windows')after=pair(0);
+  const pages=[{entries:[],newCursor:10},{entries:before,newCursor:20},{entries:[],newCursor:30},{entries:after,newCursor:40}],retained=[];
+  const capture=createOwnerResultFunctionTimingCapture(async()=>pages.shift(),e=>retained.push(e));
+  await capture(async()=>true);await capture(async()=>true);expect(retained[1].status).toBe('UNQUALIFIED');
+});
+it('preserves the finite mutation margin and original failure in phased capture', async()=>{
+  const before=Array.from({length:5},(_,n)=>pair(n)).flat();before[0].userExecutionTime=1.1;
+  const pages=[{entries:[],newCursor:10},{entries:before,newCursor:20},{entries:[],newCursor:30},{entries:pair(5),newCursor:40}],retained=[];
+  const capture=createOwnerResultFunctionTimingCapture(async()=>pages.shift(),e=>retained.push(e));
+  await capture(async()=>true);await capture(async()=>true);expect(retained[1].observedUserExecutionMarginMs).toBe(-100);
+  const original=Error('PRIVATE_CONSUMER_FAILURE'),failed=[];
+  const failing=createOwnerResultFunctionTimingCapture(async()=>{throw Error('PRIVATE_KEY');},e=>failed.push(e));
+  await expect(failing(async()=>{throw original;})).rejects.toBe(original);
+  expect(failed[0]).toMatchObject({status:'UNQUALIFIED',reason:'CONSUMER_FAILED'});expect(JSON.stringify(failed)).not.toContain('PRIVATE');
 });

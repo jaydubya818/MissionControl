@@ -87,3 +87,40 @@ export async function captureCompletedResultFunctionTiming(readPage, operation, 
     catch (error) { if (!operationFailed) throw error; }
   }
 }
+
+/** The same six consumer reads now straddle the actual owner decision.
+ * Keep raw events in memory only; validate both bounded windows and then all
+ * six pairs together, including cross-window duplicate/request detection. */
+export function createOwnerResultFunctionTimingCapture(readPage, retain) {
+  let phase = 0, before;
+  return async operation => {
+    if (phase >= 2) throw Error('OWNER_RESULT_TIMING_ALREADY_COMPLETE');
+    const current = ++phase;
+    let cursor, operationFailed = false;
+    try { cursor = (await readPage(0)).newCursor; } catch { /* Remains unqualified. */ }
+    try { return await operation(); }
+    catch (error) { operationFailed = true; throw error; }
+    finally {
+      let evidence = fail('TELEMETRY_UNAVAILABLE');
+      if (cursor !== undefined) {
+        try {
+          const page = await readPage(cursor);
+          evidence = completedResultFunctionTiming(page.entries, current === 1 ? 5 : 1);
+          if (evidence.status === 'COMPLETE') {
+            if (current === 1) {
+              before = page.entries;
+              evidence = { ...evidence, status: 'AWAITING_ACCEPTED_READBACK', consumerWindow: 'BEFORE_OWNER_ACCEPTANCE' };
+            } else {
+              evidence = before ? completedResultFunctionTiming([...before, ...page.entries]) : fail('MISSING_BEFORE_OWNER_WINDOW');
+              if (evidence.status === 'COMPLETE') evidence.consumerWindowCommands = [5, 1];
+            }
+          }
+        } catch { /* Never retain raw backend errors, events, or keys. */ }
+      }
+      if (operationFailed) evidence = fail('CONSUMER_FAILED');
+      try { await retain(evidence, current); }
+      catch (error) { if (!operationFailed) throw error; }
+      if (current === 2) before = undefined;
+    }
+  };
+}

@@ -596,13 +596,17 @@ try {
       const acceptBeforeSecurity = Boolean(resultConsumer && process.env.MYEVE_RESULT_SECURITY_COHORT
         && process.env.MYEVE_CHECKPOINT_H_BROWSER !== '1' && !ownerRejected);
       if(ownerUi) await ownerReview.authorizeBrowserResultRead();
+      const ownerTiming = ownerUi ? db.createOwnerResultTimingCapture(async (evidence: any, phase: number) => {
+        state.completedResultFunctionTiming = evidence;
+        await writeFile(join(output, phase === 1 ? 'before-owner-result-function-timing.json' : 'completed-result-function-timing.json'), JSON.stringify(evidence, null, 2) + '\n');
+      }) : undefined;
       if (resultConsumer) await step('completedEnterpriseResultConsumer', () => process.env.MYEVE_CHECKPOINT_H_BROWSER === '1'
-        ? db.captureCompletedResultTiming(() => resultConsumer.qualify(missionId), async (evidence: any) => {
+        ? ownerTiming ? ownerTiming(() => resultConsumer.qualify(missionId)) : db.captureCompletedResultTiming(() => resultConsumer.qualify(missionId), async (evidence: any) => {
           state.completedResultFunctionTiming = evidence;
           await writeFile(join(output, 'completed-result-function-timing.json'), JSON.stringify(evidence, null, 2) + '\n');
         }) : resultConsumer.qualify(missionId, acceptBeforeSecurity ? {beforeSecurity: acceptOwnerResult} : undefined));
       if (!acceptBeforeSecurity) await acceptOwnerResult();
-      if(ownerUi) await step('acceptedResultOwnerBrowser',()=>resultConsumer.afterOwnerAcceptance());
+      if(ownerUi) await step('acceptedResultOwnerBrowser',()=>ownerTiming(() => resultConsumer.afterOwnerAcceptance()));
       if (ownerReview) await step('linkedOwnerReview', async () => ownerReview.report());
       await db.restart();
       const finalAccounting = await step('hybridDurableAccounting', () => query('factory/nativeAccounting:readback', { workflowRunId: integrationDispatch.run._id }));

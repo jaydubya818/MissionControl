@@ -1,5 +1,5 @@
 import { fixtureProcessFailure, openFixtureBackendLog, runFixtureCommand } from './fixture-process-diagnostics.mjs';
-import { captureCompletedResultFunctionTiming, readFixtureFunctionLogPage } from './fixture-function-timing.mjs';
+import { captureCompletedResultFunctionTiming, createOwnerResultFunctionTimingCapture, readFixtureFunctionLogPage } from './fixture-function-timing.mjs';
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, writeFile, copyFile, symlink, cp, rm, appendFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -119,6 +119,8 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
           { cwd: repo, env, encoding: "utf8", timeout: 60000, stdio: "pipe" });
       }, captureCompletedResultTiming(operation, retain) {
         return captureCompletedResultFunctionTiming(cursor => readFixtureFunctionLogPage(url, key, cursor), operation, retain);
+      }, createOwnerResultTimingCapture(retain) {
+        return createOwnerResultFunctionTimingCapture(cursor => readFixtureFunctionLogPage(url, key, cursor), retain);
       }, localBrowserCredentials() {
         // Only this disposable loopback fixture exposes synthetic browser auth.
         return {url,key,subject:ownerSubject,projectId:seed.projectId};
