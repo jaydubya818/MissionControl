@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SofieOwnerReview } from "./SofieOwnerReview";
@@ -90,6 +90,20 @@ beforeEach(() => {
   state.decide.mockResolvedValue({ authorized: true });
 });
 describe("Sofie owner review", () => {
+  it("clears the old inspection until a requested refresh completes", async () => {
+    mount();
+    await screen.findByRole("button", { name: "Authorize Mission creation" });
+    const before = Number(screen.getByLabelText("Last owner review check").getAttribute("data-inspection-version"));
+    let finish: ((value: typeof proposal) => void) | undefined;
+    state.inspect.mockReturnValueOnce(new Promise<typeof proposal>(resolve => { finish = resolve; }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh owner review" }));
+    expect(screen.queryByLabelText("Last owner review check")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Authorize Mission creation" })).toBeNull();
+    expect(screen.getByText("Loading owner review…")).toBeTruthy();
+    await act(async () => { finish!(proposal); });
+    await screen.findByRole("button", { name: "Authorize Mission creation" });
+    expect(Number(screen.getByLabelText("Last owner review check").getAttribute("data-inspection-version"))).toBeGreaterThan(before);
+  });
   it("requires canonical Clerk mode before requesting owner data", () => {
     state.mode = "demo";
     mount();

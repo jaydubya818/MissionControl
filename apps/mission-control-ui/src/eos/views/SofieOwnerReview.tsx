@@ -38,6 +38,7 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
   const authorizeResult = useMutation(api.sofieOwnerReview.authorizeResultRead),
     decideResult = useMutation(api.sofieOwnerReview.decideResult);
   const [review, setReview] = useState<Review | null>(null),
+    [checkedAt, setCheckedAt] = useState<number | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false),
@@ -49,6 +50,7 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
   const load = useCallback(async () => {
     const current = ++generation.current;
     setReview(null);
+    setCheckedAt(null);
     setError("");
     if (!proposalId || !digest) return;
     try {
@@ -57,7 +59,10 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
         proposalId: proposalId as Id<"enterpriseMissionProposals">,
         expectedDigest: digest,
       });
-      if (current === generation.current) setReview(result);
+      if (current === generation.current) {
+        setReview(result);
+        setCheckedAt(Date.now());
+      }
     } catch {
       if (current === generation.current)
         setError(
@@ -202,6 +207,11 @@ function OwnerReview({ projectId }: { projectId: Id<"projects"> }) {
         <Button disabled={busy} onClick={() => void load()}>
           Refresh owner review
         </Button>
+      )}
+      {checkedAt !== null && (
+        <p className="text-xs text-ink-muted">
+          Last checked: <time aria-label="Last owner review check" data-inspection-version={generation.current} dateTime={new Date(checkedAt).toISOString()}>{new Date(checkedAt).toLocaleTimeString()}</time>
+        </p>
       )}
       {proposalId && !review && !error && (
         <p role="status">Loading owner review…</p>

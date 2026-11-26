@@ -19,7 +19,7 @@ export async function startLocalOwnerBrowser(db,output){
  const {default:tailwind}=await import(require.resolve('@tailwindcss/vite'));
  const credentials=db.localBrowserCredentials();
  assert.match(credentials.url,/^http:\/\/127\.0\.0\.1:\d+$/);
- const session='mc-owner-'+randomUUID(),checks=[];
+ const session='mc-owner-'+randomUUID(),checks=[];let refreshObservation;
  const cli=async(...args)=>(await execute(process.execPath,[browserProvenance.driver.launcher,'--session',session,...args],{timeout:45000,maxBuffer:1024*1024})).stdout;
  const server=await createServer({configFile:false,envFile:false,root:join(root,'apps/mission-control-ui/tests/local-owner'),
   plugins:[react(),tailwind(),{name:'disposable-owner-session',configureServer(server){server.middlewares.use('/__local_owner_session',(req,res)=>{res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','application/json');res.end(JSON.stringify(credentials));});}}],
@@ -41,8 +41,16 @@ export async function startLocalOwnerBrowser(db,output){
     await wait(t=>t.includes('Authorize Mission creation'));await click('Authorize Mission creation');await wait(t=>t.includes('Creation authorized.'));await shot('proposal-authorized');checks.push('proposal-authorized-in-owner-UI');},
   async approvePlan(missionId){await open('/v2/missions/'+missionId+'?workspace='+credentials.projectId);await wait(t=>t.includes('Overview')&&t.includes('Plan')&&t.includes('Execution'));await cli('find','role','tab','click','--name','Plan','--exact');await wait(t=>t.includes('Decision rationale'));await cli('find','label','Decision rationale','fill','Approve the exact disposable local Plan. No production or publication authority.');await click('Approve and release 3 WorkOrders');await wait(t=>t.includes('Plan approved. WorkOrders were released'));await shot('plan-approved');checks.push('exact-Plan-approved-in-owner-UI');},
   async authorizeRead(binding){await open(reviewPath(binding));await wait(t=>t.includes('Accept enterprise Result'));await click('Allow Sofie to read this Result');await wait(t=>t.includes('Sofie may read this exact Mission and Plan.'));checks.push('current-Result-read-authorized-in-owner-UI');},
-  async accept(){await click('Refresh owner review');await wait(t=>t.includes('Current enterprise Quality Gate: PASS')&&t.includes('Accept enterprise Result'));await click('Accept enterprise Result');await wait(t=>t.includes('Result accepted.')&&t.includes('Mission status: DONE'));checks.push('current-Result-accepted-in-owner-UI');},
-  report(){return {status:checks.length===5?'PASS':'INCOMPLETE',authentication:'LOCAL_SYNTHETIC_ADMIN_IMPERSONATION',transport:'REAL_LOOPBACK_CONVEX',frontend:'PRODUCTION_COMPONENTS_ON_TEST_VITE_ENTRY',browserProvenance,checks,hostedClerk:'NOT_RUN'};},
+  async accept(){
+    const inspectionVersion=async()=>Number(JSON.parse(await cli('eval','document.querySelector(\'time[aria-label="Last owner review check"]\')?.getAttribute("data-inspection-version") ?? null')));
+    const before=await inspectionVersion();await click('Refresh owner review');let after=0;
+    for(let n=0;n<120;n++){after=await inspectionVersion();if(after>before)break;await new Promise(r=>setTimeout(r,250));}
+    assert.ok(after>before,'Owner refresh must complete a new inspection');
+    await wait(t=>t.includes('Current enterprise Quality Gate: PASS')&&t.includes('Accept enterprise Result'));
+    const enabled=JSON.parse(await cli('eval','Array.from(document.querySelectorAll("button")).some(b=>b.textContent.trim()==="Accept enterprise Result"&&!b.disabled)'));
+    assert.equal(enabled,true);refreshObservation={beforeInspectionVersion:before,afterInspectionVersion:after,acceptEnabled:enabled};
+    await click('Accept enterprise Result');await wait(t=>t.includes('Result accepted.')&&t.includes('Mission status: DONE'));checks.push('current-Result-accepted-in-owner-UI');},
+  report(){return {status:checks.length===5?'PASS':'INCOMPLETE',authentication:'LOCAL_SYNTHETIC_ADMIN_IMPERSONATION',transport:'REAL_LOOPBACK_CONVEX',frontend:'PRODUCTION_COMPONENTS_ON_TEST_VITE_ENTRY',browserProvenance,refreshObservation,checks,hostedClerk:'NOT_RUN'};},
   async stop(){try{if(checks.includes('current-Result-accepted-in-owner-UI'))await shot('result-accepted');}finally{try{await cli('close');}finally{await server.close();await writeFile(join(output,'report.json'),JSON.stringify(this.report(),null,2)+'\n');}}}
  };
 }
