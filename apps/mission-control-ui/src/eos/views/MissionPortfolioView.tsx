@@ -15,6 +15,7 @@ import { CreateFactoryMissionDialog } from "../../factoryExperience/CreateFactor
 import { ExperienceLevelSelector } from "../../factoryExperience/ExperienceLevelSelector";
 import { useFactoryExperienceLevel } from "../../factoryExperience/useFactoryExperienceLevel";
 import { FactoryPackageImportDialog } from "../../factoryExperience/FactoryPackageImportDialog";
+import { FactoryIntakePanel } from "../../factoryExperience/FactoryIntakePanel";
 
 export interface MissionPortfolioViewProps {
   projectId: Id<"projects">;
@@ -138,6 +139,7 @@ export function MissionPortfolioView({
         }
       />
       <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-8 py-6">
+        <FactoryIntakePanel projectId={projectId} onOpenMission={openMission} />
         <div className="rounded-xl border border-line bg-surface-1 px-4 py-3 text-[12.5px] text-ink-secondary">
           Live Mission records from Convex. A draft remains non-executable until
           its plan and validation contract are approved.

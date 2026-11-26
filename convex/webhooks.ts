@@ -5,8 +5,69 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action, internalAction, internalMutation } from "./_generated/server";
+import { mutation, query, internalAction, internalMutation } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
+import { COMPANY_PERMISSIONS, listAccessibleWorkspaces, listCompanyMemberships, requireWorkspaceAccess } from "./lib/companyAccess";
+
+async function requireWebhookWorkspace(ctx: QueryCtx | MutationCtx, projectId?: Id<"projects">, write = false) {
+  if (!await ctx.auth.getUserIdentity()) throw new Error("Authentication is required for webhooks.");
+  const project = projectId ? await ctx.db.get(projectId) : null;
+  if (!project?.tenantId) throw new Error("Webhook workspace is unavailable or unauthorized.");
+  return requireWorkspaceAccess(ctx, project.tenantId, project._id, {
+    permission: write ? COMPANY_PERMISSIONS.MANAGE_WORKSPACES : undefined,
+  });
+}
+
+async function requireWebhookRecord(ctx: QueryCtx | MutationCtx, webhookId: Id<"webhooks">, write = false) {
+  if (!await ctx.auth.getUserIdentity()) throw new Error("Authentication is required for webhooks.");
+  const webhook = await ctx.db.get(webhookId);
+  if (!webhook) throw new Error("Webhook is unavailable or unauthorized.");
+  const access = await requireWebhookWorkspace(ctx, webhook.projectId, write);
+  if (webhook.tenantId && webhook.tenantId !== access.project.tenantId) throw new Error("Webhook company scope does not match its workspace.");
+  return { webhook, access };
+}
+
+function webhookMetadata(webhook: Doc<"webhooks">) {
+  const { secret, ...metadata } = webhook;
+  return { ...metadata, secretConfigured: secret.length > 0 };
+}
+
+function validateWebhookUrl(value: string) {
+  let url: URL;
+  try { url = new URL(value); } catch { throw new Error("Invalid webhook URL"); }
+  if (url.protocol !== "https:" || url.username || url.password || url.hash) {
+    throw new Error("Webhook URL must use HTTPS without credentials or a fragment.");
+  }
+}
+
+async function validateWebhookAgents(ctx: MutationCtx, projectId: Id<"projects">, agentIds?: Id<"agents">[]) {
+  const project = await ctx.db.get(projectId);
+  for (const agentId of agentIds ?? []) {
+    const agent = await ctx.db.get(agentId);
+    if (!agent || agent.projectId !== projectId || (agent.tenantId && agent.tenantId !== project?.tenantId)) {
+      throw new Error("Webhook agent filter must belong to its workspace.");
+    }
+  }
+}
+
+async function auditWebhookChange(ctx: MutationCtx, input: {
+  access: Awaited<ReturnType<typeof requireWebhookWorkspace>>;
+  webhookId: Id<"webhooks">;
+  action: string;
+}) {
+  await ctx.db.insert("activities", {
+    tenantId: input.access.project.tenantId,
+    projectId: input.access.project._id,
+    actorType: "HUMAN",
+    actorId: String(input.access.membership.operatorId),
+    action: input.action,
+    description: "Updated outbound webhook configuration",
+    targetType: "WEBHOOK",
+    targetId: String(input.webhookId),
+  });
+}
 
 /** HMAC-SHA256 hex using Web Crypto (Convex default runtime). */
 async function hmacSha256Hex(secret: string, data: string): Promise<string> {
@@ -37,20 +98,29 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     if (args.projectId) {
-      return await ctx.db
+      const access = await requireWebhookWorkspace(ctx, args.projectId);
+      const rows = await ctx.db
         .query("webhooks")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
+      return rows.filter(row => !row.tenantId || row.tenantId === access.project.tenantId).map(webhookMetadata);
     }
-    
-    return await ctx.db.query("webhooks").collect();
+    if (!await ctx.auth.getUserIdentity()) throw new Error("Authentication is required for webhooks.");
+    const memberships = await listCompanyMemberships(ctx);
+    const projects = (await Promise.all(memberships.map(membership => listAccessibleWorkspaces(ctx, membership.tenant._id)))).flat();
+    const rows = await Promise.all(projects.map(async project => {
+      const hooks = await ctx.db.query("webhooks").withIndex("by_project", q => q.eq("projectId", project._id)).collect();
+      return hooks.filter(hook => !hook.tenantId || hook.tenantId === project.tenantId).map(webhookMetadata);
+    }));
+    return rows.flat();
   },
 });
 
 export const get = query({
   args: { webhookId: v.id("webhooks") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.webhookId);
+    const { webhook } = await requireWebhookRecord(ctx, args.webhookId);
+    return webhookMetadata(webhook);
   },
 });
 
@@ -60,13 +130,16 @@ export const getDeliveries = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const { webhook, access } = await requireWebhookRecord(ctx, args.webhookId);
     const limit = args.limit || 50;
     
-    return await ctx.db
+    const deliveries = await ctx.db
       .query("webhookDeliveries")
       .withIndex("by_webhook", (q) => q.eq("webhookId", args.webhookId))
       .order("desc")
       .take(limit);
+    return deliveries.filter(delivery => delivery.projectId === webhook.projectId
+      && (!delivery.tenantId || delivery.tenantId === access.project.tenantId));
   },
 });
 
@@ -89,15 +162,13 @@ export const create = mutation({
     createdBy: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Validate URL
-    try {
-      new URL(args.url);
-    } catch {
-      throw new Error("Invalid URL");
-    }
+    const access = await requireWebhookWorkspace(ctx, args.projectId, true);
+    validateWebhookUrl(args.url);
+    await validateWebhookAgents(ctx, access.project._id, args.filters?.agentIds);
     
     const webhookId = await ctx.db.insert("webhooks", {
       projectId: args.projectId,
+      tenantId: access.project.tenantId,
       name: args.name,
       url: args.url,
       secret: args.secret,
@@ -106,9 +177,9 @@ export const create = mutation({
       active: true,
       deliveryCount: 0,
       failureCount: 0,
-      createdBy: args.createdBy,
+      createdBy: String(access.membership.operatorId),
     });
-    
+    await auditWebhookChange(ctx, { access, webhookId, action: "WEBHOOK_CREATED" });
     return { webhookId };
   },
 });
@@ -128,19 +199,17 @@ export const update = mutation({
     active: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const { webhookId, ...updates } = args;
-    
-    // Validate URL if provided
-    if (updates.url) {
-      try {
-        new URL(updates.url);
-      } catch {
-        throw new Error("Invalid URL");
-      }
-    }
+    const { access } = await requireWebhookRecord(ctx, args.webhookId, true);
+    const webhookId = args.webhookId;
+    const updates = Object.fromEntries(Object.entries({
+      name: args.name, url: args.url, secret: args.secret,
+      events: args.events, filters: args.filters, active: args.active,
+    }).filter(([, value]) => value !== undefined));
+    if (args.url !== undefined) validateWebhookUrl(args.url);
+    await validateWebhookAgents(ctx, access.project._id, args.filters?.agentIds);
     
     await ctx.db.patch(webhookId, updates);
-    
+    await auditWebhookChange(ctx, { access, webhookId, action: "WEBHOOK_UPDATED" });
     return { success: true };
   },
 });
@@ -148,7 +217,9 @@ export const update = mutation({
 export const remove = mutation({
   args: { webhookId: v.id("webhooks") },
   handler: async (ctx, args) => {
+    const { access } = await requireWebhookRecord(ctx, args.webhookId, true);
     await ctx.db.delete(args.webhookId);
+    await auditWebhookChange(ctx, { access, webhookId: args.webhookId, action: "WEBHOOK_REMOVED" });
     return { success: true };
   },
 });
@@ -166,6 +237,15 @@ export const triggerEvent = internalMutation({
     agentId: v.optional(v.id("agents")),
   },
   handler: async (ctx, args) => {
+    const project = args.projectId ? await ctx.db.get(args.projectId) : null;
+    if (!project?.tenantId) throw new Error("Webhook events require a valid workspace scope.");
+    for (const id of [args.taskId, args.agentId]) {
+      if (!id) continue;
+      const source = await ctx.db.get(id);
+      if (!source || source.projectId !== project._id || (source.tenantId && source.tenantId !== project.tenantId)) {
+        throw new Error("Webhook event source does not match its workspace scope.");
+      }
+    }
     // Find matching webhooks
     let webhooks = await ctx.db
       .query("webhooks")
@@ -173,9 +253,7 @@ export const triggerEvent = internalMutation({
       .collect();
     
     // Filter by project
-    if (args.projectId) {
-      webhooks = webhooks.filter((w) => !w.projectId || w.projectId === args.projectId);
-    }
+    webhooks = webhooks.filter(w => w.projectId === project._id && (!w.tenantId || w.tenantId === project.tenantId));
     
     // Filter by event subscription
     webhooks = webhooks.filter((w) => w.events.includes(args.event));
@@ -206,7 +284,8 @@ export const triggerEvent = internalMutation({
       // Create delivery
       await ctx.db.insert("webhookDeliveries", {
         webhookId: webhook._id,
-        projectId: args.projectId,
+        tenantId: project.tenantId,
+        projectId: project._id,
         event: args.event,
         payload: args.payload,
         url: webhook.url,
@@ -242,7 +321,17 @@ export const deliverPending = internalAction({
         webhookId: delivery.webhookId,
       });
 
-      if (!webhook) continue;
+      if (!webhook || !webhook.active || webhook.projectId !== delivery.projectId
+        || (delivery.tenantId && delivery.tenantId !== webhook.tenantId)
+        || webhook.url !== delivery.url) {
+        await ctx.runMutation(internal.webhooks.markFailed, {
+          deliveryId: delivery._id,
+          webhookId: delivery.webhookId,
+          error: "Webhook delivery binding is no longer current or authorized.",
+          permanent: true,
+        });
+        continue;
+      }
 
       try {
         const signature = await hmacSha256Hex(
@@ -252,6 +341,7 @@ export const deliverPending = internalAction({
 
         const response = await fetch(delivery.url, {
           method: "POST",
+          redirect: "error",
           headers: {
             "Content-Type": "application/json",
             "X-Webhook-Signature": signature,
@@ -295,10 +385,19 @@ export const deliverPending = internalAction({
 export const getPendingDeliveries = internalMutation({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
+    const pending = await ctx.db
       .query("webhookDeliveries")
       .withIndex("by_status", (q) => q.eq("status", "PENDING"))
+      .filter(q => q.lt(q.field("attempts"), q.field("maxAttempts")))
       .take(10);
+    const retrying = await ctx.db
+      .query("webhookDeliveries")
+      .withIndex("by_next_retry", q => q.gte("nextRetryAt", 0).lte("nextRetryAt", Date.now()))
+      .filter(q => q.and(q.eq(q.field("status"), "RETRYING"), q.lt(q.field("attempts"), q.field("maxAttempts"))))
+      .take(10);
+    return [...pending, ...retrying]
+      .sort((a, b) => (a.nextRetryAt ?? a._creationTime) - (b.nextRetryAt ?? b._creationTime))
+      .slice(0, 10);
   },
 });
 
@@ -306,7 +405,11 @@ export const getPendingDeliveries = internalMutation({
 export const getWebhook = internalMutation({
   args: { webhookId: v.id("webhooks") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.webhookId);
+    const webhook = await ctx.db.get(args.webhookId);
+    const project = webhook?.projectId ? await ctx.db.get(webhook.projectId) : null;
+    if (!webhook || !project?.tenantId || (webhook.tenantId && webhook.tenantId !== project.tenantId)) return null;
+    try { validateWebhookUrl(webhook.url); } catch { return null; }
+    return { ...webhook, tenantId: project.tenantId };
   },
 });
 
@@ -343,6 +446,7 @@ export const markFailed = internalMutation({
     webhookId: v.id("webhooks"),
     responseStatus: v.optional(v.number()),
     error: v.string(),
+    permanent: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -352,7 +456,7 @@ export const markFailed = internalMutation({
     
     const attempts = delivery.attempts + 1;
     
-    if (attempts >= delivery.maxAttempts) {
+    if (args.permanent || attempts >= delivery.maxAttempts) {
       // Max retries reached
       await ctx.db.patch(args.deliveryId, {
         status: "FAILED",

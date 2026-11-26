@@ -41,6 +41,14 @@ describe("Review Intelligence deterministic golden path", () => {
       prChecks: [{ workflowRunId: acceptedLineage.workflowRunId, prUrl: "https://github.com/acme/repo/pull/42", repoFullName: "acme/repo", branch: "codex/checkout", headSha: acceptedLineage.candidateRevision, prState: "OPEN", ciStatus: "PASS", source: "GITHUB", syncedAt: 195 }],
       fileChanges: [{ repositoryPath: "convex/auth.ts" }], rollbackApproach: "Revert PR #42.",
       expectedRepository: "acme/repo",
+      currentVerification: {
+        current: true, eligible: true, reasons: [],
+        sourceAttemptId: acceptedLineage.workflowRunId, candidateRevision: acceptedLineage.candidateRevision,
+        verificationReceiptId: "receipt-gate", verificationRunId: "verification-run:1",
+        exactIdentity: { workOrderId: acceptedLineage.workOrderId, workOrderRevisionNumber: 4,
+          sourceAttemptId: acceptedLineage.workflowRunId, verificationContractDigest: "sha256:contract",
+          verificationSubjectDigest: "sha256:subject" },
+      },
     });
     expect(review.status).toBe("READY");
     expect(review.criteria[0].status).toBe("PASS");

@@ -4,6 +4,12 @@ Date: November 26, 2026
 
 Source baseline: `b6bfc6a85eaa99e5af3f8fa7d3a2b947a888788a`.
 
+This is the historical comparison that led to the authorized implementation.
+See the [current implementation report](2026-11-26-authorized-factory-improvements.md)
+for the adapters, replay, readiness, and review changes now present in the
+working tree. References below to capabilities not yet implemented describe
+the inspected baseline, not the current patch.
+
 ## Decision
 
 Keep Mission Control's existing lifecycle, immutable Factory Versions,

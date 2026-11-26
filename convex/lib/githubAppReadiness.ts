@@ -36,9 +36,10 @@ const ACCESS_RANK: Record<GithubPermissionAccess, number> = {
 export function evaluateGithubAppCapabilities(input: {
   permissions: GithubPermissionGrant[];
   subscribedEvents: string[];
+  issueIntakeEnabled?: boolean;
 }) {
   const grants = new Map(input.permissions.map((item) => [item.name, item.access]));
-  const requiredNames = new Set(REQUIRED_GITHUB_APP_PERMISSIONS.map((item) => item.name));
+  const requiredNames = new Set<string>(REQUIRED_GITHUB_APP_PERMISSIONS.map((item) => item.name));
   const missingPermissions = REQUIRED_GITHUB_APP_PERMISSIONS.flatMap((required) => {
     const actual = grants.get(required.name) ?? "none";
     return ACCESS_RANK[actual] < ACCESS_RANK[required.access]
@@ -51,14 +52,20 @@ export function evaluateGithubAppCapabilities(input: {
       const required = REQUIRED_GITHUB_APP_PERMISSIONS.find(
         (candidate) => candidate.name === item.name
       );
+      if (input.issueIntakeEnabled && item.name === "issues" && item.access === "read") return false;
       return !required || ACCESS_RANK[item.access] > ACCESS_RANK[required.access];
     })
     .map((item) => `${item.name}:${item.access}`)
     .sort();
   const subscribed = new Set(input.subscribedEvents);
-  const missingEvents = REQUIRED_GITHUB_WEBHOOK_EVENTS.filter(
+  const missingEvents: string[] = REQUIRED_GITHUB_WEBHOOK_EVENTS.filter(
     (event) => !subscribed.has(event)
   );
+  if (input.issueIntakeEnabled) {
+    requiredNames.add("issues");
+    if (grants.get("issues") !== "read") missingPermissions.push("issues:read");
+    if (!subscribed.has("issues")) missingEvents.push("issues");
+  }
 
   return {
     ready:

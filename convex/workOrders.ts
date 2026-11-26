@@ -2369,7 +2369,7 @@ async function reconcilePreExecutionReservation(
   });
 }
 
-async function dispatchWorkOrder(
+export async function dispatchWorkOrder(
   ctx: MutationCtx,
   args: DispatchArgs,
   options: DispatchContextOptions = {},

@@ -43,6 +43,7 @@ import {
   type TraceObservationRecord,
 } from "../traceViewModel";
 import { EvalControlPlanePanel } from "../components/EvalControlPlanePanel";
+import { FactoryReplayPanel } from "../../factoryExperience/FactoryReplayPanel";
 
 export interface TraceInspectorViewProps {
   onNavigate: (view: string) => void;
@@ -584,10 +585,21 @@ function EvalLibrary({ analytics }: { analytics: EvalAnalyticsRecord[] }) {
 
 function DatasetLibrary({ datasets, experiments }: { datasets: EvalDatasetRecord[]; experiments: ExperimentRecord[] }) {
   return (
+    <>
     <div className="grid gap-4 px-4 pt-4 sm:px-6 xl:grid-cols-2">
       <section className="overflow-hidden rounded-xl border border-line bg-surface-1"><div className="border-b border-line px-4 py-3"><div className="flex items-center gap-2"><Database size={15} className="text-ink-muted" /><h2 className="text-[14px] font-semibold text-ink">Eval datasets</h2></div><p className="mt-0.5 text-[11.5px] text-ink-muted">Sanitized regression cases promoted from investigated traces.</p></div>{datasets.length ? <div className="divide-y divide-line">{datasets.map((dataset) => <div key={dataset._id} className="flex items-center justify-between gap-4 px-4 py-3"><div><div className="text-[12.5px] font-medium text-ink">{dataset.name}</div><div className="mt-0.5 text-[10.5px] text-ink-muted">v{dataset.version} · updated {new Date(dataset.updatedAt).toLocaleDateString()}</div></div><div className="font-mono text-[12px] text-ink">{dataset.itemCount} cases</div></div>)}</div> : <div className="p-8 text-center text-[12px] text-ink-muted">No datasets yet. Promote a trace to close the learning loop.</div>}</section>
       <section className="overflow-hidden rounded-xl border border-line bg-surface-1"><div className="border-b border-line px-4 py-3"><div className="flex items-center gap-2"><BarChart3 size={15} className="text-ink-muted" /><h2 className="text-[14px] font-semibold text-ink">Experiments</h2></div><p className="mt-0.5 text-[11.5px] text-ink-muted">Fixed Factory/model/executor variants compared against a fixed dataset version.</p></div>{experiments.length ? <div className="divide-y divide-line">{experiments.map((experiment) => <div key={experiment._id} className="px-4 py-3"><div className="flex items-center justify-between gap-3"><div className="text-[12.5px] font-medium text-ink">{experiment.name}</div><StatusBadge tone={experiment.status === "COMPLETED" ? "success" : experiment.status === "FAILED" ? "error" : "neutral"}>{humanize(experiment.status)}</StatusBadge></div><div className="mt-2 grid gap-2 sm:grid-cols-2">{experiment.variants.map((variant) => <div key={variant._id} className="rounded-md border border-line bg-surface-2 p-2.5"><div className="text-[11.5px] font-medium text-ink">{variant.name}</div><div className="mt-1 font-mono text-[10px] text-ink-muted">n={variant.sampleSize} · score {variant.metrics?.averageScore?.toFixed(2) ?? "—"} · success {formatPercent(variant.metrics?.successRate)}</div></div>)}</div><div className="mt-2 text-[10px] text-ink-muted">Dataset v{experiment.datasetVersion}; small samples are shown without significance claims.</div></div>)}</div> : <div className="p-8 text-center text-[12px] text-ink-muted">No experiments yet. Create one after a regression dataset has stable cases.</div>}</section>
     </div>
+    <div className="space-y-3 px-4 py-4 sm:px-6">
+      {experiments.filter((experiment) => Boolean(experiment.metadata?.factoryReplayManifestId)
+        || experiment.status === "DRAFT" && experiment.variants.length === 2 && experiment.variants.every((variant) => Boolean(variant.factoryDefinitionVersionId)))
+        .map((experiment) => <div key={experiment._id}>
+          <h3 className="text-sm font-medium text-ink">{experiment.name}</h3>
+          <FactoryReplayPanel experimentId={experiment._id} experimentStatus={experiment.status}
+            hasManifest={Boolean(experiment.metadata?.factoryReplayManifestId)} canFreeze={experiment.status === "DRAFT"} />
+        </div>)}
+    </div>
+    </>
   );
 }
 

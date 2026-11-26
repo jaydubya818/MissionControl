@@ -64,6 +64,7 @@ import {
   reviewCorrectionCategoryValidator,
 } from "./lib/reviewIntelligenceValidators";
 import { evalControlPlaneTables } from "./lib/evalControlPlaneSchema";
+import { factoryReplayTables } from "./lib/factoryReplaySchema";
 import {
   factoryIncidentContainmentActionValidator,
   factoryIncidentControlExecutionValidator,
@@ -72,6 +73,7 @@ import {
   factoryIncidentProposalKindValidator,
   factoryIncidentSeverityValidator,
 } from "./lib/factoryIncident";
+import { intakeSourceValidator } from "./lib/factoryIntake";
 import {
   factoryIncidentControlReceiptTypeValidator,
   repositoryDispatchAdmissionValidator,
@@ -1143,6 +1145,7 @@ export const schemaTablesPartOne = {
   // installation tokens are minted by the orchestration boundary and are never
   // persisted in Convex.
   githubAppInstallations: defineTable({
+    issueIntakeEnabled: v.optional(v.boolean()),
     tenantId: v.optional(v.id("tenants")),
     projectId: v.id("projects"),
     repositoryId: v.id("workspaceRepositories"),
@@ -1221,7 +1224,10 @@ export const schemaTablesPartOne = {
       v.literal("IGNORED"),
       v.literal("FAILED")
     ),
-    replayState: v.union(v.literal("ORIGINAL"), v.literal("DUPLICATE")),
+    replayState: v.union(v.literal("ORIGINAL"), v.literal("DUPLICATE"), v.literal("RETRY")),
+    payloadDigest: v.optional(v.string()),
+    processingLeaseExpiresAt: v.optional(v.number()),
+    failureHistory: v.optional(v.array(v.object({ attempt: v.number(), reason: v.string(), at: v.number() }))),
     attemptCount: v.number(),
     receivedAt: v.number(),
     lastAttemptAt: v.number(),
@@ -1233,6 +1239,71 @@ export const schemaTablesPartOne = {
     .index("by_repository", ["repositoryId"])
     .index("by_installation", ["installationId"])
     .index("by_received", ["receivedAt"]),
+
+  factoryIntakePolicies: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    version: v.number(),
+    enabled: v.boolean(),
+    githubEnabled: v.boolean(),
+    githubInstallationId: v.optional(v.string()),
+    githubRequiredLabel: v.string(),
+    githubActorIds: v.array(v.string()),
+    productErrorsEnabled: v.boolean(),
+    productConnectionKey: v.optional(v.string()),
+    productSecretEnv: v.optional(v.string()),
+    productActorIds: v.array(v.string()),
+    application: v.optional(v.string()),
+    environmentId: v.optional(v.id("environments")),
+    ownerMemberId: v.id("orgMembers"),
+    owningTeamId: v.id("scrumTeams"),
+    codeScopeIds: v.array(v.id("repositoryCodeScopes")),
+    budgetUsd: v.number(),
+    maxCorrectiveIterations: v.number(),
+    maxMissionsPerHour: v.number(),
+    authorizedBy: v.id("operators"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_repository", ["repositoryId"])
+    .index("by_product_connection", ["productConnectionKey"])
+    .index("by_project", ["projectId"]),
+
+  factoryIntakeDeliveries: defineTable({
+    tenantId: v.id("tenants"),
+    projectId: v.id("projects"),
+    repositoryId: v.id("workspaceRepositories"),
+    policyId: v.id("factoryIntakePolicies"),
+    receivedPolicyVersion: v.number(),
+    processedPolicyVersion: v.optional(v.number()),
+    deliveryKey: v.string(),
+    payloadDigest: v.string(),
+    source: intakeSourceValidator,
+    sourceKey: v.string(),
+    githubDeliveryId: v.optional(v.id("githubWebhookDeliveries")),
+    status: v.union(v.literal("RECEIVED"), v.literal("PROCESSED"), v.literal("IGNORED"), v.literal("FAILED")),
+    outcome: v.optional(v.union(v.literal("CREATED"), v.literal("CORRELATED"), v.literal("RECURRENCE"), v.literal("REGRESSION"), v.literal("IGNORED"))),
+    reason: v.optional(v.string()),
+    attempts: v.number(),
+    failures: v.array(v.object({ attempt: v.number(), code: v.string(), at: v.number() })),
+    receivedAt: v.number(),
+    processedAt: v.optional(v.number()),
+    lastScheduledAt: v.optional(v.number()),
+    missionId: v.optional(v.id("missions")),
+    incidentId: v.optional(v.id("factoryIncidents")),
+    previousDeliveryId: v.optional(v.id("factoryIntakeDeliveries")),
+    restoredReleaseId: v.optional(v.id("factoryReleases")),
+    restorationReceiptId: v.optional(v.id("verificationReceipts")),
+    restorationObservedAt: v.optional(v.number()),
+    restorationRecordedBy: v.optional(v.id("operators")),
+  })
+    .index("by_policy_delivery", ["policyId", "deliveryKey"])
+    .index("by_policy_source", ["policyId", "sourceKey", "receivedAt"])
+    .index("by_policy_received", ["policyId", "receivedAt"])
+    .index("by_policy_outcome_processed", ["policyId", "outcome", "processedAt"])
+    .index("by_project_received", ["projectId", "receivedAt"])
+    .index("by_status", ["status", "receivedAt"]),
 
   factoryProviderPrices: defineTable({
     projectId: v.id("projects"), snapshot: providerPriceValidator, digest: v.string(),
@@ -7513,6 +7584,7 @@ export const schemaTablesPartTwo = {
   // EVAL CONTROL PLANE (diagnostic evidence; never acceptance authority)
   // -------------------------------------------------------------------------
   ...evalControlPlaneTables,
+  ...factoryReplayTables,
   ...capabilityPolicyTables,
 
   // -------------------------------------------------------------------------

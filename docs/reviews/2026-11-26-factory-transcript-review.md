@@ -6,6 +6,11 @@ Source: `jaydubya818/MissionControl` at `b6bfc6a85eaa99e5af3f8fa7d3a2b947a888788
 
 Working branch: `codex/mission-control-transcript-qualification`.
 
+This is the historical review before the owner's instruction to proceed with
+all improvements. The [authorized implementation report](2026-11-26-authorized-factory-improvements.md)
+records the current source changes and verification results. The live to-do
+qualification remains open in both reports.
+
 ## Outcome
 
 Mission Control should retain its current delivery architecture and concentrate

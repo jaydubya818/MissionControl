@@ -101,6 +101,7 @@ export function buildFactoryAttemptReviewReadModel(input: {
       ? pullRequestArtifact.metadata.installationId
       : null,
     receiptWorkflowRunId,
+    currentVerification: input.currentVerification,
   });
   const reviewIntelligence = buildReviewIntelligenceProjection({
     workOrder: input.workOrder,

@@ -242,6 +242,13 @@ export const resolve = action({
     if (learningCandidate && (!experimentReview || experimentReview.experiment.status !== "COMPLETED")) {
       throw new Error("Complete the linked canonical experiment before creating governed implementation work");
     }
+    if (experimentReview?.experiment.metadata?.factoryReplayManifestId) {
+      const replay = "replay" in experimentReview ? experimentReview.replay : undefined;
+      if (!replay?.comparison.complete || !replay.comparison.sampleSufficient
+        || replay.comparison.recommendation.recommendation !== "PROMOTION_RECOMMENDED") {
+        throw new Error("Frozen replay requires a current complete matched comparison recommending promotion before governed work can be created");
+      }
+    }
     const project = await ctx.runQuery(api.projects.get, { projectId: suggestion.projectId });
     if (!project) throw new Error("Suggestion workspace not found");
     if (!project.githubRepo) throw new Error("Connect an approved repository before accepting repository-changing improvement work");

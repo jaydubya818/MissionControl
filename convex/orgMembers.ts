@@ -4,8 +4,121 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
-import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import {
+  COMPANY_PERMISSIONS,
+  listAccessibleWorkspaces,
+  listCompanyMemberships,
+  requireCompanyAccess,
+  requireCompanyPermission,
+  requireWorkspaceAccess,
+} from "./lib/companyAccess";
+
+type MemberScope = Pick<Doc<"orgMembers">, "tenantId" | "projectId">;
+
+async function requireMemberIdentity(ctx: QueryCtx | MutationCtx) {
+  if (!await ctx.auth.getUserIdentity()) throw new Error("Authentication is required for member administration.");
+}
+
+async function memberTenant(ctx: QueryCtx | MutationCtx, scope: MemberScope) {
+  const project = scope.projectId ? await ctx.db.get(scope.projectId) : null;
+  if (scope.projectId && (!project?.tenantId || (scope.tenantId && project.tenantId !== scope.tenantId))) {
+    throw new Error("Member workspace scope is unavailable or unauthorized.");
+  }
+  const tenantId = scope.tenantId ?? project?.tenantId;
+  if (!tenantId) throw new Error("Member company scope is unavailable or unauthorized.");
+  return tenantId;
+}
+
+async function requireMemberAdministration(ctx: MutationCtx, scope: MemberScope) {
+  await requireMemberIdentity(ctx);
+  const tenantId = await memberTenant(ctx, scope);
+  const membership = await requireCompanyPermission(ctx, tenantId, COMPANY_PERMISSIONS.MANAGE_MEMBERS);
+  return { tenantId, actorId: String(membership.operatorId) };
+}
+
+async function requireMemberRecord(ctx: MutationCtx, id: Id<"orgMembers">) {
+  await requireMemberIdentity(ctx);
+  const member = await ctx.db.get(id);
+  if (!member) throw new Error("Member is unavailable or unauthorized.");
+  const authority = await requireMemberAdministration(ctx, member);
+  return { member, ...authority };
+}
+
+async function readableMemberScope(ctx: QueryCtx | MutationCtx, projectId?: Id<"projects">) {
+  await requireMemberIdentity(ctx);
+  if (projectId) {
+    const tenantId = await memberTenant(ctx, { projectId });
+    await requireWorkspaceAccess(ctx, tenantId, projectId);
+    return { projects: new Map([[projectId, tenantId]]), tenants: new Set<Id<"tenants">>() };
+  }
+  const memberships = await listCompanyMemberships(ctx);
+  const projects = (await Promise.all(memberships.map(membership =>
+    listAccessibleWorkspaces(ctx, membership.tenant._id)
+  ))).flat();
+  return {
+    projects: new Map(projects.map(project => [project._id, project.tenantId])),
+    tenants: new Set(memberships.map(membership => membership.tenant._id)),
+  };
+}
+
+function matchesMemberScope(row: MemberScope, scope: Awaited<ReturnType<typeof readableMemberScope>>) {
+  return row.projectId
+    ? scope.projects.has(row.projectId) && (!row.tenantId || row.tenantId === scope.projects.get(row.projectId))
+    : Boolean(row.tenantId && scope.tenants.has(row.tenantId));
+}
+
+async function readableMembers(ctx: QueryCtx, projectId?: Id<"projects">) {
+  const scope = await readableMemberScope(ctx, projectId);
+  const rows = projectId
+    ? await ctx.db.query("orgMembers").withIndex("by_project", q => q.eq("projectId", projectId)).collect()
+    : await ctx.db.query("orgMembers").collect();
+  return rows.filter(row => row.active && matchesMemberScope(row, scope));
+}
+
+async function validateMemberReferences(ctx: MutationCtx, input: {
+  tenantId: Id<"tenants">;
+  projectId?: Id<"projects">;
+  memberId?: Id<"orgMembers">;
+  parentMemberId?: Id<"orgMembers">;
+  projectAccess?: Doc<"orgMembers">["projectAccess"];
+}) {
+  for (const entry of input.projectAccess ?? []) {
+    const project = await ctx.db.get(entry.projectId);
+    if (!project || project.tenantId !== input.tenantId) throw new Error("Project access must remain within the member's company.");
+  }
+  const seen = new Set<Id<"orgMembers">>();
+  let parentId = input.parentMemberId;
+  while (parentId) {
+    if (parentId === input.memberId || seen.has(parentId)) throw new Error("Member hierarchy cannot contain a cycle.");
+    seen.add(parentId);
+    const parent = await ctx.db.get(parentId);
+    if (!parent || parent.projectId !== input.projectId || await memberTenant(ctx, parent) !== input.tenantId) {
+      throw new Error("Parent member must belong to the same workspace scope.");
+    }
+    parentId = parent.parentMemberId;
+  }
+}
+
+async function auditMemberChange(ctx: MutationCtx, input: {
+  tenantId: Id<"tenants">;
+  actorId: string;
+  projectId?: Id<"projects">;
+  memberId: Id<"orgMembers">;
+  action: string;
+}) {
+  await ctx.db.insert("activities", {
+    tenantId: input.tenantId,
+    projectId: input.projectId,
+    actorType: "HUMAN",
+    actorId: input.actorId,
+    action: input.action,
+    description: "Updated company member profile",
+    targetType: "ORG_MEMBER",
+    targetId: String(input.memberId),
+  });
+}
 
 // ============================================================================
 // RBAC VALIDATORS
@@ -42,13 +155,7 @@ export const list = query({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const members = await ctx.db
-      .query("orgMembers")
-      .withIndex("by_project", (q) =>
-        args.projectId ? q.eq("projectId", args.projectId) : q
-      )
-      .filter((q) => q.eq(q.field("active"), true))
-      .collect();
+    const members = await readableMembers(ctx, args.projectId);
 
     return members.sort((a, b) => a.level - b.level);
   },
@@ -60,10 +167,7 @@ export const list = query({
 export const listAll = query({
   args: {},
   handler: async (ctx) => {
-    const members = await ctx.db
-      .query("orgMembers")
-      .filter((q) => q.eq(q.field("active"), true))
-      .collect();
+    const members = await readableMembers(ctx);
 
     return members.sort((a, b) => a.level - b.level);
   },
@@ -77,13 +181,7 @@ export const getHierarchy = query({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const members = await ctx.db
-      .query("orgMembers")
-      .withIndex("by_project", (q) =>
-        args.projectId ? q.eq("projectId", args.projectId) : q
-      )
-      .filter((q) => q.eq(q.field("active"), true))
-      .collect();
+    const members = await readableMembers(ctx, args.projectId);
 
     // Build tree structure
     const memberMap = new Map(members.map((m) => [m._id, { ...m, children: [] as any[] }]));
@@ -112,22 +210,17 @@ export const getUnifiedHierarchy = query({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    // Fetch human org members
-    const members = await ctx.db
-      .query("orgMembers")
-      .withIndex("by_project", (q) =>
-        args.projectId ? q.eq("projectId", args.projectId) : q
-      )
-      .filter((q) => q.eq(q.field("active"), true))
-      .collect();
+    const members = await readableMembers(ctx, args.projectId);
+    const scope = await readableMemberScope(ctx, args.projectId);
 
     // Fetch agents
-    const agents = args.projectId
+    const candidateAgents = args.projectId
       ? await ctx.db
           .query("agents")
           .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
           .collect()
       : await ctx.db.query("agents").collect();
+    const agents = candidateAgents.filter(agent => matchesMemberScope(agent, scope));
 
     // Build human hierarchy first
     const memberMap = new Map(
@@ -215,7 +308,13 @@ export const get = query({
     id: v.id("orgMembers"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
+    await requireMemberIdentity(ctx);
+    const member = await ctx.db.get(args.id);
+    if (!member) return null;
+    const tenantId = await memberTenant(ctx, member);
+    if (member.projectId) await requireWorkspaceAccess(ctx, tenantId, member.projectId);
+    else await requireCompanyAccess(ctx, tenantId);
+    return member;
   },
 });
 
@@ -243,32 +342,34 @@ export const create = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const project = args.projectId ? await ctx.db.get(args.projectId) : null;
-    if (args.projectId && (!project || !project.tenantId)) {
-      throw new Error("Workspace company assignment is incomplete");
-    }
-    if (project?.tenantId) {
-      await requireWorkspaceAccess(ctx, project.tenantId, project._id, {
-        permission: COMPANY_PERMISSIONS.MANAGE_WORKSPACES,
-      });
-    }
+    await requireMemberIdentity(ctx);
+    if (!args.projectId) throw new Error("A workspace is required when creating a member profile.");
+    const authority = await requireMemberAdministration(ctx, args);
+    await validateMemberReferences(ctx, { ...args, ...authority });
     // Check for duplicate email
     if (args.email) {
       const existing = await ctx.db
         .query("orgMembers")
         .withIndex("by_email", (q) => q.eq("email", args.email))
-        .first();
-      if (existing && existing.active) {
+        .collect();
+      const sameCompany = await Promise.all(existing.filter(member => member.active).map(async member => {
+        const project = member.projectId ? await ctx.db.get(member.projectId) : null;
+        const tenantId = member.tenantId ?? project?.tenantId;
+        return tenantId === authority.tenantId && (!member.projectId || project?.tenantId === tenantId);
+      }));
+      if (sameCompany.some(Boolean)) {
         throw new Error(`A member with email ${args.email} already exists`);
       }
     }
 
-    return await ctx.db.insert("orgMembers", {
+    const memberId = await ctx.db.insert("orgMembers", {
       ...args,
-      tenantId: project?.tenantId,
+      tenantId: authority.tenantId,
       active: true,
       invitedAt: Date.now(),
     });
+    await auditMemberChange(ctx, { ...authority, projectId: args.projectId, memberId, action: "ORG_MEMBER_CREATED" });
+    return memberId;
   },
 });
 
@@ -293,11 +394,21 @@ export const update = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const { id, ...updates } = args;
+    const { id } = args;
+    const updates = {
+      name: args.name, email: args.email, role: args.role, title: args.title,
+      avatar: args.avatar, parentMemberId: args.parentMemberId, level: args.level,
+      responsibilities: args.responsibilities, systemRole: args.systemRole,
+      projectAccess: args.projectAccess, permissions: args.permissions,
+      active: args.active, metadata: args.metadata,
+    };
+    const { member, ...authority } = await requireMemberRecord(ctx, id);
+    await validateMemberReferences(ctx, { ...authority, projectId: member.projectId, memberId: id, parentMemberId: updates.parentMemberId, projectAccess: updates.projectAccess });
     const filtered = Object.fromEntries(
       Object.entries(updates).filter(([_, v]) => v !== undefined)
     );
     await ctx.db.patch(id, filtered);
+    await auditMemberChange(ctx, { ...authority, projectId: member.projectId, memberId: id, action: "ORG_MEMBER_UPDATED" });
     return id;
   },
 });
@@ -313,8 +424,8 @@ export const updatePermissions = mutation({
     permissions: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const member = await ctx.db.get(args.id);
-    if (!member) throw new Error("Member not found");
+    const { member, ...authority } = await requireMemberRecord(ctx, args.id);
+    await validateMemberReferences(ctx, { ...authority, projectId: member.projectId, memberId: args.id, projectAccess: args.projectAccess });
 
     const updates: Record<string, any> = {};
     if (args.systemRole !== undefined) updates.systemRole = args.systemRole;
@@ -322,6 +433,7 @@ export const updatePermissions = mutation({
     if (args.permissions !== undefined) updates.permissions = args.permissions;
 
     await ctx.db.patch(args.id, updates);
+    await auditMemberChange(ctx, { ...authority, projectId: member.projectId, memberId: args.id, action: "ORG_MEMBER_PERMISSIONS_UPDATED" });
     return args.id;
   },
 });
@@ -336,8 +448,8 @@ export const addProjectAccess = mutation({
     accessLevel: accessLevelValidator,
   },
   handler: async (ctx, args) => {
-    const member = await ctx.db.get(args.memberId);
-    if (!member) throw new Error("Member not found");
+    const { member, ...authority } = await requireMemberRecord(ctx, args.memberId);
+    await validateMemberReferences(ctx, { ...authority, projectId: member.projectId, projectAccess: [{ projectId: args.projectId, accessLevel: args.accessLevel }] });
 
     const existing = member.projectAccess || [];
     // Remove any existing access for this project
@@ -350,6 +462,7 @@ export const addProjectAccess = mutation({
     });
 
     await ctx.db.patch(args.memberId, { projectAccess: filtered });
+    await auditMemberChange(ctx, { ...authority, projectId: member.projectId, memberId: args.memberId, action: "ORG_MEMBER_PROJECT_ACCESS_ADDED" });
     return args.memberId;
   },
 });
@@ -363,8 +476,8 @@ export const removeProjectAccess = mutation({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
-    const member = await ctx.db.get(args.memberId);
-    if (!member) throw new Error("Member not found");
+    const { member, ...authority } = await requireMemberRecord(ctx, args.memberId);
+    await validateMemberReferences(ctx, { ...authority, projectId: member.projectId, projectAccess: [{ projectId: args.projectId, accessLevel: "VIEW" }] });
 
     const existing = member.projectAccess || [];
     const filtered = existing.filter(
@@ -372,6 +485,7 @@ export const removeProjectAccess = mutation({
     );
 
     await ctx.db.patch(args.memberId, { projectAccess: filtered });
+    await auditMemberChange(ctx, { ...authority, projectId: member.projectId, memberId: args.memberId, action: "ORG_MEMBER_PROJECT_ACCESS_REMOVED" });
     return args.memberId;
   },
 });
@@ -384,7 +498,9 @@ export const remove = mutation({
     id: v.id("orgMembers"),
   },
   handler: async (ctx, args) => {
+    const { member, ...authority } = await requireMemberRecord(ctx, args.id);
     await ctx.db.patch(args.id, { active: false });
+    await auditMemberChange(ctx, { ...authority, projectId: member.projectId, memberId: args.id, action: "ORG_MEMBER_REMOVED" });
     return args.id;
   },
 });
@@ -399,10 +515,8 @@ export const move = mutation({
     newLevel: v.number(),
   },
   handler: async (ctx, args) => {
-    const member = await ctx.db.get(args.id);
-    if (!member) {
-      throw new Error("Member not found");
-    }
+    const { member, ...authority } = await requireMemberRecord(ctx, args.id);
+    await validateMemberReferences(ctx, { ...authority, projectId: member.projectId, memberId: args.id, parentMemberId: args.newParentId });
 
     const oldLevel = member.level;
     const levelDelta = args.newLevel - oldLevel;
@@ -415,12 +529,14 @@ export const move = mutation({
 
     // Update all descendants' levels recursively
     if (levelDelta !== 0) {
-      const allMembers = await ctx.db
+      const candidates = await ctx.db
         .query("orgMembers")
         .withIndex("by_project", (q) =>
           member.projectId ? q.eq("projectId", member.projectId) : q
         )
         .collect();
+      const allMembers = candidates.filter(candidate => candidate.projectId === member.projectId
+        && (candidate.tenantId === authority.tenantId || (candidate.projectId && !candidate.tenantId)));
 
       const childrenMap = new Map<Id<"orgMembers">, Id<"orgMembers">[]>();
       for (const m of allMembers) {
@@ -431,9 +547,12 @@ export const move = mutation({
         }
       }
 
+      const visited = new Set<Id<"orgMembers">>([args.id]);
       const updateDescendants = async (parentId: Id<"orgMembers">) => {
         const children = childrenMap.get(parentId) || [];
         for (const childId of children) {
+          if (visited.has(childId)) throw new Error("Member hierarchy cannot contain a cycle.");
+          visited.add(childId);
           const child = allMembers.find((m) => m._id === childId);
           if (child) {
             await ctx.db.patch(childId, {
@@ -446,7 +565,7 @@ export const move = mutation({
 
       await updateDescendants(args.id);
     }
-
+    await auditMemberChange(ctx, { ...authority, projectId: member.projectId, memberId: args.id, action: "ORG_MEMBER_MOVED" });
     return args.id;
   },
 });

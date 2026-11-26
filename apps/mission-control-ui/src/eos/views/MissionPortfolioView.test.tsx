@@ -29,6 +29,10 @@ vi.mock("../../factoryExperience/CreateFactoryMissionDialog", () => ({
   CreateFactoryMissionDialog: () => null,
 }));
 
+vi.mock("../../factoryExperience/FactoryIntakePanel", () => ({
+  FactoryIntakePanel: () => <section aria-label="External work intake">Preview intake</section>,
+}));
+
 vi.mock("../../factoryExperience/ExperienceLevelSelector", () => ({
   ExperienceLevelSelector: () => null,
 }));

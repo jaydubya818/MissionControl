@@ -662,6 +662,9 @@ export const recordExperimentOutcome = mutation({
     const experiment = await ctx.db.get(args.experimentId);
     if (!experiment) throw new Error("Experiment not found.");
     const access = await requireWorkspacePermission(ctx, experiment.projectId, FACTORY_PERMISSIONS.IMPROVE);
+    if (experiment.metadata?.factoryReplayManifestId) {
+      throw new Error("Frozen replay outcomes must be derived from canonical Attempts and independent evidence.");
+    }
     if (experiment.status === "COMPLETED" || experiment.status === "CANCELED") {
       throw new Error("Completed or canceled experiments cannot be overwritten.");
     }
@@ -777,6 +780,9 @@ export const completeDeterministicExperimentInternal = internalMutation({
   handler: async (ctx, args) => {
     const experiment = await ctx.db.get(args.experimentId);
     if (!experiment) throw new Error("Experiment not found.");
+    if (experiment.metadata?.factoryReplayManifestId) {
+      throw new Error("Deterministic fixtures cannot complete a frozen canonical replay.");
+    }
     const variants = await ctx.db.query("experimentVariants")
       .withIndex("by_experiment", (q) => q.eq("experimentId", experiment._id))
       .collect();

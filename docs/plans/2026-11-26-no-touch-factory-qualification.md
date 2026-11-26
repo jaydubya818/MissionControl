@@ -4,6 +4,12 @@ Date: 2026-11-26
 
 Source baseline: `b6bfc6a85eaa99e5af3f8fa7d3a2b947a888788a`
 
+Status after the authorized improvements: the source adapters, frozen replay,
+readiness diagnostic, and review facets are implemented and locally verified as
+described in the [current implementation report](../reviews/2026-11-26-authorized-factory-improvements.md).
+The historical findings below explain the original plan. No live workload has
+been dispatched, so the acceptance and recovery requirements remain open.
+
 ## Requested outcome
 
 Review Mission Control against four supplied Tiny Software Factories transcripts,
