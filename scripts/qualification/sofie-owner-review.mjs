@@ -55,7 +55,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
       },
     });
   }
-  let proposal, binding, missionId;
+  let proposal, binding, missionId, browserReadAuthorized=false;
   const input = {
     operation: "enterprise.propose",
     intentKey: "checkpoint-h-linked-hr",
@@ -125,7 +125,8 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
         mission: (await db.owner.query("missions:get", { missionId })).mission,
         created: false,
       };
-    await mutate("sofieEnterprise:decide", {
+    if(options.ownerUi) await options.ownerUi.authorize(binding);
+    else await mutate("sofieEnterprise:decide", {
       ...binding,
       connectionId: connection.connectionId,
       decision: "AUTHORIZE_DRAFT",
@@ -210,6 +211,7 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
         mutate("sofieOwnerReview:decideResult", { ...args, ...patch }),
         /ENTERPRISE_ACCESS_DENIED|ENTERPRISE_PLAN_STALE|ENTERPRISE_RESULT_STALE|ArgumentValidationError/,
       );
+    if(options.ownerUi && !browserReadAuthorized) await options.ownerUi.authorizeRead(binding);
     await mutate("sofieOwnerReview:authorizeResultRead", {
       ...binding,
       missionId,
@@ -232,11 +234,18 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
     await mutate("sofieOwnerReview:authorizeResultRead", { ...binding, missionId, expectedPlanDigest: args.expectedPlanDigest });
     const readAudits = (await db.owner.query("missions:get", { missionId })).events.filter(e => e.eventType === "SOFIE_RESULT_READ_AUTHORIZED");
     assert.equal(readAudits.length, 1); assert.equal(readAudits[0].actorId, s.operatorId);
+    if(options.ownerUi) {
+      assert.equal(reject,false,'Local UI journey qualifies explicit acceptance only');
+      await options.ownerUi.accept();
+      const event=(await db.owner.query('missions:get',{missionId})).events.find(e=>e.eventType==='OWNER_RESULT_ACCEPT');
+      assert.ok(event?.idempotencyKey,'Actual UI decision must have a durable audit');
+      args.idempotencyKey=event.idempotencyKey;
+    }
     const decisions = await Promise.all([
       mutate("sofieOwnerReview:decideResult", args),
       mutate("sofieOwnerReview:decideResult", args),
     ]);
-    assert.equal(decisions.filter((r) => r.created).length, 1);
+    assert.equal(decisions.filter((r) => r.created).length, options.ownerUi ? 0 : 1);
     await assert.rejects(() =>
       mutate("sofieOwnerReview:decideResult", {
         ...args,
@@ -286,6 +295,10 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
     propose,
     createMission,
     accept,
+    async authorizeBrowserResultRead(){
+      assert.ok(options.ownerUi && missionId,'Canonical local owner UI Mission required');
+      await options.ownerUi.authorizeRead(binding);browserReadAuthorized=true;
+    },
     report: () => ({
       status: "PASS",
       checks,
@@ -294,7 +307,8 @@ export async function prepareOwnerReviewFixture(db, options = {}) {
       authentication: "SYNTHETIC_API_FIXTURE",
       intakeTransport: options.applicationCommand ? "MYEVE_ACTION_GATEWAY" : "SIGNED_FIXTURE_ONLY",
       setup: { deliveryScopeBudgetAndEnvironment: "CANONICAL_OWNER_UPDATE_DRAFT", workloadTag: "DISPOSABLE_FIXTURE_METADATA_PATCH_ONLY", proposalDigestScope: "INTAKE_IDENTITY;_OWNER_AMENDS_SCOPE_AND_BUDGET_BEFORE_PLAN" },
-      browserOwnerJourney: "NOT_RUN",
+      browserOwnerJourney: options.ownerUi ? "LOCAL_SYNTHETIC_UI" : "NOT_RUN",
+      ...(options.ownerUi ? {localOwnerUi:options.ownerUi.report()} : {}),
       releaseGate: "ADVISORY",
     }),
   };

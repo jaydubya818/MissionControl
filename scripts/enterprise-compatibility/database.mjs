@@ -119,6 +119,9 @@ export async function startFixtureDatabase(repo, { canonicalAccounting = false, 
           { cwd: repo, env, encoding: "utf8", timeout: 60000, stdio: "pipe" });
       }, captureCompletedResultTiming(operation, retain) {
         return captureCompletedResultFunctionTiming(cursor => readFixtureFunctionLogPage(url, key, cursor), operation, retain);
+      }, localBrowserCredentials() {
+        // Only this disposable loopback fixture exposes synthetic browser auth.
+        return {url,key,subject:ownerSubject,projectId:seed.projectId};
       }, subscription(subject) {
         const c = new ConvexClient(url);
         c.setAdminAuth(key, { subject, issuer: "https://fixture.example.test", email: `${subject}@example.test` });

@@ -23,7 +23,13 @@ export function validateOwnerReview(report, decision, expectedMissionId) {
   assert.ok(Array.isArray(report.checks), 'Owner control manifest is required');
   assert.deepEqual([...report.checks].sort(), ownerReviewChecks(decision).sort(), 'Owner control manifest is incomplete or invalid');
   assert.equal(report.authentication, 'SYNTHETIC_API_FIXTURE');
-  assert.equal(report.browserOwnerJourney, 'NOT_RUN');
+  if(report.browserOwnerJourney==='LOCAL_SYNTHETIC_UI') {
+    assert.equal(report.localOwnerUi?.status,'PASS');
+    assert.equal(report.localOwnerUi?.authentication,'LOCAL_SYNTHETIC_ADMIN_IMPERSONATION');
+    assert.equal(report.localOwnerUi?.transport,'REAL_LOOPBACK_CONVEX');
+    assert.equal(report.localOwnerUi?.hostedClerk,'NOT_RUN');
+    assert.deepEqual(report.localOwnerUi?.checks,['actual-dashboard-and-owner-navigation','proposal-authorized-in-owner-UI','exact-Plan-approved-in-owner-UI','current-Result-read-authorized-in-owner-UI','current-Result-accepted-in-owner-UI']);
+  } else assert.equal(report.browserOwnerJourney, 'NOT_RUN');
   assert.equal(report.releaseGate, 'ADVISORY');
   return report;
 }

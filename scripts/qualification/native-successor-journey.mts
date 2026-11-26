@@ -52,9 +52,15 @@ async function step(name: string, operation: () => Promise<any>) {
 let hybridProvider: any;
 let resultConsumer: any;
 let ownerReview: any;
+let ownerUi: any;
 let adapter: any, worker: FactoryAttemptWorker | undefined;
 try {
   const s = db.seed; state.seed = s;
+  if(process.env.MC_LOCAL_OWNER_UI === '1') {
+    assert.equal(mode,'hybrid');
+    const {startLocalOwnerBrowser}=await import('./local-owner-browser.mjs');
+    ownerUi=await startLocalOwnerBrowser(db,join(output,'owner-ui'));
+  }
   if (mode === 'hybrid') {
     hybridProvider = await prepareHybridProvider();
     state.delegatedHostQualification = hybridProvider.qualification;
@@ -229,7 +235,7 @@ try {
   if (mode === 'prepare') console.log(JSON.stringify({ preparation: 'PASS', nativeExecution: 'NOT_RUN' }));
   else executionQualification: {
     const author = db.client('user_SyntheticPlanAuthorQualification');
-    if (mode === 'hybrid' && process.env.MC_OWNER_REVIEW_QUALIFICATION === '1') ownerReview = await prepareOwnerReviewFixture(db, { applicationSecret: resultConsumer?.applicationSecret, applicationKeyId: resultConsumer?.applicationKeyId, applicationCommand: resultConsumer?.applicationCommand });
+    if (mode === 'hybrid' && process.env.MC_OWNER_REVIEW_QUALIFICATION === '1') ownerReview = await prepareOwnerReviewFixture(db, { applicationSecret: resultConsumer?.applicationSecret, applicationKeyId: resultConsumer?.applicationKeyId, applicationCommand: resultConsumer?.applicationCommand,ownerUi });
     const sofie = new SofieEnterpriseContractFixture({
       createDraft: (args: any) => ownerReview ? ownerReview.createMission(args) : mutate('missions:createDraft', args),
       get: (missionId: string) => query('missions:get', { missionId }),
@@ -283,7 +289,7 @@ try {
     const planResult = await step('plan', () => mutate('missions:savePlanDraft', planDraft, author));
     const planId = planResult.plan._id;
     await step('submittedPlan', () => mutate('missions:submitPlan', { projectId: s.projectId, missionId, planId, idempotencyKey: 'native-successor-submit' }, author));
-    const release = await step('approvedPlan', () => mutate('missions:approvePlan', { projectId: s.projectId, missionId, planId,
+    const release = await step('approvedPlan', async () => ownerUi ? (await ownerUi.approvePlan(missionId), {workOrders:(await query('missions:get',{missionId})).workOrders}) : mutate('missions:approvePlan', { projectId: s.projectId, missionId, planId,
       decisionReason: 'Approve this exact synthetic plan and its explicit zero-charge native engineering tariff. No paid, publication or production authority.', idempotencyKey: 'native-successor-approve' }));
     const workOrder = release.workOrders[0]; state.workOrderId = workOrder._id;
     await step('nonAdminMissionPrincipal', () => mutate('isolationFixture:nonAdminMissionPrincipal', { scope:s }));
@@ -589,12 +595,14 @@ try {
       };
       const acceptBeforeSecurity = Boolean(resultConsumer && process.env.MYEVE_RESULT_SECURITY_COHORT
         && process.env.MYEVE_CHECKPOINT_H_BROWSER !== '1' && !ownerRejected);
+      if(ownerUi) await ownerReview.authorizeBrowserResultRead();
       if (resultConsumer) await step('completedEnterpriseResultConsumer', () => process.env.MYEVE_CHECKPOINT_H_BROWSER === '1'
         ? db.captureCompletedResultTiming(() => resultConsumer.qualify(missionId), async (evidence: any) => {
           state.completedResultFunctionTiming = evidence;
           await writeFile(join(output, 'completed-result-function-timing.json'), JSON.stringify(evidence, null, 2) + '\n');
         }) : resultConsumer.qualify(missionId, acceptBeforeSecurity ? {beforeSecurity: acceptOwnerResult} : undefined));
       if (!acceptBeforeSecurity) await acceptOwnerResult();
+      if(ownerUi) await step('acceptedResultOwnerBrowser',()=>resultConsumer.afterOwnerAcceptance());
       if (ownerReview) await step('linkedOwnerReview', async () => ownerReview.report());
       await db.restart();
       const finalAccounting = await step('hybridDurableAccounting', () => query('factory/nativeAccounting:readback', { workflowRunId: integrationDispatch.run._id }));
@@ -637,6 +645,7 @@ try {
     }
     await writeFile(join(output, 'durable-records.json'), JSON.stringify(records, null, 2) + '\n');
     await resultConsumer?.stop();
+    await ownerUi?.stop();
     await db.stop(); await hybridProvider?.f.stop();
     const admitted = state.repositoryAdmission;
     if (admitted) {
