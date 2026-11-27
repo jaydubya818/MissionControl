@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -157,6 +157,61 @@ describe("factory dependency installation", () => {
     vi.stubEnv("MISSION_CONTROL_FACTORY_PNPM_CLI_PATH", cli);
     await expect(installFrozenPnpmDependencies(await directory(), { configuredStore: null }))
       .rejects.toMatchObject({ code: "ENOENT", message: expect.stringContaining(cli) });
+  });
+
+  it.each(["file", "directory", "indirect-file", "indirect-directory", "relative-file", "relative-parent"] as const)(
+    "rejects a candidate-owned %s link reached through an ancestor alias",
+    async (kind) => {
+      const physical = await realpath(await directory());
+      const aliases = await directory();
+      const host = await directory();
+      const candidate = path.join(physical, "candidate");
+      const alias = path.join(aliases, "physical-root");
+      const rootLink = path.join(host, "candidate-root");
+      const hostCli = path.join(host, "host.cjs");
+      await mkdir(path.join(candidate, "child"), { recursive: true });
+      await writeFile(hostCli, "throw new Error('host CLI executed');\n");
+      await symlink(physical, alias);
+      await symlink(candidate, rootLink);
+      await symlink(hostCli, path.join(candidate, "host.cjs"));
+      await symlink(host, path.join(candidate, "host-directory"));
+      const aliasedCandidate = path.join(alias, "candidate");
+      await symlink(path.join(aliasedCandidate, "host.cjs"), path.join(host, "indirect.cjs"));
+      await symlink(path.join(aliasedCandidate, "host-directory"), path.join(host, "indirect-directory"));
+      await symlink(path.relative(host, path.join(aliasedCandidate, "host.cjs")), path.join(host, "relative.cjs"));
+      await symlink(path.join(aliasedCandidate, "child"), path.join(host, "child-link"));
+      await symlink("child-link/../host.cjs", path.join(host, "relative-parent.cjs"));
+      const cli = {
+        file: path.join(aliasedCandidate, "host.cjs"),
+        directory: path.join(aliasedCandidate, "host-directory", "host.cjs"),
+        "indirect-file": path.join(host, "indirect.cjs"),
+        "indirect-directory": path.join(host, "indirect-directory", "host.cjs"),
+        "relative-file": path.join(host, "relative.cjs"),
+        "relative-parent": path.join(host, "relative-parent.cjs"),
+      }[kind];
+      vi.stubEnv("MISSION_CONTROL_FACTORY_PNPM_CLI_PATH", cli);
+      const executePnpm = vi.fn(async () => {});
+
+      await expect(installFrozenPnpmDependencies(rootLink, {
+        configuredStore: null,
+        executePnpm,
+      })).rejects.toThrow("The host pnpm CLI must be outside the candidate worktree.");
+      expect(executePnpm).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["file", "parent", "cycle"] as const)("fails closed for an unresolved %s link", async (kind) => {
+    const host = await directory();
+    const link = path.join(host, "link");
+    await symlink(kind === "cycle" ? "link" : "missing", link);
+    vi.stubEnv("MISSION_CONTROL_FACTORY_PNPM_CLI_PATH", kind === "parent" ? path.join(link, "pnpm.cjs") : link);
+    const executePnpm = vi.fn(async () => {});
+
+    await expect(installFrozenPnpmDependencies(await directory(), {
+      configuredStore: null,
+      executePnpm,
+    })).rejects.toMatchObject({ code: kind === "cycle" ? "ELOOP" : "ENOENT" });
+    expect(executePnpm).not.toHaveBeenCalled();
   });
 
   it("preserves a missing executable diagnostic when stderr and stdout are empty", async () => {
