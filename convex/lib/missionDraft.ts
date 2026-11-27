@@ -13,6 +13,15 @@ export interface MissionDraftInput {
   owningTeamId?: string;
   repositoryId?: string;
   codeScopeIds?: string[];
+  executionEnvironment?: "LOCAL" | "CLOUD" | "REMOTE" | "POLICY_SELECTED";
+}
+
+export function missionDraftNextAction(mission: Pick<MissionDraftInput,
+  "ownerMemberId" | "owningTeamId" | "repositoryId" | "codeScopeIds" | "budgetUsd" | "executionEnvironment">): string {
+  return mission.ownerMemberId && mission.owningTeamId && mission.repositoryId && mission.codeScopeIds?.length
+    && (mission.budgetUsd ?? 0) > 0 && mission.executionEnvironment
+    ? "Prepare and review the canonical Plan."
+    : "Assign owner, team, repository, code scope, positive budget and execution environment before preparing a Plan.";
 }
 
 export function validateMissionDraftInput(input: MissionDraftInput): void {
@@ -66,6 +75,7 @@ const DRAFT_FIELDS = [
   "owningTeamId",
   "repositoryId",
   "codeScopeIds",
+  "executionEnvironment",
 ] as const;
 
 export function changedMissionDraftFields(
@@ -73,6 +83,7 @@ export function changedMissionDraftFields(
   next: MissionDraftInput
 ): string[] {
   return DRAFT_FIELDS.filter((field) => {
+    if (!Object.prototype.hasOwnProperty.call(next, field)) return false;
     const before = mission[field];
     const after = next[field];
     return JSON.stringify(before ?? null) !== JSON.stringify(after ?? null);

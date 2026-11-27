@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query } from "../lib/missionScopedFunctions";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";
 
 /** Operator-visible automation contracts. Activation is deliberately out of scope. */

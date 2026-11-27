@@ -5,8 +5,8 @@ license: MIT
 metadata:
   author: jstack-maintainers
   source: michael-denyer/pstack-claude
-  source-version: "0.9.30"
-  source-commit: 45f768349a6d7d7e71509fee3f5bccfad54b3bad
+  source-version: "0.9.130"
+  source-commit: d88063f3355a5ecff0e6dbb890a11bab4b08bc2e
   owner: software-factory
   risk: medium
   capabilities: jstack,pull-request-workflow
@@ -15,6 +15,12 @@ metadata:
 # Babysit a PR
 
 On Codex, Cursor, or another non-Claude runtime, read the [runtime mapping](../poteto-mode/references/harness-tools.md), including its per-skill notes, before following this skill.
+
+On GitHub Copilot, read the [platform mapping](../poteto-mode/references/copilot-tools.md), including its per-skill notes, before following this skill.
+
+On Muse, read the [platform mapping](../poteto-mode/references/muse-tools.md), including its per-skill notes, before following this skill.
+
+On Antigravity, read the [platform mapping](../poteto-mode/references/agy-tools.md), including its per-skill notes, before following this skill.
 
 Claude Code analog of Cursor's built-in `/babysit`. The implementation is a loop over `gh` CLI plus the Claude Code `loop` skill for pacing.
 

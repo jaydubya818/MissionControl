@@ -5,7 +5,7 @@ import {
   internalQuery,
   mutation,
   query,
-} from "../_generated/server";
+} from "../lib/missionScopedFunctions";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import {

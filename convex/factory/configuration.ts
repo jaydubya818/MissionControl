@@ -14,7 +14,7 @@ import {
   assertLocalSandboxScope,
 } from "../lib/localQualificationSandbox";
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query } from "../lib/missionScopedFunctions";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";
@@ -433,7 +433,7 @@ export const getActiveForWorkOrder = query({
 });
 
 export const create = mutation({
-  args: { repositoryId: v.id("workspaceRepositories"), name: v.string(), purpose: v.optional(factoryPurpose) },
+  args: { repositoryId: v.id("workspaceRepositories"), name: v.string(), purpose: v.optional(factoryPurpose), isolatedQualification: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
     const repository = await ctx.db.get(args.repositoryId);
     if (!repository) throw new Error("Repository connection is unavailable or unauthorized.");
@@ -442,11 +442,17 @@ export const create = mutation({
       repository.projectId,
       FACTORY_PERMISSIONS.MANAGE_AUTOMATION
     );
+    if (args.isolatedQualification) {
+      const local = await loadLocalRepositoryAdmission(ctx, repository, Date.now());
+      if (process.env.MC_NATIVE_SUCCESSOR_QUALIFICATION !== "1" || access.actorId !== local.admission.operatorId
+        || !args.name.trim() || args.name.length > 200) throw new Error("Isolated Factory identity requires the exact qualification owner.");
+    }
     const purpose = args.purpose ?? "SOFTWARE";
     const existingDefinitions = await ctx.db.query("factoryDefinitions")
       .withIndex("by_repository", (q) => q.eq("repositoryId", repository._id))
       .collect();
-    const existing = existingDefinitions.find((definition) => definition.status !== "ARCHIVED" && (definition.purpose ?? "SOFTWARE") === purpose);
+    const existing = existingDefinitions.find((definition) => definition.status !== "ARCHIVED" && (definition.purpose ?? "SOFTWARE") === purpose
+      && (!args.isolatedQualification || definition.name === args.name.trim()));
     if (existing) return existing._id;
     const now = Date.now();
     return await ctx.db.insert("factoryDefinitions", {

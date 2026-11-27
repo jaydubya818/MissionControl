@@ -36,6 +36,7 @@ export function MissionDraftForm({
   const saveButtonRef = useRef<HTMLButtonElement>(null);
   const saveKeyRef = useRef<string | null>(null);
   const initial = useMemo(() => missionToDraftValues(mission), [mission]);
+  const appliedServerValues = useRef(initial);
   const [baseline, setBaseline] = useState<MissionDraftValues>(initial);
   const [values, setValues] = useState<MissionDraftValues>(initial);
   const [errors, setErrors] = useState<MissionDraftErrors>({});
@@ -62,7 +63,9 @@ export function MissionDraftForm({
   );
 
   useEffect(() => {
-    if (!dirty) {
+    if (!dirty && !draftsEqual(initial, appliedServerValues.current)) {
+      // Keep the mutation's confirmed values until the query publishes a new snapshot.
+      appliedServerValues.current = initial;
       setBaseline(initial);
       setValues(initial);
     }
@@ -150,6 +153,23 @@ export function MissionDraftForm({
         <div>
           <h2 className="text-[13px] font-semibold text-ink">Draft definition</h2>
           <p className="mt-1 text-[12px] text-ink-muted">Define the governed outcome before planning begins.</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${formId}-executionEnvironment`}>Execution environment</Label>
+          <select
+            id={`${formId}-executionEnvironment`}
+            value={values.executionEnvironment ?? ""}
+            disabled={status === "saving"}
+            onChange={(event) => setField("executionEnvironment", event.target.value as MissionDraftValues["executionEnvironment"])}
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
+          >
+            <option value="" disabled>Choose execution environment</option>
+            <option value="LOCAL">Local</option>
+            <option value="CLOUD">Cloud</option>
+            <option value="REMOTE">Remote</option>
+            <option value="POLICY_SELECTED">Choose by policy</option>
+          </select>
+          <p className="text-xs text-ink-muted">Execution still requires an approved Plan and qualified host.</p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor={`${formId}-title`}>Title</Label>

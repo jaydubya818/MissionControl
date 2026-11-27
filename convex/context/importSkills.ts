@@ -17,7 +17,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { mutation } from "../lib/missionScopedFunctions";
 import { requireContextRegistryEnabled } from "../lib/contextRegistryGate";
 import {
   compareSemver,

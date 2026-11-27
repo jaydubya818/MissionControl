@@ -5,7 +5,7 @@ import {
   query,
   type MutationCtx,
   type QueryCtx,
-} from "./_generated/server";
+} from "./lib/missionScopedFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   FACTORY_PERMISSIONS,

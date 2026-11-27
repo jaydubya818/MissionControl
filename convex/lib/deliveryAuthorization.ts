@@ -1,3 +1,4 @@
+import { canAccessMission, type MissionCapability } from "./missionAccess";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { resolveFlag, type FlagRow } from "./flags";
@@ -22,7 +23,7 @@ export async function requireAuthorizedDeliveryScope(
   ctx: DeliveryCtx,
   projectId: Id<"projects"> | undefined,
   permission?: CompanyPermission
-) {
+): Promise<(Awaited<ReturnType<typeof requireWorkspaceAccess>> & { missionIds?: Set<string> }) | null> {
   const rows = (await ctx.db.query("featureFlags").collect()) as FlagRow[];
   const flagEnabled = resolveFlag(rows, "control-plane.team-authorization", projectId ?? null).enabled;
   const mode = await resolveDeploymentAuthorizationMode(ctx, flagEnabled);
@@ -31,13 +32,24 @@ export async function requireAuthorizedDeliveryScope(
   if (!projectId) throw new Error("An authorized workspace is required while team authorization is enabled.");
   const project = await ctx.db.get(projectId);
   if (!project?.tenantId) throw new Error("Workspace company assignment is incomplete.");
-  return await requireWorkspaceAccess(ctx, project.tenantId, project._id, { permission });
+  const access = await requireWorkspaceAccess(ctx, project.tenantId, project._id, { permission });
+  const capability: MissionCapability = !permission ? "READ"
+    : permission === COMPANY_PERMISSIONS.UPDATE_DELIVERY ? "CONTRIBUTE"
+    : permission === COMPANY_PERMISSIONS.VERIFY_DELIVERY ? "VERIFY" : "OWNER";
+  const missions = await ctx.db.query("missions").withIndex("by_project", q => q.eq("projectId", project._id)).collect();
+  const missionIds = new Set<string>();
+  for (const mission of missions) if (await canAccessMission(ctx, mission, capability)) missionIds.add(mission._id);
+  return { ...access, missionIds };
 }
 
 export function canAccessDeliveryRecord(
-  access: Awaited<ReturnType<typeof requireAuthorizedDeliveryScope>>,
-  record: { owningTeamId?: Id<"scrumTeams">; ownerMemberId?: Id<"orgMembers"> }
+  access: (Omit<NonNullable<Awaited<ReturnType<typeof requireAuthorizedDeliveryScope>>>, "missionIds"> & { missionIds?: Set<string> }) | null,
+  record: { _id?: string; missionId?: Id<"missions">; objective?: string; owningTeamId?: Id<"scrumTeams">; ownerMemberId?: Id<"orgMembers"> }
 ): boolean {
+  if (access?.missionIds) {
+    const missionId = record.missionId ?? (record.objective !== undefined ? record._id : undefined);
+    if (missionId) return access.missionIds.has(missionId);
+  }
   if (!access || access.membership.mode === "DEMO" || access.membership.canManageCompany) return true;
   if (access.permissions?.includes(COMPANY_PERMISSIONS.APPROVE_DELIVERY)) return true;
   if (access.roleNames.some((name) => /workspace lead|product manager|company|owner|admin/i.test(name))) return true;
@@ -47,8 +59,8 @@ export function canAccessDeliveryRecord(
 }
 
 export function assertAuthorizedDeliveryRecord(
-  access: Awaited<ReturnType<typeof requireAuthorizedDeliveryScope>>,
-  record: { owningTeamId?: Id<"scrumTeams">; ownerMemberId?: Id<"orgMembers"> }
+  access: (Omit<NonNullable<Awaited<ReturnType<typeof requireAuthorizedDeliveryScope>>>, "missionIds"> & { missionIds?: Set<string> }) | null,
+  record: { _id?: string; missionId?: Id<"missions">; objective?: string; owningTeamId?: Id<"scrumTeams">; ownerMemberId?: Id<"orgMembers"> }
 ) {
   if (!canAccessDeliveryRecord(access, record)) throw new Error("Delivery record is unavailable or unauthorized.");
 }
@@ -56,7 +68,7 @@ export function assertAuthorizedDeliveryRecord(
 export async function requireAuthorizedDeliveryRecord(
   ctx: DeliveryCtx,
   projectId: Id<"projects"> | undefined,
-  record: { owningTeamId?: Id<"scrumTeams">; ownerMemberId?: Id<"orgMembers"> },
+  record: { _id?: string; missionId?: Id<"missions">; objective?: string; owningTeamId?: Id<"scrumTeams">; ownerMemberId?: Id<"orgMembers"> },
   permission?: CompanyPermission
 ) {
   const access = await requireAuthorizedDeliveryScope(ctx, projectId, permission);

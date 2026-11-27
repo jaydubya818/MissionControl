@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "../_generated/server";
+import { internalMutation, mutation, query } from "../lib/missionScopedFunctions";
 import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "../lib/companyAccess";
 import { computeCanonicalHash } from "../lib/genomeHash";
 import {

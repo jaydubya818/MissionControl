@@ -1,0 +1,4 @@
+interface:
+  display_name: "Quick Recap"
+  short_description: "End agent responses with clear status"
+  default_prompt: "Use $quick-recap for this task and return a verified result."

@@ -1,3 +1,4 @@
+import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 /**
  * Activities — Convex Functions
  * 
@@ -5,7 +6,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 
 export const create = mutation({
   args: {
@@ -22,7 +23,15 @@ export const create = mutation({
     afterState: v.optional(v.any()),
     metadata: v.optional(v.any()),
   },
-  handler: async (ctx, args) => await ctx.db.insert("activities", args),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Authenticated operator required.");
+    if (args.actorType !== "HUMAN") {
+      if (!args.projectId) throw new Error("An authorized workspace is required for automation audit records.");
+      await requireWorkspacePermission(ctx, args.projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+    }
+    return await ctx.db.insert("activities", { ...args, actorId: identity.subject });
+  },
 });
 
 export const list = query({

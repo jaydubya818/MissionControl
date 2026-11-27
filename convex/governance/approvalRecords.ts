@@ -1,7 +1,8 @@
+import { requireApprovalActor } from "../lib/approvalIdentity";
+import { COMPANY_PERMISSIONS } from "../lib/companyAccess";
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query } from "../lib/missionScopedFunctions";
 import { appendChangeRecord } from "../lib/armAudit";
-import { resolveActiveTenantId } from "../lib/getActiveTenant";
 
 const statusValidator = v.union(
   v.literal("PENDING"),
@@ -25,16 +26,8 @@ export const createApprovalRecord = mutation({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    const tenantId = await resolveActiveTenantId(
-      { db: ctx.db as any },
-      {
-        tenantId: args.tenantId,
-        projectId: args.projectId,
-        instanceId: args.instanceId,
-        versionId: args.versionId,
-        createDefaultIfMissing: true,
-      }
-    );
+    const actor = await requireApprovalActor(ctx, args.projectId, COMPANY_PERMISSIONS.UPDATE_DELIVERY, args.tenantId);
+    const tenantId = actor.tenantId;
 
     const id = await ctx.db.insert("approvalRecords", {
       ...args,
@@ -68,11 +61,12 @@ export const decideApproval = mutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db.get(args.approvalRecordId);
     if (!existing) throw new Error("Approval record not found");
+    const actor = await requireApprovalActor(ctx, existing.projectId, COMPANY_PERMISSIONS.APPROVE_DELIVERY, existing.tenantId);
 
     await ctx.db.patch(args.approvalRecordId, {
       status: args.status,
       decisionReason: args.decisionReason,
-      decidedBy: args.decidedBy,
+      decidedBy: actor.operatorId,
       decidedAt: Date.now(),
     });
 

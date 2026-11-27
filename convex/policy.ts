@@ -1,3 +1,6 @@
+import { loadActiveLegacyPolicy, requirePolicyAdministration } from "./lib/policyAuthority";
+import { internalMutation as administrativeMutation } from "./_generated/server";
+import { missionAuthorityDatabase } from "./lib/missionScopedFunctions";
 /**
  * Policy — Convex Functions
  * 
@@ -7,12 +10,13 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import type { Doc } from "./_generated/dataModel";
 import { classifyRisk, requiresApproval } from "./lib/riskClassifier";
 import { evaluateOperatorGate, getEffectiveOperatorControl } from "./lib/operatorControls";
 import { appendChangeRecord, appendOpEvent } from "./lib/armAudit";
 import { resolveAgentRef } from "./lib/agentResolver";
+import { FACTORY_PERMISSIONS, requireWorkspacePermission } from "./lib/companyAccess";
 import { evaluatePolicyEnvelopes, type ArmDecision } from "./lib/armPolicy";
 import { evaluateLegacyToolPolicy } from "./lib/legacyToolPolicy";
 
@@ -199,12 +203,9 @@ function getTaskTypeRiskLevel(taskType: string): "GREEN" | "YELLOW" | "RED" {
 // ============================================================================
 
 export const getActive = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("policies")
-      .withIndex("by_active", (q) => q.eq("active", true))
-      .first();
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: async (ctx, args) => {
+    return await loadActiveLegacyPolicy(ctx, args.projectId);
   },
 });
 
@@ -244,13 +245,10 @@ export const explainTaskPolicy = query({
       };
     }
 
-    const policy = await ctx.db
-      .query("policies")
-      .withIndex("by_active", (q) => q.eq("active", true))
-      .first();
+    const policy = await loadActiveLegacyPolicy(ctx, task.projectId);
 
     const primaryAssigneeId = task.assigneeIds?.[0];
-    const assignee = primaryAssigneeId ? await ctx.db.get(primaryAssigneeId) : null;
+    const assignee = primaryAssigneeId ? await missionAuthorityDatabase(ctx).get(primaryAssigneeId) : null;
 
     const triggeredRules: string[] = [];
     const requiredApprovals: Array<{ type: string; reason: string }> = [];
@@ -289,7 +287,7 @@ export const explainTaskPolicy = query({
         // Only escalate to NEEDS_APPROVAL if we haven't already DENY'd
         if (decision !== "DENY") {
           decision = "NEEDS_APPROVAL";
-          reason = `Estimated cost ($${estimatedCost.toFixed(2)}) exceeds remaining agent budget ($${budgetRemaining.toFixed(2)})`;
+          reason = "Estimated cost exceeds the available agent budget";
         }
         requiredApprovals.push({
           type: "BUDGET_EXCEEDED",
@@ -410,11 +408,12 @@ export const evaluate = query({
     metadata: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
-    // Get active policy
-    const policy = await ctx.db
-      .query("policies")
-      .withIndex("by_active", (q) => q.eq("active", true))
-      .first();
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Authenticated policy evaluation required.");
+    const agent = await missionAuthorityDatabase(ctx).get(args.agentId);
+    if (!agent?.projectId) return { decision:"DENY", reason:"Agent workspace is unavailable." };
+    await requireWorkspacePermission(ctx, agent.projectId, FACTORY_PERMISSIONS.VIEW);
+    const policy = await loadActiveLegacyPolicy(ctx, agent.projectId);
     
     if (!policy) {
       return { 
@@ -423,8 +422,7 @@ export const evaluate = query({
       };
     }
     
-    // Get agent
-    const agent = await ctx.db.get(args.agentId);
+    // Agent workspace was authorized before selecting a policy.
     if (!agent) {
       return { 
         decision: "DENY", 
@@ -502,11 +500,10 @@ export const evaluate = query({
     if (estimatedCost > budgetRemaining) {
       return {
         decision: "NEEDS_APPROVAL",
-        reason: `Budget exceeded: need $${estimatedCost.toFixed(2)}, have $${budgetRemaining.toFixed(2)} remaining`,
+        reason: "Estimated cost exceeds the available agent budget",
         approval: {
           type: "BUDGET_EXCEEDED",
           estimatedCost,
-          budgetRemaining,
         },
       };
     }
@@ -638,6 +635,18 @@ export const evaluateWithARM = mutation({
     context: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    if (!await ctx.auth.getUserIdentity()) throw new Error("Authenticated policy evaluation required.");
+    const raw = missionAuthorityDatabase(ctx);
+    const [evaluationAgent,evaluationInstance] = await Promise.all([
+      args.agentId ? raw.get(args.agentId) : null,
+      args.instanceId ? raw.get(args.instanceId) : null,
+    ]);
+    const projectId = evaluationAgent?.projectId ?? evaluationInstance?.projectId;
+    if (!projectId || args.agentId && !evaluationAgent || args.instanceId && !evaluationInstance
+      || evaluationAgent?.projectId && evaluationAgent.projectId !== projectId
+      || evaluationInstance?.projectId && evaluationInstance.projectId !== projectId) throw new Error("Policy evaluation workspace is unavailable or unauthorized.");
+    await requireWorkspacePermission(ctx, projectId, FACTORY_PERMISSIONS.MANAGE_AUTOMATION);
+
     const resolved = args.instanceId
       ? await resolveAgentRef(
           { db: ctx.db as any },
@@ -651,7 +660,7 @@ export const evaluateWithARM = mutation({
       : null;
 
     const legacyAgentId = args.agentId ?? resolved?.legacyAgentId;
-    const legacyAgent = legacyAgentId ? await ctx.db.get(legacyAgentId) : null;
+    const legacyAgent = legacyAgentId ? await missionAuthorityDatabase(ctx).get(legacyAgentId) : null;
     const resolvedInstance = resolved?.instanceId ? await ctx.db.get(resolved.instanceId) : null;
     const effectiveTenantId = legacyAgent?.tenantId ?? resolvedInstance?.tenantId;
     const risk = args.toolName
@@ -660,17 +669,14 @@ export const evaluateWithARM = mutation({
 
     const envelopeDecision = await evaluatePolicyEnvelopes(ctx.db as any, {
       tenantId: effectiveTenantId,
-      projectId: legacyAgent?.projectId,
+      projectId,
       versionId: resolved?.versionId,
       toolName: args.toolName,
       riskLevel: risk,
     });
     const activeLegacyPolicy =
       !envelopeDecision && args.actionType === "TOOL_CALL" && args.toolName && legacyAgent
-        ? await ctx.db
-            .query("policies")
-            .withIndex("by_active", (q) => q.eq("active", true))
-            .first()
+        ? await loadActiveLegacyPolicy(ctx, legacyAgent.projectId)
         : null;
     const legacyDecision =
       !envelopeDecision && args.actionType === "TOOL_CALL" && args.toolName && legacyAgent
@@ -697,7 +703,7 @@ export const evaluateWithARM = mutation({
     if (decision === "NEEDS_APPROVAL") {
       await ctx.db.insert("approvalRecords", {
         tenantId: effectiveTenantId,
-        projectId: legacyAgent?.projectId,
+        projectId,
         instanceId: resolved?.instanceId,
         versionId: resolved?.versionId,
         actionType: args.actionType,
@@ -712,7 +718,7 @@ export const evaluateWithARM = mutation({
     if (decision === "DENY") {
       changeRecordId = await appendChangeRecord(ctx.db as any, {
         tenantId: effectiveTenantId,
-        projectId: legacyAgent?.projectId,
+        projectId,
         instanceId: resolved?.instanceId,
         versionId: resolved?.versionId,
         legacyAgentId,
@@ -729,7 +735,7 @@ export const evaluateWithARM = mutation({
 
     await appendOpEvent(ctx.db as any, {
       tenantId: effectiveTenantId,
-      projectId: legacyAgent?.projectId,
+      projectId,
       instanceId: resolved?.instanceId,
       versionId: resolved?.versionId,
       type:
@@ -767,6 +773,7 @@ export const evaluateWithARM = mutation({
 
 export const create = mutation({
   args: {
+    projectId: v.id("projects"),
     name: v.string(),
     scopeType: v.string(),
     scopeId: v.optional(v.string()),
@@ -778,10 +785,12 @@ export const create = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Get next version
+    const actor = await requirePolicyAdministration(ctx, args.projectId);
+    // Version only the explicitly authorized workspace; names are not global identity.
     const existing = await ctx.db
       .query("policies")
       .withIndex("by_name", (q) => q.eq("name", args.name))
+      .filter(q => q.eq(q.field("projectId"), args.projectId))
       .order("desc")
       .first();
     
@@ -793,6 +802,9 @@ export const create = mutation({
     }
     
     const policyId = await ctx.db.insert("policies", {
+      projectId: actor.projectId,
+      tenantId: actor.tenantId,
+      createdBy: actor.subject,
       version,
       name: args.name,
       scopeType: args.scopeType as any,
@@ -813,7 +825,21 @@ export const create = mutation({
 export const deactivate = mutation({
   args: { policyId: v.id("policies") },
   handler: async (ctx, args) => {
+    const policy = await ctx.db.get(args.policyId);
+    if (!policy) throw new Error("Policy unavailable or unauthorized.");
+    await requirePolicyAdministration(ctx, policy.projectId, policy.tenantId);
     await ctx.db.patch(args.policyId, { active: false });
     return { success: true };
+  },
+});
+
+/** Explicit deployment-administrator maintenance of platform defaults. */
+export const setGlobal = administrativeMutation({
+  args: { name:v.string(), rules:v.any(), active:v.boolean() },
+  handler: async(ctx,args) => {
+    const rows=await ctx.db.query('policies').withIndex('by_name',q=>q.eq('name',args.name)).collect();
+    const globals=rows.filter(row=>!row.projectId&&!row.tenantId);
+    for(const row of globals)if(row.active)await ctx.db.patch(row._id,{active:false});
+    return await ctx.db.insert('policies',{name:args.name,scopeType:'GLOBAL',version:Math.max(0,...globals.map(row=>row.version))+1,rules:args.rules,active:args.active});
   },
 });

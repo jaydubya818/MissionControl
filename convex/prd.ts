@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, action } from "./lib/missionScopedFunctions";
 import type { Id } from "./_generated/dataModel";
 import { logTaskEvent } from "./lib/taskEvents";
 import { internal } from "./_generated/api";

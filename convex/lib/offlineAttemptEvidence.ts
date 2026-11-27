@@ -1,6 +1,7 @@
 import { sha256Hex } from "@mission-control/shared";
 import { invocationDigest, invocationResultMatches, isolatedInvocationIssues, type IsolatedInvocation,
-  type IsolatedInvocationResult } from "@mission-control/workflow-engine/harness-contract";
+  type IsolatedInvocationResult, SUCCESSOR_ISOLATED_IMAGE_BINDING, SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG,
+  isolatedRuntimeImageEvidenceMatches } from "@mission-control/workflow-engine/harness-contract";
 
 /** Validates evidence consistency, not worker trust or current execution authority.
  * The accepting mutation must independently authenticate the exact claimed lease. */
@@ -19,8 +20,17 @@ export function validateOfflineAttemptEvidence(packet: unknown, request: Isolate
     || !invocationResultMatches(value.result, request)
     || new TextEncoder().encode(JSON.stringify(value)).length > 128_000) throw new Error("Offline evidence request/result binding is invalid.");
   const evidence = value.evidence;
-  const resourceBound = evidence?.schema === "factory-isolated-execution-evidence/v2";
-  if (!exact(evidence, ["schema", "evidenceOrigin", "authority", "stdoutBase64", "capturedStdoutSha256", "truncated", "exitCode", "cleanupVerified", "validatedRuntimeResult", ...(resourceBound ? ["container"] : [])])
+  const imageBound = evidence?.schema === "factory-isolated-execution-evidence/v3";
+  const successor = request.composition.runtimeImage === SUCCESSOR_ISOLATED_IMAGE_BINDING.manifestDigest
+    || request.composition.backend.digest === SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG.backendImplementationDigest;
+  if (successor !== imageBound || (imageBound && (
+    request.composition.runtimeImage !== SUCCESSOR_ISOLATED_IMAGE_BINDING.manifestDigest
+    || request.composition.bridge.digest !== SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG.bridgeImplementationDigest
+    || request.composition.backend.digest !== SUCCESSOR_ISOLATED_EFFECTIVE_CONFIG.backendImplementationDigest))) {
+    throw new Error("Offline successor evidence requires the exact registered v3 composition and image proof.");
+  }
+  const resourceBound = imageBound || evidence?.schema === "factory-isolated-execution-evidence/v2";
+  if (!exact(evidence, ["schema", "evidenceOrigin", "authority", "stdoutBase64", "capturedStdoutSha256", "truncated", "exitCode", "cleanupVerified", "validatedRuntimeResult", ...(resourceBound ? ["container"] : []), ...(imageBound ? ["runtimeImage", "containerImageId"] : [])])
     || (!resourceBound && evidence.schema !== "factory-isolated-execution-evidence/v1") || evidence.evidenceOrigin !== "CONTROL_FIXTURE"
     || evidence.authority !== "NONE" || typeof evidence.truncated !== "boolean" || typeof evidence.cleanupVerified !== "boolean"
     || !(evidence.exitCode === null || Number.isSafeInteger(evidence.exitCode))
@@ -32,6 +42,12 @@ export function validateOfflineAttemptEvidence(packet: unknown, request: Isolate
     || !/^mc-invoke-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(evidence.container.name)
     || !(evidence.container.id === null || /^[a-f0-9]{64}$/.test(evidence.container.id)))) {
     throw new Error("Offline container identity is invalid.");
+  }
+  if (imageBound && ((evidence.runtimeImage !== null && !isolatedRuntimeImageEvidenceMatches(evidence.runtimeImage, SUCCESSOR_ISOLATED_IMAGE_BINDING))
+    || (evidence.containerImageId !== null && ![SUCCESSOR_ISOLATED_IMAGE_BINDING.manifestDigest, SUCCESSOR_ISOLATED_IMAGE_BINDING.configDigest].includes(evidence.containerImageId))
+    || (evidence.containerImageId !== null && (!evidence.runtimeImage || !evidence.container.id))
+    || (value.result.status === "SUCCESS" && (!evidence.runtimeImage || !evidence.containerImageId)))) {
+    throw new Error("Offline successor image evidence does not match the qualified artifact.");
   }
   if (value.result.status === "SUCCESS" && ((resourceBound && !evidence.container.id)
     || (request.workload.reference === "verify-document-bytes/v1" && !resourceBound))) {

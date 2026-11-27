@@ -1,6 +1,7 @@
 import { requireCapabilityReceiverRecovery } from './lib/capabilityReceiverRecovery';
 import { dispatchArgs } from './lib/workOrderDispatchArgs';
-import { action, internalQuery } from './_generated/server';
+import { internalQuery } from './_generated/server';
+import { action } from './lib/missionScopedFunctions';
 import { makeFunctionReference } from 'convex/server';
 import { v } from 'convex/values';
 import { capabilityBindings, capabilityPolicyScope } from './capabilityPolicy';

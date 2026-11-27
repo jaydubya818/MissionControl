@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, query } from "./lib/missionScopedFunctions";
 
 const status = v.union(v.literal("COMPLETED"), v.literal("FAILED"));
 

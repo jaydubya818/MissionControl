@@ -57,10 +57,11 @@ describe("Factory package import authority boundary", () => {
       "missionPlans",
       "missions",
     ]);
-    expect(atomicMutation.match(/ctx\.db\.patch\(/g)).toHaveLength(1);
+    expect(atomicMutation.match(/ctx\.db\.patch\(/g)).toHaveLength(2);
     expect(atomicMutation).toContain(
       'ctx.db.patch(missionId, { state: "PLANNING"',
     );
+    expect(atomicMutation).toContain('ctx.db.patch(missionId, { ownerOperatorId: target.ownerOperatorId })');
     expect(atomicMutation).not.toMatch(/ctx\.db\.(?:delete|replace)\(/);
     expect(atomicMutation).toContain('state: "PLANNING"');
     expect(atomicMutation).toContain('status: "DRAFT"');

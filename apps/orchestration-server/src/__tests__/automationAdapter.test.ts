@@ -75,19 +75,28 @@ describe("Automation adapter safety", () => {
 
   it("cancels a running read-only adapter through its abort signal", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "mc-automation-"));
-    const content = "#!/usr/bin/env bash\nsleep 5\n";
+    const content = "#!/usr/bin/env bash\nprintf ready > adapter-ready\nexec sleep 5\n";
     const controller = new AbortController();
-    const cancel = setTimeout(() => controller.abort(), 25);
+    const execution = executeAutomation({
+      adapterType: "SHELL", repository: "test/repo", repositoryRoot: root, workingDirectory: ".",
+      artifactPath: "automations/cancel.sh", artifactContent: content, artifactContentHash: hash(content),
+      timeoutMs: 5_000, secretReferences: [], configuration: {},
+    }, controller.signal);
     try {
-      const result = await executeAutomation({
-        adapterType: "SHELL", repository: "test/repo", repositoryRoot: root, workingDirectory: ".",
-        artifactPath: "automations/cancel.sh", artifactContent: content, artifactContentHash: hash(content),
-        timeoutMs: 5_000, secretReferences: [], configuration: {},
-      }, controller.signal);
+      const deadline = Date.now() + 2_000;
+      while (await readFile(path.join(root, "adapter-ready"), "utf8").catch(() => "") !== "ready") {
+        if (Date.now() >= deadline) throw new Error("Adapter did not become ready");
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+      // Measure cancellation of a running adapter, separately from process startup.
+      const abortedAt = Date.now();
+      controller.abort();
+      const result = await execution;
       expect(result.status).toBe("cancelled");
-      expect(result.durationMs).toBeLessThan(1_000);
+      expect(Date.now() - abortedAt).toBeLessThan(1_000);
     } finally {
-      clearTimeout(cancel);
+      controller.abort();
+      await execution;
       await rm(root, { recursive: true, force: true });
     }
   });

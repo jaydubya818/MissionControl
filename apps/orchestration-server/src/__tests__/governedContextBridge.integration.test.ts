@@ -52,6 +52,8 @@ describe.skipIf(process.env.RUN_GOVERNED_CONTEXT_BRIDGE_INTEGRATION !== "1")("go
 
     const client = new ConvexHttpClient(CONVEX_URL);
     const convex = client as any;
+    if (!process.env.CONVEX_SELF_HOSTED_ADMIN_KEY) throw new Error("The opt-in integration fixture requires deployment administrator credentials for internal workflow seeding.");
+    convex.setAdminAuth(process.env.CONVEX_SELF_HOSTED_ADMIN_KEY);
     const { app } = await import("../index.js");
 
     const project = await convex.query("projects:getBySlug", {

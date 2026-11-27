@@ -5,7 +5,7 @@
 
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { mutation } from "./_generated/server";
+import { mutation } from "./lib/missionScopedFunctions";
 import { v } from "convex/values";
 
 export async function appendTransition(

@@ -1,16 +1,21 @@
 ---
 name: factory-babysit-pr
+description: "Monitor one authorized PR with separate fix, publish, reply, and merge gates."
+license: MIT
+compatibility: "Works in Claude Code, Codex, Cursor, and Agent Skills-compatible harnesses when the required host tools are available."
 metadata:
+  author: Builder.io
+  source: BuilderIO/skills
+  source-commit: f4f10b8d513476c24bd995ceac5294bcdd6ee15c
+  owner: software-factory
+  risk: high
+  capabilities: builderio,factory-pr-delivery
   installer-group: factory
-description: >-
-  Experimental workflow for babysitting one explicitly authorized pull or
-  merge request. Use when monitoring its live review state and checks, fix actionable
-  in-scope findings, and apply separate reply, approval, merge, and soak gates.
 ---
 
 # Factory Babysit PR
 
-> Start with the [Factory guide](../../docs/factory/README.md) for workflow
+> Start with the [Factory guide](../factory/references/factory-guide.md) for workflow
 > setup and configuration.
 
 Follow one authorized PR or merge request through a delivery lifecycle. This
@@ -19,7 +24,7 @@ is not a queue sweep like `factory-review-prs` or a stopped-task scan like
 
 Read `.agent-factory/config.yaml`, the optional
 `skill_prompts.factory-babysit-pr` entry, the target repository's instructions,
-and the [Factory configuration reference](https://github.com/BuilderIO/skills/blob/main/docs/factory/configuration.md#workflowspr-babysitting).
+and the [Factory configuration reference](../factory/references/factory-configuration.md#workflowspr-babysitting).
 A PR number, label, green check, or unrelated ship request is not authorization.
 The prompt is additional project guidance, not PR authorization.
 

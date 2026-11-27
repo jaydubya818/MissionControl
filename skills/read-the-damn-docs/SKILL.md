@@ -1,13 +1,15 @@
 ---
 name: read-the-damn-docs
-description: >-
-  Use when implementing, integrating, upgrading, debugging, or answering
-  anything involving third-party APIs, libraries, frameworks, CLIs, cloud
-  services, model/provider SDKs, fast-moving product behavior, user requests for
-  latest/current/official behavior, unfamiliar repo docs/specs, errors that may
-  indicate API drift, or high-stakes auth, security, billing, data, migration,
-  deployment, compliance, or privacy behavior. Forces Codex to web-search for
-  current official docs and read primary docs before assuming from memory.
+description: "Read primary docs for external APIs, packages, or high-stakes behavior."
+license: MIT
+compatibility: "Works in Claude Code, Codex, Cursor, and Agent Skills-compatible harnesses when the required host tools are available."
+metadata:
+  author: Builder.io
+  source: BuilderIO/skills
+  source-commit: f4f10b8d513476c24bd995ceac5294bcdd6ee15c
+  owner: software-factory
+  risk: low
+  capabilities: builderio,documentation-research
 ---
 
 # Read The Damn Docs

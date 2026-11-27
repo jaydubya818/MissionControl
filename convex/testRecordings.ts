@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 
 function buildSessionId(): string {
   return `rec_${Math.random().toString(36).slice(2, 10)}`;

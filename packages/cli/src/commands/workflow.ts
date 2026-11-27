@@ -23,6 +23,12 @@ if (!CONVEX_URL) {
 }
 
 const client = new ConvexHttpClient(CONVEX_URL);
+const workflowAuthToken = process.env.CONVEX_SERVICE_AUTH_TOKEN?.trim();
+if (!workflowAuthToken) {
+  console.error(chalk.red("Error: CONVEX_SERVICE_AUTH_TOKEN is required for authorized workflow access"));
+  process.exit(1);
+}
+client.setAuth(workflowAuthToken);
 
 export const workflowCommand = new Command("workflow")
   .description("Manage multi-agent workflows")
@@ -93,7 +99,7 @@ function runCommand() {
     .description("Start a workflow run")
     .argument("<workflow-id>", "Workflow ID (e.g., feature-dev)")
     .argument("<task>", "Task description")
-    .option("-p, --project <id>", "Project ID")
+    .requiredOption("-p, --project <id>", "Authorized workspace ID")
     .action(async (workflowId, task, options) => {
       const spinner = ora(`Starting ${workflowId} workflow...`).start();
       

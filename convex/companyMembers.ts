@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import { missionAuthorityDatabase, mutation, query } from "./lib/missionScopedFunctions";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   COMPANY_PERMISSIONS,
@@ -69,7 +69,7 @@ function bootstrapConfiguration() {
   };
 }
 
-async function resolveBootstrapTenant(ctx: MutationCtx, subject: string) {
+async function resolveBootstrapTenant(ctx: MutationCtx | QueryCtx, subject: string) {
   const configured = bootstrapConfiguration();
   if (!configured.subject || !configured.tenantSlug || configured.subject !== subject) {
     return null;
@@ -83,7 +83,7 @@ async function resolveBootstrapTenant(ctx: MutationCtx, subject: string) {
     .query("operators")
     .withIndex("by_tenant", (q) => q.eq("tenantId", tenant._id))
     .collect();
-  if (operators.some((operator) => operator.active && operator.authId)) return null;
+  if (operators.length > 0) return null;
   return tenant;
 }
 
@@ -238,22 +238,10 @@ export const getBootstrapStatus = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return { eligible: false as const };
-    const configured = bootstrapConfiguration();
-    if (!configured.subject || !configured.tenantSlug || configured.subject !== identity.subject) {
-      return { eligible: false as const };
-    }
-    const tenant = await ctx.db
-      .query("tenants")
-      .withIndex("by_slug", (q) => q.eq("slug", configured.tenantSlug!))
-      .first();
-    if (!tenant?.active) return { eligible: false as const };
-    const operators = await ctx.db
-      .query("operators")
-      .withIndex("by_tenant", (q) => q.eq("tenantId", tenant._id))
-      .collect();
-    if (operators.some((operator) => operator.active && operator.authId)) {
-      return { eligible: false as const };
-    }
+    const tenant = await resolveBootstrapTenant(
+      { ...ctx, db: missionAuthorityDatabase(ctx) }, identity.subject
+    );
+    if (!tenant) return { eligible: false as const };
     return { eligible: true as const, tenantName: tenant.name };
   },
 });
@@ -263,6 +251,9 @@ export const bootstrapOwner = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return { success: false, error: "Authentication is required." };
+    // First-owner enrollment precedes Mission access. Its explicit one-time
+    // authority check and membership audit must use the complete company records.
+    ctx = { ...ctx, db: missionAuthorityDatabase(ctx) };
     const tenant = await resolveBootstrapTenant(ctx, identity.subject);
     if (!tenant) return { success: false, error: "Owner bootstrap is unavailable." };
     const inputError = validateMembershipInput({
@@ -280,7 +271,9 @@ export const bootstrapOwner = mutation({
     if (duplicateEmail) {
       return { success: false, error: "That email already belongs to an existing operator record." };
     }
-    let ownerRole = (await getTenantRoles(ctx, tenant._id)).find(isOwnerRole);
+    let ownerRole = (await getTenantRoles(ctx, tenant._id)).find((role) =>
+      DEFAULT_ROLES[0].permissions.every((permission) => role.permissions.includes(permission))
+    );
     if (!ownerRole) {
       const definition = DEFAULT_ROLES[0];
       const roleId = await ctx.db.insert("roles", {

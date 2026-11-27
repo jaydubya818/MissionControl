@@ -192,6 +192,7 @@ export function AddPersonModal({ open, onClose, projectId }: AddPersonModalProps
   };
 
   const handleSubmit = async () => {
+    if (!projectId) { setError("Select a workspace before adding a person."); return; }
     if (!name.trim()) {
       setError("Name is required");
       return;
@@ -467,7 +468,8 @@ export function AddPersonModal({ open, onClose, projectId }: AddPersonModalProps
           )}
         </div>
 
-        {error && <div className="px-6 py-2 text-err text-[13px]">{error}</div>}
+        {!projectId && <div role="status" className="px-6 py-2 text-ink-secondary text-[13px]">Select a workspace before adding a person.</div>}
+        {error && <div role="alert" className="px-6 py-2 text-err text-[13px]">{error}</div>}
 
         {/* Footer */}
         <div className="flex justify-end gap-2.5 px-6 py-4 border-t border-line">
@@ -479,8 +481,9 @@ export function AddPersonModal({ open, onClose, projectId }: AddPersonModalProps
           </button>
           <button
             className="h-9 px-3 rounded-lg text-[13px] font-medium bg-act text-act-ink border-none cursor-pointer transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={!projectId ? "Select a workspace before adding a person" : undefined}
             onClick={handleSubmit}
-            disabled={saving}
+            disabled={saving || !projectId}
           >
             {saving ? "Adding..." : "Add Member"}
           </button>

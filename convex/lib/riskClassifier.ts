@@ -93,7 +93,10 @@ export function classifyRisk(
 
   // Upgrade risk if params contain secrets or affect production
   if (params) {
-    const paramsStr = JSON.stringify(params).toLowerCase();
+    // Convex accepts int64 values; keep scanning their surrounding fields.
+    const paramsStr = JSON.stringify(params, (_key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ).toLowerCase();
     if (containsSecrets(paramsStr) || affectsProduction(paramsStr)) {
       risk = "RED";
     }
@@ -198,7 +201,7 @@ export function requiresApproval(
   ) {
     return {
       required: true,
-      reason: `Estimated cost ($${estimatedCost.toFixed(2)}) exceeds remaining budget ($${budgetRemaining.toFixed(2)})`,
+      reason: "Estimated cost exceeds the available budget",
     };
   }
 

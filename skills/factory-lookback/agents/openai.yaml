@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory Lookback"
+  short_description: "Find recurring signals and systemic fixes"
+  default_prompt: "Use $factory-lookback for this task and return a verified result."

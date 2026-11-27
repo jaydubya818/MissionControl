@@ -1,3 +1,4 @@
+import { SofieOwnerReview } from "./SofieOwnerReview";
 import { FileInput, Target } from "lucide-react";
 import { useQuery } from "convex/react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -114,6 +115,7 @@ export function MissionPortfolioView({
 
   return (
     <div className="relative flex-1 overflow-auto bg-app">
+      <SofieOwnerReview projectId={projectId} />
       <PageHeader
         title="Missions"
         description="Governed outcomes with explicit validation, handoffs, and operator decision gates."

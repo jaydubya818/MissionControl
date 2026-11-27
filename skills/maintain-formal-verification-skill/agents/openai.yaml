@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain Formal Verification Skill"
+  short_description: "Refresh formal verification against code"
+  default_prompt: "Use $maintain-formal-verification-skill to handle this task with the Jstack workflow and return a verified result."

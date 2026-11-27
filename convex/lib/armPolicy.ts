@@ -69,7 +69,7 @@ export async function evaluatePolicyEnvelopes(
 
   for (const scope of candidates) {
     const active = scope.rows
-      .filter((row) => row.active)
+      .filter((row) => row.active && (!row.projectId || row.projectId === args.projectId) && (!args.tenantId || !row.tenantId || row.tenantId === args.tenantId))
       .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
     for (const envelope of active) {

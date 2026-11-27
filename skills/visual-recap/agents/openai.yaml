@@ -1,0 +1,4 @@
+interface:
+  display_name: "Visual Recap"
+  short_description: "Publish a grounded visual change recap"
+  default_prompt: "Use $visual-recap for this task and return a verified result."

@@ -1,3 +1,4 @@
+import { TaskCompletionActions } from "./components/TaskCompletionActions";
 /**
  * TaskDrawer with Tabs
  *
@@ -843,10 +844,7 @@ function OverviewTab({
     "BLOCK" | "REQUEST_CHANGES" | "UNBLOCK" | null
   >(null);
   const verificationTrace = buildVerificationTrace(task, runs, approvals);
-  const approved = approvals.some((approval) => approval.status === "APPROVED");
-  const pendingApproval = approvals.some((approval) =>
-    ["PENDING", "ESCALATED"].includes(approval.status)
-  );
+
 
   const handleRequestApproval = async () => {
     const requestorAgentId = task.assigneeIds[0];
@@ -1059,26 +1057,13 @@ function OverviewTab({
               Mark ready
             </Button>
           )}
-          {task.status === "REVIEW" && approved && (
-            <Button size="sm" onClick={() => void onTransition("DONE")} disabled={loading}>
-              Accept and mark done
-            </Button>
-          )}
           {task.status === "REVIEW" && (
             <Button size="sm" variant="outline" onClick={() => setContextAction("REQUEST_CHANGES")} disabled={loading}>
               Request changes
             </Button>
           )}
-          {task.status === "REVIEW" && !approved && !pendingApproval && (
-            <Button size="sm" onClick={handleRequestApproval} disabled={loading}>
-              Request approval
-            </Button>
-          )}
-          {task.status === "REVIEW" && pendingApproval && (
-            <Button size="sm" variant="outline" disabled>
-              Awaiting approval
-            </Button>
-          )}
+          <TaskCompletionActions status={task.status} approvals={approvals} loading={loading}
+            onComplete={() => void onTransition("DONE")} onRequestApproval={handleRequestApproval} />
           {task.status === "BLOCKED" && (
             <Button size="sm" onClick={() => setContextAction("UNBLOCK")} disabled={loading}>
               Unblock

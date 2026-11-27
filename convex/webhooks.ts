@@ -5,7 +5,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query, action, internalAction, internalMutation } from "./_generated/server";
+import { mutation, query, action, internalAction, internalMutation } from "./lib/missionScopedFunctions";
 import { internal } from "./_generated/api";
 
 /** HMAC-SHA256 hex using Web Crypto (Convex default runtime). */

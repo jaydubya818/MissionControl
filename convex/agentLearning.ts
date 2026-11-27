@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 
 /**
  * Agent Learning System
@@ -211,6 +211,7 @@ export const recordTaskCompletion = mutation({
             : existing.avgCostUsd;
 
         await ctx.db.patch(existing._id, {
+          sourceTaskIds: [...new Set([...(existing.sourceTaskIds ?? []), task._id])],
           successCount: existing.successCount + (args.success ? 1 : 0),
           failureCount: existing.failureCount + (args.success ? 0 : 1),
           avgCompletionTimeMs: newAvgTime,
@@ -220,6 +221,7 @@ export const recordTaskCompletion = mutation({
         });
       } else {
         await ctx.db.insert("agentPerformance", {
+          sourceTaskIds: [task._id],
           agentId,
           projectId: task.projectId,
           taskType: task.type,
@@ -287,6 +289,7 @@ export const createPattern = mutation({
         projectId,
         actorType: "HUMAN",
         action: "PATTERN_UPDATED",
+        metadata: { sourceEvidence: mergedEvidence },
         description: `Updated existing pattern: ${args.pattern}`,
         agentId: args.agentId,
       });
@@ -308,6 +311,7 @@ export const createPattern = mutation({
       projectId,
       actorType: "HUMAN",
       action: "PATTERN_CREATED",
+      metadata: { sourceEvidence: args.evidence ?? [] },
       description: `Manually created pattern: ${args.pattern}`,
       agentId: args.agentId,
     });
@@ -353,6 +357,7 @@ export const removePattern = mutation({
       projectId: existing.projectId,
       actorType: "HUMAN",
       action: "PATTERN_DELETED",
+      metadata: { sourceEvidence: existing.evidence },
       description: `Deleted pattern: ${existing.pattern}`,
       agentId: existing.agentId,
     });
@@ -412,6 +417,7 @@ export const discoverPattern = mutation({
       agentId: args.agentId,
       actorType: "SYSTEM",
       action: "PATTERN_DISCOVERED",
+      metadata: { sourceEvidence: [...new Set([...(existing?.evidence ?? []), ...args.evidence])] },
       description: `Discovered pattern: ${args.pattern} (${(args.confidence * 100).toFixed(0)}% confidence)`,
     });
 

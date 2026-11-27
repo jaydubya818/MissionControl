@@ -176,12 +176,12 @@ export function AgentDashboard({ projectId, onClose, onSelectAgent }: AgentDashb
                     </div>
                   </div>
                   <div>
-                    <div className="text-[12.5px] text-ink-muted mb-0.5">Today&apos;s Spend</div>
+                    <div className="text-[12.5px] text-ink-muted mb-0.5">Authorized run cost</div>
                     <div className="text-[17px] font-semibold font-mono text-ink">
                       ${metrics.spendToday.toFixed(2)}
                     </div>
                     <div className="text-[12.5px] text-ink-muted">
-                      ${metrics.budgetRemaining.toFixed(2)} left
+                      Shared limit enforced at admission
                     </div>
                   </div>
                 </div>
@@ -189,7 +189,7 @@ export function AgentDashboard({ projectId, onClose, onSelectAgent }: AgentDashb
                 {/* Budget Bar */}
                 <div>
                   <div className="flex items-center justify-between text-[12.5px] text-ink-muted mb-1">
-                    <span>Budget Utilization</span>
+                    <span>Visible cost / limit</span>
                     <span className="font-mono">
                       {(metrics.utilization != null && !Number.isNaN(metrics.utilization)
                         ? metrics.utilization.toFixed(0)

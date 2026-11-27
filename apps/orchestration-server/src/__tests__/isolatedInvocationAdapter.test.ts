@@ -24,6 +24,46 @@ export function controlRequest(): IsolatedInvocation {
 function wrap(request: IsolatedInvocation) { return { executionId: request.executionId, repositoryRoot: "/workspace", workingDirectory: "/workspace", prompt: JSON.stringify(request), allowedPaths: [], timeoutMs: request.limits.timeoutMs, isolation: "WORKSPACE_WRITE" as const }; }
 
 describe("offline invocation contract (not profile admission)", () => {
+  it.each(["manifest", "classic", "contradictory", "lost-run-ack"])("pins one OCI artifact without execution retry: %s", async mode => {
+    const request = controlRequest(); request.limits.timeoutMs = 5000;
+    const binding = { manifestDigest: request.composition.runtimeImage, configDigest: `sha256:${"b".repeat(64)}`,
+      sourceSha: "c".repeat(40), os: "linux" as const, architecture: "amd64" as const };
+    const directory = await mkdtemp(join(tmpdir(), "invocation-image-identity-"));
+    try {
+      const executable = join(directory, "fake-docker");
+      const log = join(directory, "commands.jsonl");
+      const observed = { Id: mode === "classic" ? binding.configDigest : binding.manifestDigest,
+        Os: binding.os, Architecture: mode === "contradictory" ? "arm64" : binding.architecture,
+        Config: { Labels: { "org.opencontainers.image.revision": binding.sourceSha } },
+        ...(mode === "classic" ? {} : { Descriptor: { digest: binding.manifestDigest, annotations: { "config.digest": binding.configDigest } } }) };
+      await writeFile(executable, `#!${process.execPath}
+const fs=require('node:fs'),a=process.argv.slice(6);fs.appendFileSync(${JSON.stringify(log)},JSON.stringify(a)+'\\n');
+if(a[0]==='image'){
+ if(${JSON.stringify(mode)}==='classic'&&a.at(-1)===${JSON.stringify(binding.manifestDigest)}){process.stderr.write('Error response from daemon: No such image: '+a.at(-1));process.exitCode=1;}
+ else process.stdout.write(${JSON.stringify(JSON.stringify([observed]))});
+}else if(a[0]==='run'){
+ fs.writeFileSync(a[a.indexOf('--cidfile')+1],'d'.repeat(64));process.stdin.resume();process.stdin.on('end',()=>{
+ if(${JSON.stringify(mode)}==='lost-run-ack')process.exitCode=1;else process.stdout.write(${JSON.stringify(JSON.stringify(invocationResult(request, "SUCCESS", 1, 2)))});});
+}else if(a[0]==='container'&&a.includes('--format'))process.stdout.write(${JSON.stringify(binding.configDigest)});
+else if(a[0]==='container'){process.stderr.write('No such container: '+a.at(-1));process.exitCode=1;}
+`, { mode: 0o700 });
+      const adapter = new IsolatedInvocationAdapter(request.composition, async () => true, executable, binding);
+      const handle = await adapter.execute(await adapter.prepare(wrap(request), { emit() {} }));
+      const result = await adapter.collectResult(handle);
+      const commands = (await readFile(log, "utf8")).trim().split("\n").map(line => JSON.parse(line) as string[]);
+      const runs = commands.filter(args => args[0] === "run");
+      expect(runs).toHaveLength(mode === "contradictory" ? 0 : 1);
+      expect(commands.filter(args => args[0] === "image")).toHaveLength(mode === "classic" ? 2 : 1);
+      expect(JSON.parse(result.output!).status).toBe(["contradictory", "lost-run-ack"].includes(mode) ? "INFRASTRUCTURE_FAILURE" : "SUCCESS");
+      expect(result.invocationEvidence.schema).toBe("factory-isolated-execution-evidence/v3");
+      if (mode !== "contradictory") {
+        expect(result.invocationEvidence.runtimeImage?.selectedReference).toBe(mode === "classic" ? binding.configDigest : binding.manifestDigest);
+        expect(result.invocationEvidence.containerImageId).toBe(binding.configDigest);
+        expect(runs[0]).toContain(result.invocationEvidence.runtimeImage!.selectedReference);
+      }
+      await adapter.cleanup(handle);
+    } finally { await rm(directory, { recursive: true, force: true }); }
+  });
   it("cannot turn a failed independent byte comparison into a successful result", () => {
     const request = controlRequest();
     const content = "# Synthetic\n";

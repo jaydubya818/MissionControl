@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Ui Engineering"
+  short_description: "Build complete and accessible UI flows"
+  default_prompt: "Use $frontend-ui-engineering for this task and report the evidence and remaining limits."

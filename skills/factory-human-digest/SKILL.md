@@ -1,16 +1,21 @@
 ---
 name: factory-human-digest
+description: "Read-only summary of configured work needing human decisions."
+license: MIT
+compatibility: "Works in Claude Code, Codex, Cursor, and Agent Skills-compatible harnesses when the required host tools are available."
 metadata:
+  author: Builder.io
+  source: BuilderIO/skills
+  source-commit: f4f10b8d513476c24bd995ceac5294bcdd6ee15c
+  owner: software-factory
+  risk: low
+  capabilities: builderio,factory-human-review
   installer-group: factory
-description: >-
-  Experimental workflow for summarizing work that still needs human judgment
-  across configured pull requests, issues, feedback, errors, and delivery
-  signals. Use for a human decision queue or bounded review.
 ---
 
 # Factory Human Digest
 
-> Start with the [Factory guide](../../docs/factory/README.md) for workflow
+> Start with the [Factory guide](../factory/references/factory-guide.md) for workflow
 > setup and configuration.
 
 Read `.agent-factory/config.yaml` and apply the optional

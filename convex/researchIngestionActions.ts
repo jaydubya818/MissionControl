@@ -9,7 +9,7 @@ import {
   type NormalizedObservation,
 } from "@mission-control/research-adapters";
 import { internal } from "./_generated/api";
-import { action, internalAction } from "./_generated/server";
+import { action, internalAction } from "./lib/missionScopedFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   RESEARCH_RUN_VERIFIER,

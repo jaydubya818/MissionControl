@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -72,13 +72,9 @@ function CopyButton({ value, label }: { value: string; label?: string }) {
 }
 
 export function DirectoryView({ projectId }: { projectId: Id<"projects"> | null }) {
-  const { toast } = useToast();
   const [selectedTenantId, setSelectedTenantId] = useState<Id<"tenants"> | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<Id<"agentTemplates"> | null>(null);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
-  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
-  const [isBackfilling, setIsBackfilling] = useState(false);
-  const [isTenantBackfilling, setIsTenantBackfilling] = useState(false);
 
   const tenants = useQuery(api["registry/tenants"].listTenants, { activeOnly: false });
   const templates = useQuery(api["registry/agentTemplates"].listTemplates, {
@@ -97,11 +93,6 @@ export function DirectoryView({ projectId }: { projectId: Id<"projects"> | null 
     api["registry/environments"].listEnvironments,
     selectedTenantId ? { tenantId: selectedTenantId } : "skip"
   );
-  const migrationHealth = useQuery(api["migrations/backfillInstanceRefs"].getMigrationHealth, {});
-
-  const seedMissionControlDemo = useMutation(api.seedMissionControlDemo.run);
-  const runInstanceRefBackfill = useAction(api["migrations/backfillInstanceRefs"].runBackfill);
-  const runTenantBackfill = useAction(api["migrations/backfillInstanceRefs"].runTenantBackfill);
 
   useEffect(() => {
     if (!selectedTenantId && tenants && tenants.length > 0) setSelectedTenantId(tenants[0]._id);
@@ -136,92 +127,6 @@ export function DirectoryView({ projectId }: { projectId: Id<"projects"> | null 
     for (const e of environments ?? []) map.set(e._id, { name: e.name, type: e.type });
     return map;
   }, [environments]);
-
-  const handleSeedDemo = async () => {
-    try {
-      setIsSeedingDemo(true);
-      const result = await seedMissionControlDemo({});
-      const counts = Object.entries(result.counts ?? {}).map(([k, v]) => `${k}:${v}`).join(" ");
-      toast(`Demo data seeded. ${counts}`);
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Seed failed", true);
-    } finally {
-      setIsSeedingDemo(false);
-    }
-  };
-
-  const handleRunBackfill = async () => {
-    try {
-      setIsBackfilling(true);
-      let tasksOffset = 0, runsOffset = 0, toolCallsOffset = 0, messagesOffset = 0, pass = 0;
-      const total = { tasks: 0, runs: 0, toolCalls: 0, messages: 0 };
-      while (pass < 50) {
-        const result = await runInstanceRefBackfill({
-          batchSize: 100,
-          tasksOffset,
-          runsOffset,
-          toolCallsOffset,
-          messagesOffset,
-        });
-        total.tasks += result.updated?.tasks ?? 0;
-        total.runs += result.updated?.runs ?? 0;
-        total.toolCalls += result.updated?.toolCalls ?? 0;
-        total.messages += result.updated?.messages ?? 0;
-        if (result.done) break;
-        tasksOffset = result.next?.tasksOffset ?? tasksOffset;
-        runsOffset = result.next?.runsOffset ?? runsOffset;
-        toolCallsOffset = result.next?.toolCallsOffset ?? toolCallsOffset;
-        messagesOffset = result.next?.messagesOffset ?? messagesOffset;
-        pass++;
-      }
-      toast(`Backfill done. tasks:${total.tasks} runs:${total.runs} toolCalls:${total.toolCalls} messages:${total.messages}`);
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Backfill failed", true);
-    } finally {
-      setIsBackfilling(false);
-    }
-  };
-
-  const handleTenantBackfill = async () => {
-    try {
-      setIsTenantBackfilling(true);
-      let projectsOffset = 0, agentsOffset = 0, tasksOffset = 0, runsOffset = 0, toolCallsOffset = 0, messagesOffset = 0, approvalsOffset = 0, pass = 0;
-      const total = { projects: 0, agents: 0, tasks: 0, runs: 0, toolCalls: 0, messages: 0, approvals: 0 };
-      while (pass < 50) {
-        const result = await runTenantBackfill({
-          batchSize: 100,
-          projectsOffset,
-          agentsOffset,
-          tasksOffset,
-          runsOffset,
-          toolCallsOffset,
-          messagesOffset,
-          approvalsOffset,
-        });
-        total.projects += result.updated?.projects ?? 0;
-        total.agents += result.updated?.agents ?? 0;
-        total.tasks += result.updated?.tasks ?? 0;
-        total.runs += result.updated?.runs ?? 0;
-        total.toolCalls += result.updated?.toolCalls ?? 0;
-        total.messages += result.updated?.messages ?? 0;
-        total.approvals += result.updated?.approvals ?? 0;
-        if (result.done) break;
-        projectsOffset = result.next?.projectsOffset ?? projectsOffset;
-        agentsOffset = result.next?.agentsOffset ?? agentsOffset;
-        tasksOffset = result.next?.tasksOffset ?? tasksOffset;
-        runsOffset = result.next?.runsOffset ?? runsOffset;
-        toolCallsOffset = result.next?.toolCallsOffset ?? toolCallsOffset;
-        messagesOffset = result.next?.messagesOffset ?? messagesOffset;
-        approvalsOffset = result.next?.approvalsOffset ?? approvalsOffset;
-        pass++;
-      }
-      toast(`Tenant backfill done. projects:${total.projects} agents:${total.agents} tasks:${total.tasks}`);
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Tenant backfill failed", true);
-    } finally {
-      setIsTenantBackfilling(false);
-    }
-  };
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -415,32 +320,7 @@ export function DirectoryView({ projectId }: { projectId: Id<"projects"> | null 
           {devToolsOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           Dev Tools
         </button>
-        {devToolsOpen && (
-          <Card className="mt-2 p-4">
-            <p className="text-[12.5px] text-ink-secondary mb-3">
-              Seed demo data and backfill legacy agent refs into ARM instance/version fields.
-            </p>
-            <div className="flex flex-wrap gap-2 mb-3">
-              <Button size="sm" variant="outline" onClick={handleSeedDemo} disabled={isSeedingDemo}>
-                {isSeedingDemo ? "Seeding…" : "Seed Mission Control Demo"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleRunBackfill} disabled={isBackfilling}>
-                {isBackfilling ? "Backfilling…" : "Run Instance Ref Backfill"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleTenantBackfill} disabled={isTenantBackfilling}>
-                {isTenantBackfilling ? "Backfilling Tenants…" : "Run Tenant Backfill"}
-              </Button>
-            </div>
-            {migrationHealth && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11.5px] text-ink-muted">
-                <div>Missing task refs: {migrationHealth.missingInstanceRefs?.tasks ?? 0}</div>
-                <div>Missing run refs: {migrationHealth.missingInstanceRefs?.runs ?? 0}</div>
-                <div>Missing toolCall refs: {migrationHealth.missingInstanceRefs?.toolCalls ?? 0}</div>
-                <div>Missing message refs: {migrationHealth.missingInstanceRefs?.messages ?? 0}</div>
-              </div>
-            )}
-          </Card>
-        )}
+        {devToolsOpen && <p className="rounded-lg border border-line p-4 text-sm text-muted-foreground">Membership migrations require a deployment administrator. Existing ownership must be verified before any data is changed.</p>}
       </div>
       </div>
     </section>

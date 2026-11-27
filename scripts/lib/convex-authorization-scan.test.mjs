@@ -26,6 +26,19 @@ function fixture(files) {
 }
 
 describe("convex authorization scan", () => {
+  it("recognizes the authenticated member and approval authority helpers", () => {
+    const root = fixture({
+      "members.ts": `
+        export const create = mutation({ args: {}, handler: async (ctx, args) => {
+          await requireMemberCreation(ctx, args.projectId, args.tenantId);
+        }});
+        export const approve = mutation({ args: {}, handler: async (ctx, args) => {
+          await requireApprovalActor(ctx, args.projectId, "delivery.approve");
+        }});
+      `,
+    });
+    expect(scanConvexAuthorization(root).unauthorized).toEqual([]);
+  });
   it("flags a public function whose own body resolves no authority", () => {
     const root = fixture({
       "revenue.ts": `

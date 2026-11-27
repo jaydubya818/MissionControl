@@ -1,3 +1,4 @@
+import "./support/domainFunctions.fixture";
 import { describe, expect, it } from "vitest";
 import {
   beginWebhookDelivery,

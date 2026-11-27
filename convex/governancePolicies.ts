@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./lib/missionScopedFunctions";
 import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
 import { isCompanyContextEnforced } from "./lib/companyContextGate";
 import { DEFAULT_GOVERNANCE_POLICY } from "./lib/workOrderRevision";

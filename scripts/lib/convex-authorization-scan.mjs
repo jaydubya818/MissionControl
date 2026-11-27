@@ -21,6 +21,7 @@ import ts from "typescript";
 
 /** Calls that establish server-side authority. */
 const AUTHORIZATION_MARKERS = [
+  "requireMissionAccess",
   "requireCompanyAccess",
   "requireCompanyPermission",
   "requireCompanyAdministrator",
@@ -30,6 +31,9 @@ const AUTHORIZATION_MARKERS = [
   "assertAuthorizedDeliveryRecord",
   "requireApprovalDecisionAuthority",
   "requireMemberAdministration",
+  "requireMemberCreation",
+  "requireApprovalActor",
+  "requirePolicyAdministration",
   "requireWebhookWorkspace",
   "requireAgentFleetAuthority",
   "requireFactoryActionWithAudit",
@@ -40,6 +44,7 @@ const AUTHORIZATION_MARKERS = [
   "ctx.auth.getUserIdentity",
   // Signed service-command boundary (convex/serviceCommands.ts).
   "authorizeServiceCommand",
+  "authorizeSofieApplicationCommand",
   "claimScoped",
 ];
 

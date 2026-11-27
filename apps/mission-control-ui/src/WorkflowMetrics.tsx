@@ -1,3 +1,4 @@
+import { useState } from "react";
 /**
  * Workflow Metrics Dashboard
  *
@@ -21,12 +22,16 @@ export function WorkflowMetrics({ projectId }: WorkflowMetricsProps) {
   const workflows = useQuery(api.workflows.list, {});
   const refreshMetrics = useMutation(api.workflowMetrics.refreshAll);
 
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const handleRefresh = async () => {
+    if (!projectId) return;
+    setRefreshing(true); setRefreshError(null);
     try {
-      await refreshMetrics();
+      await refreshMetrics({ projectId });
     } catch (error) {
-      console.error("Failed to refresh metrics:", error);
-    }
+      setRefreshError(error instanceof Error ? error.message : "Could not refresh metrics. Try again.");
+    } finally { setRefreshing(false); }
   };
 
   if (!summary || !allMetrics || !workflows) {
@@ -47,13 +52,15 @@ export function WorkflowMetrics({ projectId }: WorkflowMetricsProps) {
         actions={
           <button
             onClick={handleRefresh}
+            disabled={!projectId || refreshing}
             className="inline-flex h-9 items-center rounded-lg border border-line px-3 text-[13px] font-medium text-ink-secondary transition-colors duration-150 hover:border-line-strong hover:text-ink"
           >
-            Refresh metrics
+            {refreshing ? "Refreshing…" : projectId ? "Refresh metrics" : "Select a workspace"}
           </button>
         }
       />
 
+      {refreshError && <p role="alert" className="px-6 py-3 text-sm text-red-500">{refreshError}</p>}
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-6 py-6">
         {/* Summary */}
         <MetricRow className="xl:grid-cols-5">

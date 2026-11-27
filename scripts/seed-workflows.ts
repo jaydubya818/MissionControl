@@ -8,19 +8,20 @@
  */
 
 import { ConvexHttpClient } from "convex/browser";
+import { spawnSync } from "node:child_process";
 import { api } from "../convex/_generated/api";
 import * as workflowLoader from "../packages/workflow-engine/src/loader.ts";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-const CONVEX_URL = process.env.CONVEX_URL || process.env.VITE_CONVEX_URL;
+const CONVEX_URL = process.env.CONVEX_SELF_HOSTED_URL;
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const loadAllWorkflows =
   workflowLoader.loadAllWorkflows ??
   (workflowLoader as unknown as { default?: typeof workflowLoader }).default?.loadAllWorkflows;
 
-if (!CONVEX_URL) {
-  console.error("Error: CONVEX_URL or VITE_CONVEX_URL environment variable not set");
+if (!CONVEX_URL || !process.env.CONVEX_SELF_HOSTED_ADMIN_KEY) {
+  console.error("Legacy workflow seeding requires explicit CONVEX_SELF_HOSTED_URL and CONVEX_SELF_HOSTED_ADMIN_KEY deployment administrator credentials.");
   process.exit(1);
 }
 
@@ -58,7 +59,7 @@ async function main() {
   let failureCount = 0;
   for (const [id, workflow] of workflows) {
     try {
-      await client.mutation(api.workflows.upsert, {
+      const definition = {
         workflowId: workflow.id,
         name: workflow.name,
         description: workflow.description,
@@ -69,7 +70,15 @@ async function main() {
         steps: workflow.steps,
         active: true,
         createdBy: "seed-script",
-      });
+      };
+      // The CLI supports internal functions under deployment-admin authority.
+      // Credentials stay in the environment and never enter logged arguments.
+      const seeded = spawnSync(process.execPath, [
+        path.join(scriptDirectory, "../node_modules/convex/bin/main.js"),
+        "run", "workflows:upsert", JSON.stringify(definition),
+      ], { env: process.env, stdio: "inherit" });
+      if (seeded.error) throw seeded.error;
+      if (seeded.status !== 0) throw new Error("Deployment administrator workflow seeding failed.");
       
       console.log(`✅ Seeded: ${workflow.name}`);
     } catch (error) {

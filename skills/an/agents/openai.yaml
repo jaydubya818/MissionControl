@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent-Native Apps"
+  short_description: "Operate Agent-Native apps through Dispatch"
+  default_prompt: "Use $an for this task and return a verified result."

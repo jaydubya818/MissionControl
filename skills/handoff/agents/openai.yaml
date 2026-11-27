@@ -1,0 +1,6 @@
+interface:
+  display_name: "Session handoff"
+  short_description: "Save verified context for the next agent"
+  default_prompt: "Use $handoff to save the verified state, decisions, evidence, and remaining work for this task."
+policy:
+  allow_implicit_invocation: false

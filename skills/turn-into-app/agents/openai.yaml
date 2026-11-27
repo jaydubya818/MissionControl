@@ -1,0 +1,4 @@
+interface:
+  display_name: "Turn Into App"
+  short_description: "Package repeatable workflows as apps"
+  default_prompt: "Use $turn-into-app for this task and return a verified result."

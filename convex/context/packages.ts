@@ -16,7 +16,7 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query } from "../lib/missionScopedFunctions";
 import { requireContextRegistryEnabled } from "../lib/contextRegistryGate";
 import {
   canTransitionPackageStatus,

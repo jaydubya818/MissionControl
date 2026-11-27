@@ -1,6 +1,6 @@
 ---
 name: mission-control-delivery
-description: Preserve Mission-to-release lineage, evidence, and authority boundaries. Use when Mission Control or a similar software factory governs the work.
+description: Preserve evidence and authority when Mission Control governs delivery.
 compatibility: Works in Claude Code, Codex, and Agent Skills-compatible harnesses. Mission Control mutations require separately installed integration skills or tools and explicit task authority.
 metadata:
   author: software-factory

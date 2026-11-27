@@ -3,6 +3,7 @@ name: greploop-apps
 description: Run greploop through @greptile-apps when the normal trigger rejects a large PR. Use only with the companion greploop skill.
 license: MIT
 metadata:
+  source-commit: 941290ad67b4de2a143dfc80e15b2773ed4855d0
   author: greptileai
   version: "2.1.0"
   owner: software-factory

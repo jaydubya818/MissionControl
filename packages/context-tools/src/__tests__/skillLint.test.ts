@@ -193,6 +193,31 @@ owner: team
     expect(rules(mk(description))).toEqual([]);
   });
 
+  it.each([
+    "Design API contracts, compatibility, and duplicate-safe mutations.",
+    "Audit, monitor, compare, or repair another agent's session or PR when asked.",
+    "Review security or harden sensitive trust boundaries with abuse-case tests.",
+    "Read-only summary of configured work needing human decisions.",
+    "Use /efficient-fable for efficient-orchestrator on supported hosts.",
+    "Use a red, yellow, or green status line for compact agent completion reports.",
+  ])("accepts task-oriented routing: %s", (description) => {
+    const result = lintSkill(mk(description));
+    expect(result.findings.filter((finding) => finding.severity === "error")).toEqual([]);
+    expect(result.score).toBe(90);
+  });
+
+  it.each(["Review", "Helpful tooling for everyone.", "A general-purpose assistant.", "Read-only summary."])("rejects unscoped routing: %s", (description) => {
+    expect(rules(mk(description))).toContain("activation-language-missing");
+  });
+
+  it("still rejects malformed metadata and dangerous instructions with task-oriented routing", () => {
+    const markdown = mk("Review repository changes before release.").replace("owner: team", "owner: team\ndisable-model-invocation: yes") + "\nsudo reboot\n";
+    const result = lintSkill(markdown);
+    expect(result.findings.map((finding) => finding.rule)).toContain("frontmatter-invalid");
+    expect(result.findings.map((finding) => finding.rule)).toContain("dangerous-instruction");
+    expect(result.score).toBeLessThan(80);
+  });
+
   it("is skipped when the description is missing entirely", () => {
     const md = `---
 name: a-skill

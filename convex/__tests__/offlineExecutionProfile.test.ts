@@ -6,6 +6,7 @@ import {
   ISOLATED_CONTAINER_POLICY,
   harnessCapabilityManifestDigest,
   harnessRuntimeArtifactDigest,
+  findKnownIsolatedHarness,
 } from "@mission-control/workflow-engine/harness-contract";
 import { executionProfileSnapshot, executionProfileDigest, executionProfileQualificationSnapshot, executionProfileQualificationDigest, executionProfileCurrentness, executionProfileCurrentnessIssues, executionProfileIssues } from "../lib/executionProfile";
 import { isolatedSandboxAdmission, isolatedSandboxDigest, ISOLATED_SANDBOX_ADMISSION_SCHEMA, type IsolatedSandboxSnapshot } from "../lib/isolatedSandbox";
@@ -18,7 +19,9 @@ import { factoryWorkloadClassForPurpose, validFactoryExecutionBinding } from "..
 import { loadExecutionProfileAdmission } from "../lib/executionProfileAdmission";
 
 const sha = `sha256:${"a".repeat(64)}`;
-function fixture() {
+function fixture(harnessVersion = "1") {
+  const { config: ISOLATED_INVOCATION_EFFECTIVE_CONFIG, manifest: ISOLATED_INVOCATION_MANIFEST,
+    runtime: ISOLATED_INVOCATION_RUNTIME_ARTIFACT } = findKnownIsolatedHarness(harnessVersion)!;
   const sandboxSnapshot: IsolatedSandboxSnapshot = {
     schema: "factory-sandbox-profile/v2", provider: "LOCAL_CONTAINER", profileKey: "isolated-control", version: 1,
     imageDigest: ISOLATED_INVOCATION_RUNTIME_ARTIFACT.imageDigest!, bridgeDigest: ISOLATED_INVOCATION_EFFECTIVE_CONFIG.bridgeImplementationDigest, backendDigest: ISOLATED_INVOCATION_EFFECTIVE_CONFIG.backendImplementationDigest,
@@ -38,7 +41,7 @@ function fixture() {
   };
   const manifest = ISOLATED_INVOCATION_MANIFEST;
   const profile = executionProfileSnapshot({ profileKey: "offline-control", version: 1,
-    harness: { adapter: "isolated-invocation", version: "1", capabilityManifest: manifest, capabilityManifestDigest: harnessCapabilityManifestDigest(manifest), effectiveConfigSha256: manifest.effectiveConfigSha256 },
+    harness: { adapter: "isolated-invocation", version: harnessVersion, capabilityManifest: manifest, capabilityManifestDigest: harnessCapabilityManifestDigest(manifest), effectiveConfigSha256: manifest.effectiveConfigSha256 },
     runtimeArtifact: { snapshot: ISOLATED_INVOCATION_RUNTIME_ARTIFACT, digest: harnessRuntimeArtifactDigest(ISOLATED_INVOCATION_RUNTIME_ARTIFACT) },
     executionBackend: "isolated-container", offlinePolicy: policy,
     sandboxProfile: { profileId: sandbox._id, profileDigest: sandbox.profileDigest, profileSnapshot: sandboxSnapshot }, isolationModes: ["WORKSPACE_WRITE"],
@@ -48,7 +51,7 @@ function fixture() {
     workloadClasses: ["SOFTWARE_CHANGE"], riskClasses: ["GREEN"], evidenceReference: "composition-control-evidence", evidenceDigest: sha,
     approvedBy: "reviewer", approvedAt: 1500, validUntil: 9000 });
   const record = { _id: "profile-id", projectId: "project-1", tenantId: "tenant-1", profileKey: profile.profileKey, version: profile.version, profileDigest, immutableSnapshot: profile,
-    executor: { adapter: "isolated-invocation", version: "1" }, harnessCapabilityManifest: manifest,
+    executor: { adapter: "isolated-invocation", version: harnessVersion }, harnessCapabilityManifest: manifest,
     harnessCapabilityManifestDigest: profile.harness.capabilityManifestDigest, harnessEffectiveConfigSha256: manifest.effectiveConfigSha256,
     harnessRuntimeArtifact: ISOLATED_INVOCATION_RUNTIME_ARTIFACT, harnessRuntimeArtifactDigest: profile.runtimeArtifact.digest,
     executionBackend: "isolated-container", sandboxProfileId: sandbox._id, sandboxProfileDigest: sandbox.profileDigest,
@@ -59,6 +62,14 @@ function fixture() {
 }
 
 describe("versioned offline Execution Profile", () => {
+  it.each(["1", "2", "3"])("keeps exact version %s registration and rejects a mixed runtime", version => {
+    const { profile } = fixture(version);
+    expect(executionProfileIssues(profile)).toEqual([]);
+    const changed = structuredClone(profile);
+    const other = findKnownIsolatedHarness(version === "3" ? "2" : "3")!;
+    changed.runtimeArtifact = { snapshot: other.runtime, digest: harnessRuntimeArtifactDigest(other.runtime) };
+    expect(executionProfileIssues(changed).length).toBeGreaterThan(0);
+  });
   it("constructs frozen manifest data with no route or execution authority", async () => {
     const { profile, record, sandbox } = fixture();
     const operation = { reference: "render-markdown/v1", digest: RENDER_MARKDOWN_OPERATION_DIGEST,
