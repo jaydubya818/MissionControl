@@ -105,17 +105,28 @@ export async function projectEnterpriseResult(ctx: MutationCtx, connection: Doc<
         || verifier.metadata?.observationOnly !== true || verifier.metadata?.evaluationMode !== 'IMPORTED_SIGNED_FACTORY_EVIDENCE') return denied();
       producerInvocationId = signed.localExecution.producerAllocation;
     }
+    const verifierFactoryVersion = verifier.factoryConfigurationDigest ?? verifier.metadata?.factoryVersion;
+    const runtimeImage = source.enterpriseSettlement.nativeUsage?.runtimeImage ?? null;
+    const verifierSettlementDigest = verifier.enterpriseSettlement?.digest ?? null;
+    if (!source.factoryDefinitionVersionId || !producerInvocationId || !verifier.executorInvocationId || !verifierFactoryVersion
+      || producerInvocationId === verifier.executorInvocationId
+      || (reservation.provider === 'isolated-container'
+        ? !runtimeImage || !verifier.factoryDefinitionVersionId || !verifierSettlementDigest
+        : reservation.provider !== 'local-docker' || runtimeImage !== null || verifier.factoryDefinitionVersionId
+          || verifierSettlementDigest !== null || verifierFactoryVersion !== reservation.factoryVersion)) {
+      reasons.push('RESULT_PROJECTION_INCOMPLETE'); continue;
+    }
     results.push({ workOrderId:wo._id, revisionId:wo.currentRevisionId, revision:wo.currentRevisionNumber ?? 1,
       sourceAttemptId:source._id, verificationAttemptId:verifier._id, candidate:gate.candidateRevision,
       producerInvocationId, provider:reservation.provider, factoryVersion:reservation.factoryVersion, factoryDefinitionVersionId:source.factoryDefinitionVersionId,
       verifierFactoryDefinitionVersionId:verifier.factoryDefinitionVersionId ?? null,
-      verifierFactoryVersion:verifier.factoryConfigurationDigest ?? verifier.metadata?.factoryVersion, verifierInvocationId:verifier.executorInvocationId,
-      runtimeImage:source.enterpriseSettlement.nativeUsage?.runtimeImage ?? null,
+      verifierFactoryVersion, verifierInvocationId:verifier.executorInvocationId,
+      runtimeImage,
       qualityContractDigest:wo.qualityContractDigest, verificationContractDigest:wo.verificationContractDigest,
       verificationRunId:gate.verificationRunId, verificationReceiptId:receipt._id, verificationPlanDigest:gate.verificationPlanDigest,
       evidenceSetDigest:gate.evidenceSetDigest, evidenceIds:evidence.map(e=>e!._id),
       reservationDigest:reservation.digest, settlementDigest:source.enterpriseSettlement.digest, proofDigest:source.enterpriseSettlement.proofDigest,
-      verifierSettlementDigest:verifier.enterpriseSettlement?.digest ?? null, handoffId:handoff._id,
+      verifierSettlementDigest, handoffId:handoff._id,
       artifactIds:handoff.artifactIds, gate:'PASS', independentlyVerified:true });
   }
   const assertionProofs = [];
