@@ -10,8 +10,9 @@ controls. It uses the existing Mission Control lifecycle and authority.
 The [implementation report](2026-11-26-authorized-factory-improvements.md)
 describes the independently reviewed source snapshot before publication. Its
 statements about uncommitted work describe that recorded snapshot. The commit
-history and pull request record the subsequent publication state. Publishing
-source does not deploy the change or establish live factory qualification.
+history and pull request record the subsequent publication state. Source
+publication can trigger configured preview builds. It does not authorize
+production promotion or establish live factory qualification.
 
 ## Commit order
 
