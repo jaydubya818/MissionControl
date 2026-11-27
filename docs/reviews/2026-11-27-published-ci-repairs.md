@@ -94,6 +94,50 @@ The installed dependency gate failed with the single advisory described above.
 Hosted results for the new candidate are tracked in the pull request. A new CI
 configuration is not itself a passing result.
 
+## Subsequent hosted verification
+
+Candidate `492b6deeb41041bacadbfcd1f071617b3bd4c742` completed the
+[next CI run](https://github.com/jaydubya818/MissionControl/actions/runs/46025292578).
+The native macOS unit job passed 855 orchestration tests and skipped 11. It also
+passed all 403 UI component tests, 2,005 Convex tests, and 13 receipt regressions.
+Other workspace package tests passed. The earlier host CLI failure is cleared,
+including the nine added regressions.
+
+The [capability qualification workflow](https://github.com/jaydubya818/MissionControl/actions/runs/46025292640)
+passed 59 component tests on each of Node 20 and Node 24, plus 84 admission and
+containment tests. The release and composed-qualification jobs stopped at the
+same dependency advisory. Those results do not establish the later composed
+worker stages.
+
+Both browser installations succeeded. The existing critical browser and
+accessibility suite passed all 15 cases, and the retained operator-route E2E
+case passed. The seven new operator Preview cases produced six passes and one
+failure. Screenshot inspection revealed a second fixture defect that passing
+behavioral assertions had missed.
+
+The recipe test used exact label text, which included the nested select's option
+text. The browser exposed the expected accessible name on its combobox. The test
+now selects that exact named control within the named dialog and retains every
+draft-only assertion.
+
+The fixture's CSS build scanned its own directory but omitted utility classes
+from imported application components. Browser traces and a separate baseline
+build both confirmed the omission. A fixture stylesheet now imports the existing
+application stylesheet and explicitly registers the application source. The
+repaired build contains the missing layout utilities. New computed-style and
+viewport assertions prevent that omission from producing another misleading
+pass. Styled layout and contrast qualification require the next hosted browser
+run and its screenshots. The prior six passes do not establish that result.
+
+Lint also reached the public runtime-contract guard for the first time. It found
+18 contract changes against the PR base while both versions remained 63. The
+shared client/backend constant advances to 64 for the intake and replay APIs
+and the optional measurement `targetDirection` argument. The unchanged guard
+now passes against the explicit PR base. Its regression and documentation tests
+passed 14 cases, and UI compatibility tests passed 12. Historical v63 records
+remain unchanged. Deployed clients and the backend must still advance together;
+source publication does not establish that deployment.
+
 ## Live factory qualification remains open
 
 Neither this source repair nor the operator fixture tests establish live to-do

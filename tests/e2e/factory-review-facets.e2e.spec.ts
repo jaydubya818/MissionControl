@@ -9,6 +9,7 @@ for (const theme of ["dark", "light"]) {
       await page.route("https://fonts.googleapis.com/**", (route) => route.fulfill({ status: 200, contentType: "text/css", body: "" }));
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`/?theme=${theme}`);
+      await expect(page.locator("#run-review-package")).toHaveCSS("border-top-width", "1px");
       await expect(page.getByRole("heading", { name: "Review questions" })).toBeVisible();
       await expect(page.getByRole("status").first()).toHaveText("BLOCKED");
       await expect(page.getByRole("heading", { name: "Rollback cost" })).toBeVisible();
@@ -28,11 +29,15 @@ for (const theme of ["dark", "light"]) {
 test("recipe recommendation and explicit override stay draft-only", async ({ page }) => {
   await page.route("https://fonts.googleapis.com/**", (route) => route.fulfill({ status: 200, contentType: "text/css", body: "" }));
   await page.goto("/?view=recipe");
-  const recipe = page.getByLabel("Workflow recipe", { exact: true });
+  const dialog = page.getByRole("dialog", { name: "Start governed work", exact: true });
+  await expect(dialog).toHaveCSS("position", "fixed");
+  await expect(dialog).toBeInViewport();
+  const recipe = dialog.getByRole("combobox", { name: "Workflow recipe", exact: true });
   await expect(recipe).toHaveValue("scout");
   await recipe.selectOption("quality");
   await expect(page.getByText(/Override recorded/)).toBeVisible();
-  await page.getByRole("button", { name: "Create Mission draft", exact: true }).click();
+  await page.screenshot({ path: "test-results/factory-review/recipe-dark-1280.png", fullPage: true });
+  await dialog.getByRole("button", { name: "Create Mission draft", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Draft captured by the local fixture.");
   const draft = JSON.parse(await page.getByTestId("captured-draft").innerText());
   expect(draft.metadata.factoryExperience).toMatchObject({ recommendedRecipeId: "scout", selectedRecipeId: "quality", operatorOverrodeRecommendation: true });

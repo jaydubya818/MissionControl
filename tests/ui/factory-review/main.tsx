@@ -5,7 +5,7 @@ import { CreateFactoryMissionDialog } from "../../../apps/mission-control-ui/src
 import { FactoryIntakePanel } from "../../../apps/mission-control-ui/src/factoryExperience/FactoryIntakePanel";
 import { FactoryReplayPanel } from "../../../apps/mission-control-ui/src/factoryExperience/FactoryReplayPanel";
 import { buildReviewPackage } from "../../../convex/lib/reviewPackage";
-import "../../../apps/mission-control-ui/src/index.css";
+import "./styles.css";
 
 const params = new URLSearchParams(window.location.search);
 document.documentElement.setAttribute("data-theme", params.get("theme") === "light" ? "light" : "dark");
