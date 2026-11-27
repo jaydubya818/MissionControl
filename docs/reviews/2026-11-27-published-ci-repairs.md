@@ -138,6 +138,54 @@ passed 14 cases, and UI compatibility tests passed 12. Historical v63 records
 remain unchanged. Deployed clients and the backend must still advance together;
 source publication does not establish that deployment.
 
+## Styled verification and the worker test deadline
+
+Candidate `47d95bac26fc1738492101e8f4a52f057c3c181b` completed the
+[styled browser run](https://github.com/jaydubya818/MissionControl/actions/runs/46027148133).
+All seven operator Preview cases passed, alongside the existing fifteen critical
+browser/accessibility cases and the retained operator-route E2E case. Root
+downloaded artifact `factory-operator-preview-1` (ID `15212164603`), verified its
+SHA-256 as
+`4a3ed954ec3f7939d7d1108c37ad5f66d992f4b335a7426189ffca29e76e8734`,
+and inspected all seven screenshots. Light/dark and narrow/wide layouts now
+contain the application styles. The recipe dialog, intake failure, and replay
+blocked states render correctly within the explicit fixture scope. Lint and
+the runtime-contract guard also passed.
+
+That candidate's first native unit job passed 854 orchestration tests, failed
+one, and skipped eleven. The failing case waits for a failed Fab attempt to
+retain its normalized result. Its first assertion observed `failedCount: 0`
+when the ten-second polling deadline expired, before checking the result and
+durable session. The case took 12,726 milliseconds including setup. UI and
+receipt regressions passed; the full Convex suite did not execute after the
+workspace failure. The relevant worker and fixture sources were unchanged from
+the preceding passing candidate.
+
+One controlled rerun of that same native job passed 855 orchestration tests,
+403 UI tests, 2,005 Convex tests, and thirteen receipt regressions. The affected
+case passed in 5,560 milliseconds. The original failure remains part of the
+record. The original log lacks phase timings and final fixture state, so it
+cannot identify which operation was slow.
+
+Local probes established a narrower, reproducible test defect. The polling
+deadline is ten seconds while the fixture's Fab stage permits twenty seconds.
+A controlled eleven-second model-response delay left the real worker active
+with one model call and no error when the original polling assertion failed.
+The worker then recorded the expected terminal failure, token usage, one model
+call, durable failed session, and `TURN_LIMIT` event. Every original semantic
+assertion passed, including absence of PR creation. Root independently repeated
+this probe: the original wait failed at 10,005 milliseconds, and the terminal
+report arrived at 12,257 milliseconds. This demonstrates the polling deadline
+can reject a permitted execution duration; it does not identify the original
+hosted delay's exact phase.
+
+Only that case now allows thirty seconds for the terminal-state assertion and
+forty-five seconds overall. These finite limits cover the twenty-second stage
+plus fixture preparation and reporting. All result, session, usage, turn-limit,
+and publication assertions remain in place. Shared test deadlines and production
+execution limits are unchanged. The correction still requires the published
+candidate's native CI result; a same-head retry does not validate new source.
+
 ## Live factory qualification remains open
 
 Neither this source repair nor the operator fixture tests establish live to-do
