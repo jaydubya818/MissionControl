@@ -191,7 +191,7 @@ jobs:
 
   e2e-tests:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # E2E requires a live Convex backend — run but don't block merges if infra unavailable
     continue-on-error: true
     steps:
@@ -245,7 +245,7 @@ jobs:
 
   browser-security:
     name: Browser Security and Accessibility
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
