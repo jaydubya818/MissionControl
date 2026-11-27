@@ -78,6 +78,9 @@ importers:
       concurrently:
         specifier: ^8.2.2
         version: 8.2.2
+      convex-test:
+        specifier: 0.0.54
+        version: 0.0.54(convex@1.42.3(@clerk/react@6.12.10(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1))
       esbuild:
         specifier: 0.27.0
         version: 0.27.0
@@ -2622,6 +2625,11 @@ packages:
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  convex-test@0.0.54:
+    resolution: {integrity: sha512-C0v2SQcuxrELAJRNzE6fQ686XDPor7UFoC22jcoJXeCRqhLo8ZIMZ4jyUHoo1UdAL2enCb0AbiprCVpLDN8u9Q==}
+    peerDependencies:
+      convex: ^1.32.0
 
   convex@1.31.7:
     resolution: {integrity: sha512-PtNMe1mAIOvA8Yz100QTOaIdgt2rIuWqencVXrb4McdhxBHZ8IJ1eXTnrgCC9HydyilGT1pOn+KNqT14mqn9fQ==}
@@ -6529,6 +6537,10 @@ snapshots:
   content-type@2.1.0: {}
 
   convert-source-map@2.0.0: {}
+
+  convex-test@0.0.54(convex@1.42.3(@clerk/react@6.12.10(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)):
+    dependencies:
+      convex: 1.42.3(@clerk/react@6.12.10(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
 
   convex@1.31.7(react@18.3.1):
     dependencies:
