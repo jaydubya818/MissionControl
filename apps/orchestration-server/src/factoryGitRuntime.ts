@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readlink, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -166,6 +166,29 @@ export async function installFrozenPnpmDependencies(
       pnpmCli = await realpath(configuredCli);
       if (insideCandidate(pnpmCli)) throw new Error("The host pnpm CLI must be outside the candidate worktree.");
       if (!(await stat(pnpmCli)).isFile()) throw new Error("MISSION_CONTROL_FACTORY_PNPM_CLI_PATH must resolve to a regular file.");
+      const resolutionPaths = [configuredCli];
+      const inspectedEntries = new Set<string>();
+      let symlinkCount = 0;
+      for (let index = 0; index < resolutionPaths.length; index += 1) {
+        let entryPath = resolutionPaths[index];
+        while (!inspectedEntries.has(entryPath)) {
+          inspectedEntries.add(entryPath);
+          const parent = path.dirname(entryPath);
+          const canonicalParent = await realpath(parent);
+          const canonicalEntry = path.join(canonicalParent, path.basename(entryPath));
+          if (insideCandidate(canonicalEntry)) throw new Error("The host pnpm CLI must be outside the candidate worktree.");
+          if ((await lstat(entryPath)).isSymbolicLink()) {
+            symlinkCount += 1;
+            if (symlinkCount > 40) {
+              throw Object.assign(new Error("The host pnpm CLI contains too many symbolic links."), { code: "ELOOP" });
+            }
+            const target = await readlink(entryPath);
+            resolutionPaths.push(path.isAbsolute(target) ? target : `${canonicalParent}${path.sep}${target}`);
+          }
+          if (parent === entryPath) break;
+          entryPath = parent;
+        }
+      }
     }
     const installArgs = [
       "install",
