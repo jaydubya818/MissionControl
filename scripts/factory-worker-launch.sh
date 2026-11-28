@@ -12,5 +12,12 @@ set -a; . "$ENV_FILE"; set +a
 if [ "$(uname -s)" = "Darwin" ]; then
   case "${TMPDIR:-}" in ""|/tmp|/tmp/*|/private/tmp|/private/tmp/*) TMPDIR="$(getconf DARWIN_USER_TEMP_DIR)"; export TMPDIR;; esac
 fi
+# The adapter admits only the evaluated Codex build (version and native digest), and falls back to `codex` on PATH,
+# which under a service manager resolves to an unqualified install. Default to the pinned build when it is present;
+# an explicit CODEX_EXECUTABLE (for example from the env file) always wins, and the adapter still verifies it.
+if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ] && [ -z "${CODEX_EXECUTABLE:-}" ]; then
+  pinned="$HOME/.mission-control/codex-0.146.0/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+  if [ -x "$pinned" ]; then CODEX_EXECUTABLE="$pinned"; export CODEX_EXECUTABLE; fi
+fi
 [ "$#" -gt 0 ] || set -- pnpm run worker:implementation
 exec "$@"

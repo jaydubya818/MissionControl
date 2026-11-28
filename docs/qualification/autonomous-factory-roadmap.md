@@ -22,7 +22,7 @@ Commit rules (AGENTS.md): operator's Git identity, no AI co-author trailers.
 
 | Phase | Status | Basis |
 | --- | --- | --- |
-| 0 Security/runtime blockers | IN PROGRESS | hono 2.1.11 pin + TMPDIR launcher committed; CI green on `163decb`; independent hono-v2 and Codex-binary verification running |
+| 0 Security/runtime blockers | IN PROGRESS | hono 2.1.11 independently verified PASS; Codex binary wiring defect found and fixed (below); exact-candidate CI on the final head still to be confirmed |
 | 1 Hosted control plane | IN PROGRESS | deployment and UI live; bootstrap vars set (this session); **owner Clerk sign-in pending** |
 | 2 Mac worker admission | BLOCKED | needs Phase 1 bootstrap, then Project/Repository/Factory Version bindings |
 | 3–8 | NOT RUN | critical path; preparation only |
@@ -39,6 +39,10 @@ Commit rules (AGENTS.md): operator's Git identity, no AI co-author trailers.
   bindings and the accounting journal path are still to be added.
 - Qualified Codex is pinned at `~/.mission-control/codex-0.146.0`; the shell
   `codex` on PATH is 0.163.0 and is not the qualified runtime.
+- The continuation record's "adapter READY under `env -i`" was not reproducible
+  with the committed launcher: nothing set `CODEX_EXECUTABLE`, so the adapter fell
+  back to `codex` on PATH (an unqualified install under a service manager).
+  Reproduced FAIL, fixed, and re-verified below.
 - The qualification UI sits behind Vercel deployment protection (SSO) in front
   of the Clerk sign-in; both are intact.
 
@@ -46,9 +50,9 @@ Commit rules (AGENTS.md): operator's Git identity, no AI co-author trailers.
 
 | Agent | Package | Status |
 | --- | --- | --- |
-| Security & Governance | Phase 0: verify hono 2.x upgrade and Codex binary reference on `163decb` | running, read-only |
-| Infrastructure & Cloud | Phase 5 prep: inventory existing sandbox/cloud worker work, Linux runtime qualification needs, hosting options | running, read-only |
-| MyEve/Sofie Integration | Phase 6 prep: gap analysis vs required contract; contract 64 vs 72 divergence | running, read-only |
+| Security & Governance | Phase 0: verify hono 2.x upgrade and Codex binary reference on `163decb` | done; findings below |
+| Infrastructure & Cloud | Phase 5 prep: inventory existing sandbox/cloud worker work, Linux runtime qualification needs, hosting options | done; findings below |
+| MyEve/Sofie Integration | Phase 6 prep: gap analysis vs required contract; contract 64 vs 72 divergence | done; findings below |
 
 Findings are appended below when each agent reports; none are treated as
 verified until reproduced or cited to source.
@@ -152,3 +156,27 @@ executing Attempts; (2) a GCP VM, which needs a named project and billing cap;
 authorizing any VM allocation or live canary. The repo requires explicit Product
 Owner approval for that, and the program directive forbids new paid commitments
 without it. Phase 5 qualification stays NOT RUN until then.
+
+## Phase 0 verification results (Security agent, reproduced by principal where noted)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| hono node-server 2.1.11 engine range (`>=20`) vs CI Node 20/24 and local 24 | PASS | package engines; `ci.yml`. Vercel Node 26.x not set in repo: UNVERIFIED (Vercel builds only the UI) |
+| API call sites | PASS | only `serve()` in `apps/orchestration-server/src/index.ts`; no `serveStatic`; `serve`/`Options` types unchanged 1.19.19→2.1.11; `tsc --noEmit` clean |
+| Startup, SSE, upgrade, close, auth 401/200, error 500 | PASS (throwaway harness) | identical results on 1.19.19 and 2.1.11. Gap: no repo test binds `startServer()`; real MCP transport over HTTP not exercised |
+| Targeted vitest (11 files) | PASS | 137 passed, 1 skipped, 0 failed |
+| Dependency audit and `release:security` | PASS | production and all scopes 0/0/0/0; ratchet 591 vs baseline 592; secret scan and docs check pass |
+| Lockfile | PASS | only `@hono/node-server@2.1.11` and `hono@4.13.18` |
+| Codex runtime through the real launcher | FIXED | see below |
+
+Codex wiring defect: `scripts/factory-worker-launch.sh` did not set
+`CODEX_EXECUTABLE`. With a service-manager-style environment
+(`env -i` plus a minimal PATH) and the Codex worker enabled, `factory:readiness`
+reported `codex-runtime` FAIL. The launcher now defaults `CODEX_EXECUTABLE` to the
+pinned 0.146.0 native binary on macOS arm64 when the variable is unset; an explicit
+value always wins and the adapter still verifies version and digest. Re-run:
+`codex-runtime` PASS with the default; FAIL when `CODEX_EXECUTABLE` points to the
+unqualified Homebrew binary (the gate is not weakened). Note
+`scripts/codex-factory-worker.ts` defaults to a nonexistent
+`/Applications/Codex.app/...` path; it is not on the launcher path. Follow-ups, not
+done: raise root `engines` to `>=20`; add a startup test that binds the listener.
