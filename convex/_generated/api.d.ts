@@ -8,6 +8,11 @@
  * @module
  */
 
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 import type * as activities from "../activities.js";
 import type * as agentDocuments from "../agentDocuments.js";
 import type * as agentHiring from "../agentHiring.js";
@@ -21,6 +26,9 @@ import type * as approvals from "../approvals.js";
 import type * as automationExecutions from "../automationExecutions.js";
 import type * as automationScheduler from "../automationScheduler.js";
 import type * as automations from "../automations.js";
+import type * as capabilityChallenges from "../capabilityChallenges.js";
+import type * as capabilityLifecycle from "../capabilityLifecycle.js";
+import type * as capabilityPolicy from "../capabilityPolicy.js";
 import type * as captures from "../captures.js";
 import type * as codegen from "../codegen.js";
 import type * as comments from "../comments.js";
@@ -63,6 +71,7 @@ import type * as factory_health from "../factory/health.js";
 import type * as factory_incidentControlObserver from "../factory/incidentControlObserver.js";
 import type * as factory_incidentControls from "../factory/incidentControls.js";
 import type * as factory_incidents from "../factory/incidents.js";
+import type * as factory_intake from "../factory/intake.js";
 import type * as factory_learning from "../factory/learning.js";
 import type * as factory_metaLoop from "../factory/metaLoop.js";
 import type * as factory_piBridge from "../factory/piBridge.js";
@@ -70,6 +79,7 @@ import type * as factory_prChecks from "../factory/prChecks.js";
 import type * as factory_providerLiability from "../factory/providerLiability.js";
 import type * as factory_releases from "../factory/releases.js";
 import type * as factory_repetitiveTasks from "../factory/repetitiveTasks.js";
+import type * as factory_replay from "../factory/replay.js";
 import type * as factory_workflows from "../factory/workflows.js";
 import type * as factoryMemory from "../factoryMemory.js";
 import type * as factoryPackageImports from "../factoryPackageImports.js";
@@ -105,6 +115,13 @@ import type * as lib_authorizationRollout from "../lib/authorizationRollout.js";
 import type * as lib_automationDispatch from "../lib/automationDispatch.js";
 import type * as lib_automationGovernance from "../lib/automationGovernance.js";
 import type * as lib_bedrockBridgeIdentity from "../lib/bedrockBridgeIdentity.js";
+import type * as lib_capabilityAdmission from "../lib/capabilityAdmission.js";
+import type * as lib_capabilityLifecycleInventory from "../lib/capabilityLifecycleInventory.js";
+import type * as lib_capabilityLifecycleWire from "../lib/capabilityLifecycleWire.js";
+import type * as lib_capabilityOrderingWire from "../lib/capabilityOrderingWire.js";
+import type * as lib_capabilityPolicySchema from "../lib/capabilityPolicySchema.js";
+import type * as lib_capabilityReceiverRecovery from "../lib/capabilityReceiverRecovery.js";
+import type * as lib_capabilityWorkControl from "../lib/capabilityWorkControl.js";
 import type * as lib_companyAccess from "../lib/companyAccess.js";
 import type * as lib_companyContextGate from "../lib/companyContextGate.js";
 import type * as lib_companyMemberPolicy from "../lib/companyMemberPolicy.js";
@@ -130,6 +147,8 @@ import type * as lib_executionProfile from "../lib/executionProfile.js";
 import type * as lib_executionProfileAdmission from "../lib/executionProfileAdmission.js";
 import type * as lib_executionRecovery from "../lib/executionRecovery.js";
 import type * as lib_executionRouting from "../lib/executionRouting.js";
+import type * as lib_fabCostPersistence from "../lib/fabCostPersistence.js";
+import type * as lib_fabObservedCost from "../lib/fabObservedCost.js";
 import type * as lib_factoryActionAuthorization from "../lib/factoryActionAuthorization.js";
 import type * as lib_factoryAttempt from "../lib/factoryAttempt.js";
 import type * as lib_factoryConfiguration from "../lib/factoryConfiguration.js";
@@ -139,6 +158,7 @@ import type * as lib_factoryHumanReview from "../lib/factoryHumanReview.js";
 import type * as lib_factoryIncident from "../lib/factoryIncident.js";
 import type * as lib_factoryIncidentControl from "../lib/factoryIncidentControl.js";
 import type * as lib_factoryIncidentDrills from "../lib/factoryIncidentDrills.js";
+import type * as lib_factoryIntake from "../lib/factoryIntake.js";
 import type * as lib_factoryLearning from "../lib/factoryLearning.js";
 import type * as lib_factoryMemory from "../lib/factoryMemory.js";
 import type * as lib_factoryMemoryDemoSeed from "../lib/factoryMemoryDemoSeed.js";
@@ -153,6 +173,9 @@ import type * as lib_factoryPackageRetrieval from "../lib/factoryPackageRetrieva
 import type * as lib_factoryProjectSeed from "../lib/factoryProjectSeed.js";
 import type * as lib_factoryQualificationScope from "../lib/factoryQualificationScope.js";
 import type * as lib_factoryRelease from "../lib/factoryRelease.js";
+import type * as lib_factoryReplay from "../lib/factoryReplay.js";
+import type * as lib_factoryReplayPersistence from "../lib/factoryReplayPersistence.js";
+import type * as lib_factoryReplaySchema from "../lib/factoryReplaySchema.js";
 import type * as lib_factoryReviewReadModel from "../lib/factoryReviewReadModel.js";
 import type * as lib_factoryWorkerRuntime from "../lib/factoryWorkerRuntime.js";
 import type * as lib_factoryWorkerValidators from "../lib/factoryWorkerValidators.js";
@@ -223,7 +246,9 @@ import type * as lib_repetitiveTasks from "../lib/repetitiveTasks.js";
 import type * as lib_repositoryExecutionPolicy from "../lib/repositoryExecutionPolicy.js";
 import type * as lib_researchEvidenceBundle from "../lib/researchEvidenceBundle.js";
 import type * as lib_researchIngestionPolicy from "../lib/researchIngestionPolicy.js";
+import type * as lib_researchLabDockerScope from "../lib/researchLabDockerScope.js";
 import type * as lib_researchSourcePolicy from "../lib/researchSourcePolicy.js";
+import type * as lib_reviewFacets from "../lib/reviewFacets.js";
 import type * as lib_reviewIntelligence from "../lib/reviewIntelligence.js";
 import type * as lib_reviewIntelligenceValidators from "../lib/reviewIntelligenceValidators.js";
 import type * as lib_reviewPackage from "../lib/reviewPackage.js";
@@ -245,6 +270,7 @@ import type * as lib_verificationPersistence from "../lib/verificationPersistenc
 import type * as lib_workOrderCompat from "../lib/workOrderCompat.js";
 import type * as lib_workOrderCreate from "../lib/workOrderCreate.js";
 import type * as lib_workOrderDispatch from "../lib/workOrderDispatch.js";
+import type * as lib_workOrderDispatchArgs from "../lib/workOrderDispatchArgs.js";
 import type * as lib_workOrderGovernance from "../lib/workOrderGovernance.js";
 import type * as lib_workOrderParentSync from "../lib/workOrderParentSync.js";
 import type * as lib_workOrderReadiness from "../lib/workOrderReadiness.js";
@@ -350,12 +376,14 @@ import type * as workflowRuns from "../workflowRuns.js";
 import type * as workflows from "../workflows.js";
 import type * as workspaceHostBindings from "../workspaceHostBindings.js";
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
-
+/**
+ * A utility for referencing Convex functions in your app's API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 declare const fullApi: ApiFromModules<{
   activities: typeof activities;
   agentDocuments: typeof agentDocuments;
@@ -370,6 +398,9 @@ declare const fullApi: ApiFromModules<{
   automationExecutions: typeof automationExecutions;
   automationScheduler: typeof automationScheduler;
   automations: typeof automations;
+  capabilityChallenges: typeof capabilityChallenges;
+  capabilityLifecycle: typeof capabilityLifecycle;
+  capabilityPolicy: typeof capabilityPolicy;
   captures: typeof captures;
   codegen: typeof codegen;
   comments: typeof comments;
@@ -412,6 +443,7 @@ declare const fullApi: ApiFromModules<{
   "factory/incidentControlObserver": typeof factory_incidentControlObserver;
   "factory/incidentControls": typeof factory_incidentControls;
   "factory/incidents": typeof factory_incidents;
+  "factory/intake": typeof factory_intake;
   "factory/learning": typeof factory_learning;
   "factory/metaLoop": typeof factory_metaLoop;
   "factory/piBridge": typeof factory_piBridge;
@@ -419,6 +451,7 @@ declare const fullApi: ApiFromModules<{
   "factory/providerLiability": typeof factory_providerLiability;
   "factory/releases": typeof factory_releases;
   "factory/repetitiveTasks": typeof factory_repetitiveTasks;
+  "factory/replay": typeof factory_replay;
   "factory/workflows": typeof factory_workflows;
   factoryMemory: typeof factoryMemory;
   factoryPackageImports: typeof factoryPackageImports;
@@ -454,6 +487,13 @@ declare const fullApi: ApiFromModules<{
   "lib/automationDispatch": typeof lib_automationDispatch;
   "lib/automationGovernance": typeof lib_automationGovernance;
   "lib/bedrockBridgeIdentity": typeof lib_bedrockBridgeIdentity;
+  "lib/capabilityAdmission": typeof lib_capabilityAdmission;
+  "lib/capabilityLifecycleInventory": typeof lib_capabilityLifecycleInventory;
+  "lib/capabilityLifecycleWire": typeof lib_capabilityLifecycleWire;
+  "lib/capabilityOrderingWire": typeof lib_capabilityOrderingWire;
+  "lib/capabilityPolicySchema": typeof lib_capabilityPolicySchema;
+  "lib/capabilityReceiverRecovery": typeof lib_capabilityReceiverRecovery;
+  "lib/capabilityWorkControl": typeof lib_capabilityWorkControl;
   "lib/companyAccess": typeof lib_companyAccess;
   "lib/companyContextGate": typeof lib_companyContextGate;
   "lib/companyMemberPolicy": typeof lib_companyMemberPolicy;
@@ -479,6 +519,8 @@ declare const fullApi: ApiFromModules<{
   "lib/executionProfileAdmission": typeof lib_executionProfileAdmission;
   "lib/executionRecovery": typeof lib_executionRecovery;
   "lib/executionRouting": typeof lib_executionRouting;
+  "lib/fabCostPersistence": typeof lib_fabCostPersistence;
+  "lib/fabObservedCost": typeof lib_fabObservedCost;
   "lib/factoryActionAuthorization": typeof lib_factoryActionAuthorization;
   "lib/factoryAttempt": typeof lib_factoryAttempt;
   "lib/factoryConfiguration": typeof lib_factoryConfiguration;
@@ -488,6 +530,7 @@ declare const fullApi: ApiFromModules<{
   "lib/factoryIncident": typeof lib_factoryIncident;
   "lib/factoryIncidentControl": typeof lib_factoryIncidentControl;
   "lib/factoryIncidentDrills": typeof lib_factoryIncidentDrills;
+  "lib/factoryIntake": typeof lib_factoryIntake;
   "lib/factoryLearning": typeof lib_factoryLearning;
   "lib/factoryMemory": typeof lib_factoryMemory;
   "lib/factoryMemoryDemoSeed": typeof lib_factoryMemoryDemoSeed;
@@ -502,6 +545,9 @@ declare const fullApi: ApiFromModules<{
   "lib/factoryProjectSeed": typeof lib_factoryProjectSeed;
   "lib/factoryQualificationScope": typeof lib_factoryQualificationScope;
   "lib/factoryRelease": typeof lib_factoryRelease;
+  "lib/factoryReplay": typeof lib_factoryReplay;
+  "lib/factoryReplayPersistence": typeof lib_factoryReplayPersistence;
+  "lib/factoryReplaySchema": typeof lib_factoryReplaySchema;
   "lib/factoryReviewReadModel": typeof lib_factoryReviewReadModel;
   "lib/factoryWorkerRuntime": typeof lib_factoryWorkerRuntime;
   "lib/factoryWorkerValidators": typeof lib_factoryWorkerValidators;
@@ -572,7 +618,9 @@ declare const fullApi: ApiFromModules<{
   "lib/repositoryExecutionPolicy": typeof lib_repositoryExecutionPolicy;
   "lib/researchEvidenceBundle": typeof lib_researchEvidenceBundle;
   "lib/researchIngestionPolicy": typeof lib_researchIngestionPolicy;
+  "lib/researchLabDockerScope": typeof lib_researchLabDockerScope;
   "lib/researchSourcePolicy": typeof lib_researchSourcePolicy;
+  "lib/reviewFacets": typeof lib_reviewFacets;
   "lib/reviewIntelligence": typeof lib_reviewIntelligence;
   "lib/reviewIntelligenceValidators": typeof lib_reviewIntelligenceValidators;
   "lib/reviewPackage": typeof lib_reviewPackage;
@@ -594,6 +642,7 @@ declare const fullApi: ApiFromModules<{
   "lib/workOrderCompat": typeof lib_workOrderCompat;
   "lib/workOrderCreate": typeof lib_workOrderCreate;
   "lib/workOrderDispatch": typeof lib_workOrderDispatch;
+  "lib/workOrderDispatchArgs": typeof lib_workOrderDispatchArgs;
   "lib/workOrderGovernance": typeof lib_workOrderGovernance;
   "lib/workOrderParentSync": typeof lib_workOrderParentSync;
   "lib/workOrderReadiness": typeof lib_workOrderReadiness;
@@ -699,28 +748,10 @@ declare const fullApi: ApiFromModules<{
   workflows: typeof workflows;
   workspaceHostBindings: typeof workspaceHostBindings;
 }>;
-
-/**
- * A utility for referencing Convex functions in your app's public API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
-
-/**
- * A utility for referencing Convex functions in your app's internal API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = internal.myModule.myFunction;
- * ```
- */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">

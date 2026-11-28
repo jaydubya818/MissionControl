@@ -242,6 +242,13 @@ export const resolve = action({
     if (learningCandidate && (!experimentReview || experimentReview.experiment.status !== "COMPLETED")) {
       throw new Error("Complete the linked canonical experiment before creating governed implementation work");
     }
+    if (experimentReview?.experiment.metadata?.factoryReplayManifestId) {
+      const replay = "replay" in experimentReview ? experimentReview.replay : undefined;
+      if (!replay?.comparison.complete || !replay.comparison.sampleSufficient
+        || replay.comparison.recommendation.recommendation !== "PROMOTION_RECOMMENDED") {
+        throw new Error("Frozen replay requires a current complete matched comparison recommending promotion before governed work can be created");
+      }
+    }
     const project = await ctx.runQuery(api.projects.get, { projectId: suggestion.projectId });
     if (!project) throw new Error("Suggestion workspace not found");
     if (!project.githubRepo) throw new Error("Connect an approved repository before accepting repository-changing improvement work");
@@ -542,6 +549,7 @@ export const recordMeasurement = mutation({
     baseline: v.number(),
     result: v.number(),
     target: v.number(),
+    targetDirection: v.optional(v.union(v.literal("HIGHER_IS_BETTER"), v.literal("LOWER_IS_BETTER"))),
     unit: v.string(),
     evidenceRefs: v.array(v.string()),
   },
@@ -588,7 +596,7 @@ export const recordMeasurement = mutation({
       description: `Measured ${row.title}: ${args.result}${args.unit} against ${args.target}${args.unit}`,
       targetType: "META_LOOP_SUGGESTION",
       targetId: row._id,
-      metadata: { verdict, baseline: args.baseline, result: args.result, target: args.target },
+      metadata: { verdict, baseline: args.baseline, result: args.result, target: args.target, targetDirection: measurement.targetDirection },
     });
     return { verdict };
   },

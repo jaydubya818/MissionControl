@@ -10,7 +10,8 @@
     "../../convex/lib/**/*.ts",
     "../../convex/capabilityPolicy.ts",
     "../../convex/factory/incidentControls.ts",
-    "../../convex/inferenceGateway.ts"
+    "../../convex/inferenceGateway.ts",
+    "../../convex/workOrders.ts"
   ],
   "references": [
     { "path": "../shared" },

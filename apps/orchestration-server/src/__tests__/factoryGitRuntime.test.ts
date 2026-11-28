@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertFactoryCandidateUnchanged,
   captureVerificationDocument,
@@ -22,6 +22,7 @@ const execFileAsync = promisify(execFile);
 const cleanup: string[] = [];
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(cleanup.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
@@ -138,6 +139,8 @@ describe("Factory Git runtime", () => {
 
   it("never loads candidate pnpm hooks or lifecycle scripts during offline preparation", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "mc-dependency-hooks-")); cleanup.push(root);
+    const store = await mkdtemp(path.join(tmpdir(), "mc-dependency-store-")); cleanup.push(store);
+    vi.stubEnv("MISSION_CONTROL_FACTORY_PNPM_STORE_DIR", store);
     await git(root, ["init", "-b", "main"]); await git(root, ["config", "user.name", "Test"]); await git(root, ["config", "user.email", "fixture@example.invalid"]);
     await writeFile(path.join(root, "package.json"), JSON.stringify({ private: true, scripts: { preinstall: "node -e \"throw Error('lifecycle executed')\"" } }));
     await writeFile(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\n\nimporters:\n\n  .: {}\n");
@@ -146,6 +149,7 @@ describe("Factory Git runtime", () => {
     await writeFile(path.join(root, ".gitignore"), "node_modules/\n");
     await git(root, ["add", "."]); await git(root, ["commit", "-m", "Synthetic preparation fixture"]);
     await expect(prepareFactoryDependencies({ worktree: root })).resolves.toMatchObject({ status: "PREPARED" });
+    expect((await git(root, ["status", "--porcelain=v1"])).stdout).toBe("");
   });
 
   it("rejects a worktree root symlink that escapes the canonical checkout", async () => {

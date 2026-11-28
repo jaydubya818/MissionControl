@@ -24,6 +24,7 @@ describe("meta-loop signal safety", () => {
       baseline: 0,
       result: 1,
       target: 1,
+      targetDirection: "HIGHER_IS_BETTER",
       unit: "successful recovery",
       evidenceRefs: ["pr:57"],
       verdict: "MET",

@@ -20,6 +20,7 @@ import {
   sha256Hex,
   verifyGithubInstallationSetup,
 } from "./lib/githubAppAuth";
+import { normalizeGithubIssue, normalizeProductError, readIntakeBody, verifyProductErrorSignature } from "./lib/factoryIntake";
 
 const http = httpRouter();
 
@@ -284,7 +285,9 @@ http.route({
   path: "/github/webhook",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const body = await request.text();
+    let body: string;
+    try { body = await readIntakeBody(request, 1_048_576); }
+    catch { return new Response("GitHub webhook body is invalid or exceeds 1 MiB", { status: 413 }); }
     const secret = process.env.GITHUB_WEBHOOK_SECRET;
     const signature = request.headers.get("x-hub-signature-256");
     const deliveryId = request.headers.get("x-github-delivery");
@@ -292,28 +295,22 @@ http.route({
     if (!deliveryId || !event) {
       return new Response("GitHub delivery and event headers are required", { status: 400 });
     }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(deliveryId) || !/^[a-z_]{1,100}$/.test(event)) {
+      return new Response("GitHub delivery or event header is invalid", { status: 400 });
+    }
     if (!secret) {
       return new Response("GitHub webhook is not configured", { status: 503 });
     }
     const valid = await verifyGithubWebhookSignature(body, signature, secret);
     if (!valid) {
-      await ctx.runMutation(internal.githubAppConnections.beginWebhookDelivery, {
-        deliveryId,
-        event,
-        signatureStatus: signature ? "INVALID" : "MISSING",
-      });
       return new Response("GitHub webhook signature verification failed", { status: 401 });
     }
 
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(body);
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Invalid body");
     } catch {
-      await ctx.runMutation(internal.githubAppConnections.beginWebhookDelivery, {
-        deliveryId,
-        event,
-        signatureStatus: "VALID",
-      });
       return new Response("Invalid JSON", { status: 400 });
     }
 
@@ -329,13 +326,14 @@ http.route({
         providerRepositoryId: repository?.id != null ? String(repository.id) : undefined,
         installationId: installation?.id != null ? String(installation.id) : undefined,
         signatureStatus: "VALID",
+        payloadDigest: `sha256=${await sha256Hex(body)}`,
       }
     );
     if (delivery.duplicate) {
       return new Response("OK (duplicate)", { status: 200 });
     }
     if (!delivery.accepted) {
-      return new Response(delivery.error ?? "GitHub installation is not authorized", { status: 403 });
+      return new Response(delivery.error ?? "GitHub installation is not authorized", { status: delivery.inFlight ? 409 : 403 });
     }
 
     const complete = async (
@@ -345,11 +343,26 @@ http.route({
     ) => {
       await ctx.runMutation(internal.githubAppConnections.completeWebhookDelivery, {
         deliveryRecordId: delivery.deliveryRecordId,
+        processingAttempt: delivery.processingAttempt!,
         status,
         result,
         error,
       });
     };
+
+    if (event === "issues") {
+      try {
+        const result = await ctx.runMutation(makeFunctionReference<"mutation">("factory/intake:receive"), {
+          githubDeliveryId: delivery.deliveryRecordId, deliveryId,
+          payloadDigest: `sha256=${await sha256Hex(body)}`, source: normalizeGithubIssue(payload, Date.now()),
+        });
+        await complete(result.accepted ? "PROCESSED" : "IGNORED", result.accepted ? "Recorded issue intake. Mission execution is separately governed." : result.reason);
+        return Response.json(result, { status: result.accepted ? 202 : 200 });
+      } catch {
+        await complete("FAILED", undefined, "Issue intake validation or processing failed.");
+        return new Response("GitHub issue intake failed", { status: 500 });
+      }
+    }
 
     if (event === "installation" || event === "installation_repositories") {
       const removed = payload.repositories_removed as Array<{ id?: number }> | undefined;
@@ -422,6 +435,36 @@ http.route({
     }
 
     return new Response("OK", { status: 200 });
+  }),
+});
+
+http.route({
+  path: "/factory/product-errors",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const connectionKey = request.headers.get("x-mc-connection");
+    const deliveryId = request.headers.get("x-mc-delivery");
+    if (!connectionKey || !deliveryId) return new Response("Connection and delivery headers are required", { status: 400 });
+    let body: string;
+    try { body = await readIntakeBody(request); }
+    catch { return new Response("Application-error body is invalid or exceeds 64 KiB", { status: 413 }); }
+    let connection;
+    try { connection = await ctx.runQuery(makeFunctionReference<"query">("factory/intake:resolveProductConnection"), { connectionKey }); }
+    catch { return new Response("Application-error connection is unavailable", { status: 403 }); }
+    const secret = connection?.secretEnv ? process.env[connection.secretEnv] : undefined;
+    if (!connection || !secret) return new Response("Application-error connection is unavailable", { status: 503 });
+    if (!(await verifyProductErrorSignature({ body, timestamp: request.headers.get("x-mc-timestamp"), signature: request.headers.get("x-mc-signature"), secret, now: Date.now(), connectionKey, deliveryId }))) {
+      return new Response("Application-error signature verification failed", { status: 401 });
+    }
+    try {
+      const source = normalizeProductError(JSON.parse(body), Date.now());
+      const result = await ctx.runMutation(makeFunctionReference<"mutation">("factory/intake:receive"), {
+        policyId: connection.policyId, deliveryId, payloadDigest: `sha256=${await sha256Hex(body)}`, source,
+      });
+      return Response.json(result, { status: 202 });
+    } catch {
+      return new Response("Application-error envelope is invalid or conflicts with a prior delivery", { status: 400 });
+    }
   }),
 });
 

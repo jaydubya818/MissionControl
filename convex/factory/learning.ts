@@ -8,6 +8,7 @@
  */
 
 import { v } from "convex/values";
+import { loadReplayReview } from "../lib/factoryReplayPersistence";
 import {
   action,
   internalMutation,
@@ -883,12 +884,28 @@ export const getExperimentReview = query({
       .query("experimentVariants")
       .withIndex("by_experiment", (q) => q.eq("experimentId", experiment._id))
       .collect();
-    const metrics = variants.map((variant) => ({
-      sampleSize: variant.sampleSize,
-      successRate: safeNumber(recordValue(variant.metrics).successRate),
-      averageDurationMs: safeNumber(recordValue(variant.metrics).averageDurationMs),
-      averageCostUsd: safeNumber(recordValue(variant.metrics).averageCostUsd),
-    }));
+    if (experiment.metadata?.factoryReplayManifestId) {
+      if (!await ctx.auth.getUserIdentity()) throw new Error("Authenticated replay access is required.");
+      const replay = await loadReplayReview(ctx, experiment._id);
+      if (!replay) throw new Error("Frozen experiment replay manifest is missing.");
+      const replayVariants = replay.comparison.variants.map((derived) => {
+        const variant = variants.find((item) => item._id === derived.variantId);
+        if (!variant || variant.projectId !== experiment.projectId) throw new Error("Replay variant binding is invalid.");
+        return { ...variant, sampleSize: derived.pairedSampleSize, metrics: derived.metrics };
+      });
+      return { experiment, variants: replayVariants,
+        recommendation: replay.comparison.recommendation, replay };
+    }
+    const metrics = variants.map((variant) => {
+      const recorded = recordValue(variant.metrics);
+      return {
+        sampleSize: variant.sampleSize,
+        successRate: safeNumber(recorded.successRate),
+        averageDurationMs: safeNumber(recorded.averageDurationMs),
+        averageCostUsd: safeNumber(recorded.averageCostUsd),
+        averageScore: recorded.averageScore === undefined ? undefined : safeNumber(recorded.averageScore) ?? null,
+      };
+    });
     return {
       experiment,
       variants,

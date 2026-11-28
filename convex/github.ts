@@ -1,6 +1,9 @@
 import { v } from "convex/values";
 import { mutation, query, action, internalQuery } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { COMPANY_PERMISSIONS, requireWorkspaceAccess } from "./lib/companyAccess";
 
 /**
  * GitHub Integration
@@ -8,7 +11,7 @@ import { api, internal } from "./_generated/api";
  * Syncs GitHub issues as Mission Control tasks via the INBOX invariant:
  * - All tasks created from GitHub land in INBOX (never DONE/IN_PROGRESS).
  * - GitHub issue state is tracked separately in metadata.githubState.
- * - Idempotency is enforced via deterministic keys: `github:{owner}/{repo}#{number}`.
+ * - Issue idempotency is scoped to the workspace, with legacy key adoption.
  * - Task types are mapped to valid schema values only.
  * - All task creation goes through api.tasks.create.
  */
@@ -18,8 +21,107 @@ import { api, internal } from "./_generated/api";
 // ============================================================================
 
 /** Build a deterministic idempotency key for a GitHub issue */
-function githubIdempotencyKey(repoOwner: string, repoName: string, issueNumber: number): string {
-  return `github:${repoOwner}/${repoName}#${issueNumber}`;
+function githubIdempotencyKey(projectId: Id<"projects">, repoOwner: string, repoName: string, issueNumber: number): string {
+  return `github:${projectId}:${repoOwner}/${repoName}#${issueNumber}`;
+}
+
+type GitHubIssue = {
+  number: number;
+  title: string;
+  body: string;
+  state: string;
+  labels: string[];
+};
+
+async function requireGitHubIdentity(ctx: Pick<QueryCtx, "auth">) {
+  if (!await ctx.auth.getUserIdentity()) throw new Error("Authentication is required for GitHub integration.");
+}
+
+async function requireGitHubWorkspace(ctx: QueryCtx | MutationCtx, projectId: Id<"projects">, write = false) {
+  await requireGitHubIdentity(ctx);
+  const project = await ctx.db.get(projectId);
+  if (!project?.tenantId) throw new Error("Workspace is unavailable or unauthorized.");
+  return requireWorkspaceAccess(ctx, project.tenantId, project._id, {
+    permission: write ? COMPANY_PERMISSIONS.UPDATE_DELIVERY : undefined,
+  });
+}
+
+async function requireGitHubTask(ctx: QueryCtx | MutationCtx, taskId: Id<"tasks">) {
+  await requireGitHubIdentity(ctx);
+  const task = await ctx.db.get(taskId);
+  if (!task?.projectId) throw new Error("Task is unavailable or unauthorized.");
+  await requireGitHubWorkspace(ctx, task.projectId, true);
+  return task;
+}
+
+function githubRepository(owner: string, name: string) {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$/.test(owner)
+    || !/^[a-zA-Z0-9_.-]{1,100}$/.test(name) || name === "." || name === "..") {
+    throw new Error("Invalid GitHub repository.");
+  }
+  return { owner: owner.toLowerCase(), name: name.toLowerCase(), url: `https://github.com/${owner.toLowerCase()}/${name.toLowerCase()}` };
+}
+
+function githubRepositoryUrl(value: string) {
+  const url = new URL(value);
+  const parts = url.pathname.replace(/\/$/, "").split("/");
+  if (url.origin !== "https://github.com" || url.username || url.password || url.search || url.hash || parts.length !== 3) {
+    throw new Error("Invalid GitHub repository URL.");
+  }
+  return githubRepository(parts[1], parts[2]).url;
+}
+
+function requireIssueNumber(value: number) {
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error("Invalid GitHub issue or pull request number.");
+}
+
+function githubIssuePage(value: unknown): GitHubIssue[] {
+  if (!Array.isArray(value) || value.length > 100) throw new Error("Invalid GitHub issue page.");
+  return value.flatMap((item: unknown) => {
+    if (!item || typeof item !== "object") throw new Error("Invalid GitHub issue response.");
+    const row = item as Record<string, unknown>;
+    if (row.pull_request) return [];
+    if (typeof row.number !== "number" || typeof row.title !== "string"
+      || (row.state !== "open" && row.state !== "closed")
+      || (row.body != null && typeof row.body !== "string") || !Array.isArray(row.labels)) {
+      throw new Error("Invalid GitHub issue response.");
+    }
+    requireIssueNumber(row.number);
+    const labels = row.labels.map((label: unknown) => {
+      if (typeof label === "string") return label;
+      if (label && typeof label === "object" && "name" in label && typeof label.name === "string") return label.name;
+      throw new Error("Invalid GitHub issue labels.");
+    });
+    return [{ number: row.number, title: row.title, body: typeof row.body === "string" ? row.body : "", state: row.state, labels }];
+  });
+}
+
+function nextGitHubIssuePage(header: string | null, currentUrl: string, issuesPath: string): string | null {
+  if (!header) return null;
+  let next: string | null = null;
+  for (const part of header.split(/,\s*(?=<)/)) {
+    const link = /^\s*<([^>]+)>(.*)$/.exec(part);
+    const relation = link?.[2].match(/;\s*rel\s*=\s*(?:"([^"]+)"|([^;\s]+))/i);
+    if (!link || !relation) throw new Error("Invalid GitHub pagination link.");
+    if (!(relation[1] ?? relation[2]).split(/\s+/).includes("next")) continue;
+    if (next) throw new Error("Ambiguous GitHub pagination links.");
+    let url: URL;
+    try { url = new URL(link[1]); } catch { throw new Error("Invalid GitHub pagination URL."); }
+    const pageText = url.searchParams.get("page");
+    const page = Number(pageText);
+    const currentPage = Number(new URL(currentUrl).searchParams.get("page") ?? 1);
+    const keys = [...url.searchParams.keys()];
+    const issuePath = url.pathname.toLowerCase() === issuesPath || /^\/repositories\/[1-9]\d*\/issues$/.test(url.pathname);
+    if (url.origin !== "https://api.github.com" || url.username || url.password || url.hash
+      || !issuePath || (url.searchParams.has("state") && url.searchParams.get("state") !== "all")
+      || (url.searchParams.has("per_page") && url.searchParams.get("per_page") !== "100")
+      || !Number.isSafeInteger(page) || pageText !== String(page) || page !== currentPage + 1
+      || new Set(keys).size !== keys.length || keys.some(key => !["state", "per_page", "page"].includes(key))) {
+      throw new Error("Unsafe or incomplete GitHub pagination URL.");
+    }
+    next = `https://api.github.com${issuesPath}?state=all&per_page=100&page=${page}`;
+  }
+  return next;
 }
 
 /** Map GitHub labels to a valid TaskType */
@@ -49,7 +151,8 @@ function mapLabelsToPriority(labels: string[]): number {
 
 export const getGitHubConfig = query({
   args: { projectId: v.id("projects") },
-  handler: async (_ctx, _args) => {
+  handler: async (ctx, args) => {
+    await requireGitHubWorkspace(ctx, args.projectId);
     // TODO: Implement when githubSync table is added to schema
     return null;
   },
@@ -58,6 +161,7 @@ export const getGitHubConfig = query({
 export const listGitHubLinkedTasks = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
+    await requireGitHubWorkspace(ctx, args.projectId);
     const tasks = await ctx.db
       .query("tasks")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -70,6 +174,29 @@ export const listGitHubLinkedTasks = query({
 // ============================================================================
 // INTERNAL QUERIES (used by actions)
 // ============================================================================
+
+export const authorizeGitHubProject = internalQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await requireGitHubWorkspace(ctx, args.projectId, true);
+    return null;
+  },
+});
+
+export const authorizeGitHubIssueUpdate = internalQuery({
+  args: { taskId: v.id("tasks"), repoOwner: v.string(), repoName: v.string(), issueNumber: v.number() },
+  handler: async (ctx, args) => {
+    const task = await requireGitHubTask(ctx, args.taskId);
+    const repository = githubRepository(args.repoOwner, args.repoName);
+    requireIssueNumber(args.issueNumber);
+    const metadata = task.metadata as Record<string, unknown> | undefined;
+    if (task.source !== "GITHUB" || metadata?.githubIssueNumber !== args.issueNumber
+      || typeof metadata.githubRepoUrl !== "string" || githubRepositoryUrl(metadata.githubRepoUrl) !== repository.url) {
+      throw new Error("The task is not linked to the requested GitHub issue.");
+    }
+    return null;
+  },
+});
 
 /** Find an existing task by its GitHub idempotency key */
 export const findTaskByIdempotencyKey = internalQuery({
@@ -93,18 +220,19 @@ export const linkTaskToGitHubIssue = mutation({
     repoUrl: v.string(),
   },
   handler: async (ctx, args) => {
-    const task = await ctx.db.get(args.taskId);
-    if (!task) return { success: false, error: "Task not found" };
+    const task = await requireGitHubTask(ctx, args.taskId);
+    const repoUrl = githubRepositoryUrl(args.repoUrl);
+    requireIssueNumber(args.issueNumber);
     
     // Store GitHub link in metadata
     const existingMeta = (task.metadata as Record<string, any>) ?? {};
     await ctx.db.patch(args.taskId, {
       source: "GITHUB",
-      sourceRef: `${args.repoUrl}#${args.issueNumber}`,
+      sourceRef: `${repoUrl}#${args.issueNumber}`,
       metadata: {
         ...existingMeta,
         githubIssueNumber: args.issueNumber,
-        githubRepoUrl: args.repoUrl,
+        githubRepoUrl: repoUrl,
       },
     });
     
@@ -131,8 +259,9 @@ export const linkTaskToGitHubPR = mutation({
     repoUrl: v.string(),
   },
   handler: async (ctx, args) => {
-    const task = await ctx.db.get(args.taskId);
-    if (!task) return { success: false, error: "Task not found" };
+    const task = await requireGitHubTask(ctx, args.taskId);
+    const repoUrl = githubRepositoryUrl(args.repoUrl);
+    requireIssueNumber(args.prNumber);
     
     const existingMeta = (task.metadata as Record<string, any>) ?? {};
     await ctx.db.patch(args.taskId, {
@@ -140,7 +269,8 @@ export const linkTaskToGitHubPR = mutation({
         ...existingMeta,
         githubPrNumber: args.prNumber,
         githubBranch: args.branch,
-        githubRepoUrl: args.repoUrl,
+        githubPrRepoUrl: repoUrl,
+        ...(existingMeta.githubIssueNumber == null ? { githubRepoUrl: repoUrl } : {}),
       },
     });
     
@@ -179,21 +309,39 @@ export const upsertTaskFromIssue = mutation({
     }),
   },
   handler: async (ctx, args): Promise<{ taskId: any; created: boolean }> => {
-    const idemKey = githubIdempotencyKey(args.repoOwner, args.repoName, args.issue.number);
-    const repoUrl = `https://github.com/${args.repoOwner}/${args.repoName}`;
-    const sourceRef = `${args.repoOwner}/${args.repoName}#${args.issue.number}`;
+    await requireGitHubWorkspace(ctx, args.projectId, true);
+    const repository = githubRepository(args.repoOwner, args.repoName);
+    requireIssueNumber(args.issue.number);
+    const idemKey = githubIdempotencyKey(args.projectId, repository.owner, repository.name, args.issue.number);
+    const repoUrl = repository.url;
+    const sourceRef = `${repository.owner}/${repository.name}#${args.issue.number}`;
     
     // Check if task already exists via idempotency key
-    const existing = await ctx.db
+    let existing = await ctx.db
       .query("tasks")
       .withIndex("by_idempotency", (q) => q.eq("idempotencyKey", idemKey))
       .first();
+    if (!existing) {
+      const legacyKeys = new Set([
+        `github:${args.repoOwner}/${args.repoName}#${args.issue.number}`,
+        `github:${repository.owner}/${repository.name}#${args.issue.number}`,
+      ]);
+      for (const key of legacyKeys) {
+        const legacy = await ctx.db.query("tasks")
+          .withIndex("by_idempotency", q => q.eq("idempotencyKey", key))
+          .filter(q => q.eq(q.field("projectId"), args.projectId))
+          .first();
+        if (legacy?.source === "GITHUB") { existing = legacy; break; }
+      }
+    }
     
     if (existing) {
+      if (existing.projectId !== args.projectId || existing.source !== "GITHUB") throw new Error("Imported task is unavailable or unauthorized.");
       // ── UPDATE existing task (title, description, metadata) ──
       // NEVER change task.status from GitHub events
       const existingMeta = (existing.metadata as Record<string, any>) ?? {};
       await ctx.db.patch(existing._id, {
+        idempotencyKey: idemKey,
         title: `[GH-${args.issue.number}] ${args.issue.title}`,
         description: args.issue.body || existing.description,
         labels: args.issue.labels.length > 0 ? args.issue.labels : existing.labels,
@@ -208,7 +356,7 @@ export const upsertTaskFromIssue = mutation({
       
       // Log the sync
       await ctx.db.insert("activities", {
-        projectId: args.projectId,
+        projectId: existing.projectId,
         taskId: existing._id,
         actorType: "SYSTEM",
         action: "GITHUB_SYNCED",
@@ -240,7 +388,8 @@ export const upsertTaskFromIssue = mutation({
       },
     });
     
-    return { taskId: result.task?._id, created: true };
+    if (!result.task?._id || result.task.projectId !== args.projectId) throw new Error("Imported task is unavailable or unauthorized.");
+    return { taskId: result.task._id, created: result.created };
   },
 });
 
@@ -249,7 +398,7 @@ export const upsertTaskFromIssue = mutation({
 // ============================================================================
 
 /**
- * Sync all open issues from a GitHub repo.
+ * Sync GitHub issues within the bounded pagination limit.
  * Uses upsertTaskFromIssue for each issue — idempotent, safe to re-run.
  */
 export const syncGitHubIssues = action({
@@ -260,6 +409,8 @@ export const syncGitHubIssues = action({
     accessToken: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireGitHubIdentity(ctx);
+    await ctx.runQuery(internal.github.authorizeGitHubProject, { projectId: args.projectId });
     // Authorization: this action spends the deployment's provider budget, and a
     // Convex `action` export is callable by anyone holding the deployment URL —
     // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
@@ -271,25 +422,26 @@ export const syncGitHubIssues = action({
     });
     if (!budget.allowed) throw new Error(budget.message);
 
-    // Fetch issues from GitHub API (open + recently closed)
-    const response = await fetch(
-      `https://api.github.com/repos/${args.repoOwner}/${args.repoName}/issues?state=all&per_page=100`,
-      {
+    const repository = githubRepository(args.repoOwner, args.repoName);
+    const issuesPath = `/repos/${repository.owner}/${repository.name}/issues`;
+    let url: string | null = `https://api.github.com${issuesPath}?state=all&per_page=100`;
+    const realIssues: GitHubIssue[] = [];
+    let pagesFetched = 0;
+    const maxPages = 10;
+    while (url) {
+      if (pagesFetched === maxPages) throw new Error(`GitHub pagination limit of ${maxPages} pages exceeded; sync is incomplete and no issues were imported.`);
+      const response = await fetch(url, {
+        redirect: "error",
         headers: {
           Authorization: `Bearer ${args.accessToken}`,
           Accept: "application/vnd.github.v3+json",
         },
-      }
-    );
-    
-    if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+      });
+      if (!response.ok) throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+      realIssues.push(...githubIssuePage(await response.json()));
+      pagesFetched++;
+      url = nextGitHubIssuePage(response.headers.get("link"), url, issuesPath);
     }
-    
-    const issues = await response.json();
-    
-    // Filter out pull requests (GitHub API returns PRs in /issues)
-    const realIssues = issues.filter((i: any) => !i.pull_request);
     
     let created = 0;
     let updated = 0;
@@ -299,13 +451,7 @@ export const syncGitHubIssues = action({
         projectId: args.projectId,
         repoOwner: args.repoOwner,
         repoName: args.repoName,
-        issue: {
-          number: issue.number,
-          title: issue.title,
-          body: issue.body || "",
-          state: issue.state,
-          labels: issue.labels.map((l: any) => l.name),
-        },
+        issue,
       });
       
       if (result.created) created++;
@@ -317,13 +463,14 @@ export const syncGitHubIssues = action({
       issuesFound: realIssues.length, 
       tasksCreated: created,
       tasksUpdated: updated,
+      pagesFetched,
     };
   },
 });
 
 /**
- * Handle a GitHub webhook event for issues.
- * Called by an HTTP endpoint (or Convex httpAction) when GitHub sends a webhook.
+ * Replay GitHub issue data as an authenticated workspace operator.
+ * This is not the signed external webhook ingress.
  * Supports: opened, edited, closed, reopened, labeled, unlabeled.
  */
 export const handleIssueWebhook = action({
@@ -343,6 +490,8 @@ export const handleIssueWebhook = action({
     }),
   },
   handler: async (ctx, args): Promise<{ success: boolean; action: string; taskId: any; created: boolean }> => {
+    await requireGitHubIdentity(ctx);
+    await ctx.runQuery(internal.github.authorizeGitHubProject, { projectId: args.projectId });
     const labelNames = args.issue.labels.map(l => l.name);
     
     // All webhook events go through upsert — it handles create-or-update
@@ -378,6 +527,10 @@ export const updateGitHubIssueStatus = action({
     accessToken: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireGitHubIdentity(ctx);
+    await ctx.runQuery(internal.github.authorizeGitHubIssueUpdate, {
+      taskId: args.taskId, repoOwner: args.repoOwner, repoName: args.repoName, issueNumber: args.issueNumber,
+    });
     // Authorization: this action spends the deployment's provider budget, and a
     // Convex `action` export is callable by anyone holding the deployment URL —
     // which ships to every browser as VITE_CONVEX_URL. Resolve a real operator
@@ -389,10 +542,12 @@ export const updateGitHubIssueStatus = action({
     });
     if (!budget.allowed) throw new Error(budget.message);
 
+    const repository = githubRepository(args.repoOwner, args.repoName);
     const response = await fetch(
-      `https://api.github.com/repos/${args.repoOwner}/${args.repoName}/issues/${args.issueNumber}`,
+      `https://api.github.com/repos/${repository.owner}/${repository.name}/issues/${args.issueNumber}`,
       {
         method: "PATCH",
+        redirect: "error",
         headers: {
           Authorization: `Bearer ${args.accessToken}`,
           Accept: "application/vnd.github.v3+json",

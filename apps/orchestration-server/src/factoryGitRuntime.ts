@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readlink, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -156,6 +156,40 @@ export async function installFrozenPnpmDependencies(
     if (storeDirectory === candidateRoot || storeDirectory.startsWith(`${candidateRoot}${path.sep}`)) {
       throw new Error("The offline dependency store must be outside the candidate worktree.");
     }
+    const configuredCli = process.env.MISSION_CONTROL_FACTORY_PNPM_CLI_PATH;
+    let pnpmCli: string | undefined;
+    if (configuredCli) {
+      if (!path.isAbsolute(configuredCli)) throw new Error("MISSION_CONTROL_FACTORY_PNPM_CLI_PATH must be absolute.");
+      const insideCandidate = (file: string) => [path.resolve(worktree), candidateRoot]
+        .some((root) => file === root || file.startsWith(`${root}${path.sep}`));
+      if (insideCandidate(path.resolve(configuredCli))) throw new Error("The host pnpm CLI must be outside the candidate worktree.");
+      pnpmCli = await realpath(configuredCli);
+      if (insideCandidate(pnpmCli)) throw new Error("The host pnpm CLI must be outside the candidate worktree.");
+      if (!(await stat(pnpmCli)).isFile()) throw new Error("MISSION_CONTROL_FACTORY_PNPM_CLI_PATH must resolve to a regular file.");
+      const resolutionPaths = [configuredCli];
+      const inspectedEntries = new Set<string>();
+      let symlinkCount = 0;
+      for (let index = 0; index < resolutionPaths.length; index += 1) {
+        let entryPath = resolutionPaths[index];
+        while (!inspectedEntries.has(entryPath)) {
+          inspectedEntries.add(entryPath);
+          const parent = path.dirname(entryPath);
+          const canonicalParent = await realpath(parent);
+          const canonicalEntry = path.join(canonicalParent, path.basename(entryPath));
+          if (insideCandidate(canonicalEntry)) throw new Error("The host pnpm CLI must be outside the candidate worktree.");
+          if ((await lstat(entryPath)).isSymbolicLink()) {
+            symlinkCount += 1;
+            if (symlinkCount > 40) {
+              throw Object.assign(new Error("The host pnpm CLI contains too many symbolic links."), { code: "ELOOP" });
+            }
+            const target = await readlink(entryPath);
+            resolutionPaths.push(path.isAbsolute(target) ? target : `${canonicalParent}${path.sep}${target}`);
+          }
+          if (parent === entryPath) break;
+          entryPath = parent;
+        }
+      }
+    }
     const installArgs = [
       "install",
       "--frozen-lockfile",
@@ -181,33 +215,39 @@ export async function installFrozenPnpmDependencies(
       NPM_CONFIG_IGNORE_SCRIPTS: "true",
     };
     const executePnpm = options.executePnpm ?? (async (args: string[], executionEnv: NodeJS.ProcessEnv) => {
-      await execFileAsync("pnpm", args, {
+      await execFileAsync(pnpmCli ? process.execPath : "pnpm", pnpmCli ? [pnpmCli, ...args] : args, {
         cwd: worktree,
         env: executionEnv,
         timeout: 300_000,
         maxBuffer: 4 * 1024 * 1024,
       });
     });
-    let offlineDetail = "";
+    let offlineError: unknown;
     if (configuredStore) {
       try {
         await executePnpm(["--offline", ...installArgs], { ...env, COREPACK_ENABLE_NETWORK: "0" });
         return;
-      } catch (offlineError: any) {
-        offlineDetail = `${offlineError?.stderr ?? offlineError?.message ?? ""}`.trim();
+      } catch (error) {
+        offlineError = error;
       }
     }
-    await executePnpm(installArgs, { ...env, COREPACK_ENABLE_NETWORK: "1" }).catch((onlineError: any) => {
-      const detail = `${onlineError?.stderr ?? onlineError?.stdout ?? onlineError?.message ?? ""}`.trim() || offlineDetail;
-      throw new Error(`Factory dependency preparation failed${detail ? `: ${detail.slice(-2_000)}` : "."}`);
+    await executePnpm(installArgs, { ...env, COREPACK_ENABLE_NETWORK: "1" }).catch((onlineError: unknown) => {
+      throw dependencyPreparationFailure(onlineError, offlineError);
     });
   } catch (error: any) {
     if (error instanceof Error && error.message.startsWith("Factory dependency preparation failed")) throw error;
-    const detail = `${error?.stderr ?? error?.stdout ?? error?.message ?? "unknown error"}`.trim();
-    throw new Error(`Factory dependency preparation failed${detail ? `: ${detail.slice(-2_000)}` : "."}`);
+    throw dependencyPreparationFailure(error);
   } finally {
     await rm(scratchHome, { recursive: true, force: true });
   }
+}
+
+function dependencyPreparationFailure(error: any, fallback?: any) {
+  const detail = [error?.stderr, error?.stdout, error?.message, fallback?.stderr, fallback?.stdout, fallback?.message]
+    .map((value) => `${value ?? ""}`.trim()).find(Boolean);
+  const code = error?.code ?? fallback?.code;
+  const failure = new Error(`Factory dependency preparation failed${code === undefined ? "" : ` (${code})`}${detail ? `: ${detail.slice(-2_000)}` : "."}`);
+  return Object.assign(failure, code === undefined ? {} : { code });
 }
 
 export async function listChangedFiles(worktree: string, baseSha?: string) {

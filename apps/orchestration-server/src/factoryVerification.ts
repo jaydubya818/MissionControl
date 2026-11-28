@@ -164,6 +164,7 @@ function commandResult(
         commandClass: command.commandClass,
         output: safeOutput,
         outputTruncated: output.length > safeOutput.length,
+        verifierHost: { platform: process.platform, architecture: process.arch, nodeVersion: process.version },
         // Surfaced so an operator can see WHY a green check is not independent.
         independenceReason: independence.reason,
       },

@@ -119,6 +119,15 @@ export type ReviewEvidencePackageData = {
   reviewerFocus: string[];
   rollbackApproach: string | null;
   recovery: { attempts: number; staleRecoveries: number };
+  reviewFacets?: {
+    authority: "ADVISORY";
+    mandatoryGateStatus: string;
+    facets: Array<{ id: string; label: string; status: "SUPPORTED" | "ATTENTION" | "UNKNOWN"; summary: string; evidenceIds: string[] }>;
+    rollback: { observation: { estimatedMinutes: number; operatorSteps: number; requiresDataRestore: boolean; requiresRedeployment: boolean; restorationTest: string } | null; evidenceId: string | null };
+    errorDetection: { observation: { mechanism: string; faultInjected: boolean; signalObserved: boolean } | null; evidenceId: string | null };
+    verifierHost: { platform: string; architecture: string; nodeVersion: string; evidenceId: string } | null;
+    applicationRuntime: "UNVERIFIED";
+  };
   reviewIntelligence?: ReviewIntelligenceData;
 };
 
@@ -233,6 +242,41 @@ export function ReviewEvidencePackage({
         <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Next action</div>
         <p className="mt-1 whitespace-pre-line text-sm text-foreground">{normalizeNarrativeText(review.nextAction)}</p>
       </div>
+
+      {review.reviewFacets ? (
+        <section className="mt-4" aria-labelledby="review-questions-heading">
+          <h3 id="review-questions-heading" className="text-sm font-medium text-foreground">Review questions</h3>
+          <p className="mt-1 text-sm text-muted-foreground">These observations support review. Required checks still control readiness.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {review.reviewFacets.facets.map((facet) => (
+              <article key={facet.id} className="min-w-0 rounded-lg border border-[var(--panel-line)] bg-background/20 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-sm font-medium text-foreground">{facet.label}</h4>
+                  <Badge variant="outline">{facet.status === "SUPPORTED" ? "Evidence available" : facet.status === "ATTENTION" ? "Needs review" : "Unknown"}</Badge>
+                </div>
+                <p className="mt-2 whitespace-pre-line break-words text-sm text-muted-foreground">{normalizeNarrativeText(facet.summary)}</p>
+                {level !== "BASIC" && facet.evidenceIds.length ? (
+                  <details className="mt-2 text-xs text-muted-foreground">
+                    <summary className="min-h-8 cursor-pointer rounded py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Evidence references for {facet.label.toLowerCase()}</summary>
+                    <ul className="mt-1 space-y-1">{[...new Set(facet.evidenceIds)].map((id) => <li key={id} className="break-all font-mono">{id}</li>)}</ul>
+                  </details>
+                ) : null}
+              </article>
+            ))}
+          </div>
+          {review.reviewFacets.rollback.observation ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Data restore required: {review.reviewFacets.rollback.observation.requiresDataRestore ? "Yes" : "No"}. Redeployment required: {review.reviewFacets.rollback.observation.requiresRedeployment ? "Yes" : "No"}.
+            </p>
+          ) : null}
+          {level === "ADVANCED" ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {review.reviewFacets.verifierHost ? `Verifier host: ${review.reviewFacets.verifierHost.platform}/${review.reviewFacets.verifierHost.architecture}, ${review.reviewFacets.verifierHost.nodeVersion}.` : "Verifier host: Unknown."}
+              {" "}Application runtime requires its own acceptance evidence.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {onRecordJudgment && intelligence ? (
         <div className="mt-3 rounded-lg border border-[var(--panel-line)] bg-background/20 p-3">

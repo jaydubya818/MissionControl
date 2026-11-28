@@ -411,25 +411,36 @@ export function recommendFactoryRecipe(
   if (normalized.length < 8) return null;
 
   const matches = (pattern: RegExp) => pattern.test(normalized);
-  const highRisk = matches(
-    /\b(security|auth(?:entication|orization)?|permission|secret|payment|schema|migration|runtime|policy|acceptance|verification|production|deploy|release|data loss|breaking change)\b/,
-  );
-  if (highRisk) {
-    return {
-      recipeId: "full-sdlc",
-      rationale:
-        "The request touches a safety, runtime, data, or acceptance boundary, so it needs planning, independent review, and exact-subject verification.",
-      signals: [
-        "governance-sensitive change",
-        "independent verification required",
-      ],
-    };
-  }
+  const mutationVerb = /\b(add|build|change|create|delete|edit|fix|implement|migrate|modify|refactor|remove|rename|repair|update|write|deploy|release|publish|merge|approve)\b/;
+  const asksForMutation = normalized
+    .split(/[.!?;,\n]|\b(?:and|then|but|also|(?:before|while)\s+you)\b/)
+    .some((part) => {
+      const clause = part.trim().replace(
+        /^(?:(?:please|can you|could you|would you)\s+)+/,
+        "",
+      );
+      if (/^(?:do not|don['’]t|never|without)\b/.test(clause)) return false;
+      if (
+        /^(?:investigate|inspect|research|audit|analy[sz]e|explain|understand|find root cause|assess|how|why|what|where|which)\b/.test(clause)
+      ) {
+        const directive = clause.slice(clause.indexOf(":") + 1).trim().replace(
+          /^(?:(?:please|can you|could you|would you)\s+)+/,
+          "",
+        );
+        return clause.includes(":") && mutationVerb.exec(directive)?.index === 0;
+      }
+      if (
+        /^(?:(?:write|create|draft|prepare)\s+(?:(?:an?|the)\s+)?(?:(?:implementation|project)\s+)?(?:plan|specification|design proposal)|plan|design)\b/.test(clause)
+      ) return false;
+      return mutationVerb.test(
+        clause.replace(/\bbuild check\b/g, ""),
+      );
+    });
 
   const asksForPlanDeliverable = matches(
     /\b(implementation plan|project plan|write (?:a )?plan|create (?:a )?plan|plan only|specification|design proposal)\b/,
   );
-  if (asksForPlanDeliverable) {
+  if (asksForPlanDeliverable && !asksForMutation) {
     return {
       recipeId: "plan",
       rationale:
@@ -440,9 +451,6 @@ export function recommendFactoryRecipe(
 
   const asksForResearch = matches(
     /\b(investigate|inspect|research|audit|analy[sz]e|explain|understand|find root cause|assess)\b/,
-  );
-  const asksForMutation = matches(
-    /\b(add|build|change|create|delete|edit|fix|implement|migrate|modify|refactor|remove|rename|update|write)\b/,
   );
   if (asksForResearch && !asksForMutation) {
     return {
@@ -475,6 +483,21 @@ export function recommendFactoryRecipe(
       rationale:
         "The request names known repository checks and no remediation, so deterministic execution is sufficient unless a gate fails.",
       signals: ["known commands", "deterministic-first"],
+    };
+  }
+
+  const highRisk = matches(
+    /\b(security|auth(?:entication|orization)?|permission|secret|payment|schema|migration|runtime|policy|acceptance|verification|production|deploy|release|data loss|breaking change)\b/,
+  );
+  if (highRisk) {
+    return {
+      recipeId: "full-sdlc",
+      rationale:
+        "The request touches a safety, runtime, data, or acceptance boundary, so it needs planning, independent review, and exact-subject verification.",
+      signals: [
+        "governance-sensitive change",
+        "independent verification required",
+      ],
     };
   }
 

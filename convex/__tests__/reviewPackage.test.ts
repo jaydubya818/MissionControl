@@ -79,6 +79,39 @@ const base = {
 };
 
 describe("unified review package", () => {
+  it("keeps policy-v2 readiness incomplete when current verification is unavailable", () => {
+    const review = buildReviewPackage({ ...base,
+      workOrder: { ...base.workOrder, verificationContract: { schemaVersion: 2 } },
+      receipts: base.receipts.map((receipt) => ({ ...receipt, independenceValid: true })),
+    });
+    expect(review.status).toBe("INCOMPLETE");
+    expect(review.blockers).toContain("Canonical current verification assessment is missing.");
+  });
+
+  it("rejects a favorable canonical assessment for a different candidate", () => {
+    const review = buildReviewPackage({ ...base,
+      workOrder: { ...base.workOrder, verificationContract: { schemaVersion: 2 } },
+      receipts: base.receipts.map((receipt) => ({ ...receipt, independenceValid: true })),
+      currentVerification: { current: true, eligible: true, reasons: [], sourceAttemptId: "newer-source", candidateRevision: "newer-head",
+        verificationReceiptId: "newer-receipt", verificationRunId: "newer-verification",
+        exactIdentity: { workOrderId: "wo-1", workOrderRevisionNumber: 2, sourceAttemptId: "newer-source",
+          verificationSubjectDigest: "sha256:subject", verificationContractDigest: "sha256:contract" } },
+    });
+    expect(review.status).toBe("BLOCKED");
+    expect(review.blockers).toContain("The inspected Attempt and receipt do not match the canonical current verification.");
+  });
+
+  it("does not let an older policy-v2 receipt override the current canonical rejection", () => {
+    const review = buildReviewPackage({
+      ...base,
+      workOrder: { ...base.workOrder, verificationContract: { schemaVersion: 2 } },
+      receipts: base.receipts.map((receipt) => ({ ...receipt, independenceValid: true })),
+      currentVerification: { current: false, eligible: false, reasons: ["A newer verification supersedes the old pass."] },
+    });
+    expect(review.status).toBe("BLOCKED");
+    expect(review.blockers).toContain("A newer verification supersedes the old pass.");
+  });
+
   it("reports ready only for exact-head CI and complete criterion evidence", () => {
     const review = buildReviewPackage(base);
     expect(review.status).toBe("READY");

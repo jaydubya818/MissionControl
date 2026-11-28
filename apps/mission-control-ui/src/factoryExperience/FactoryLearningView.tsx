@@ -33,6 +33,7 @@ import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { RiskBadge, StatusBadge } from "../components/factory/badges";
 import { cn } from "../lib/utils";
+import { FactoryReplayPanel } from "./FactoryReplayPanel";
 import {
   canPromoteImprovement,
   candidateStatusTone,
@@ -335,6 +336,9 @@ function ExperimentsPanel({ dashboard }: { dashboard: LearningDashboard }) {
                   ))}
                 </div>
                 <p className="mt-2 text-[10px] text-ink-muted">Dataset v{experiment.datasetVersion} · aggregate outcome comparison · no significance claim</p>
+                <FactoryReplayPanel experimentId={experiment._id} experimentStatus={experiment.status}
+                  hasManifest={Boolean(experiment.metadata?.factoryReplayManifestId)}
+                  canFreeze={experiment.status === "DRAFT" && experiment.variants.length === 2 && experiment.variants.every((variant) => Boolean(variant.factoryDefinitionVersionId))} />
               </div>
             ))}
           </div>
@@ -401,7 +405,8 @@ function CandidateReviewDialog({
   const [outcomes, setOutcomes] = useState<Record<string, { sample: string; successes: string; duration: string; cost: string }>>({});
   if (!candidate) return null;
   const reviewable = ["OPEN", "SNOOZED"].includes(candidate.status);
-  const recordable = candidate.status === "ACCEPTED" && experiment?.status === "DRAFT" && experiment.variants.length === 2;
+  const recordable = candidate.status === "ACCEPTED" && experiment?.status === "DRAFT" && experiment.variants.length === 2
+    && !experiment.metadata?.factoryReplayManifestId;
   const canRecord = recordable && experiment.variants.every((variant) => {
     const row = outcomes[String(variant._id)];
     const sample = Number(row?.sample);

@@ -56,4 +56,32 @@ describe("CreateFactoryMissionDialog", () => {
     expect(payload).not.toHaveProperty("approved");
     expect(payload).not.toHaveProperty("accepted");
   });
+
+  it.each([
+    ["Explain how authentication works; report findings only", "scout"],
+    ["Write an implementation plan for a schema migration", "plan"],
+  ])("keeps the requested non-mutating recipe when drafting %s", async (request, recipeId) => {
+    render(
+      <CreateFactoryMissionDialog
+        projectId={"project-1" as Id<"projects">}
+        open
+        onOpenChange={vi.fn()}
+        experienceLevel="intermediate"
+        initialRequest={request}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Create Mission draft" }),
+    );
+    await waitFor(() => expect(createDraft).toHaveBeenCalledTimes(1));
+    const payload = createDraft.mock.calls[0][0];
+    expect(payload.metadata.factoryExperience).toMatchObject({
+      recommendedRecipeId: recipeId,
+      selectedRecipeId: recipeId,
+      operatorOverrodeRecommendation: false,
+    });
+    expect(payload).not.toHaveProperty("dispatch");
+    expect(payload).not.toHaveProperty("approved");
+    expect(payload).not.toHaveProperty("accepted");
+  });
 });

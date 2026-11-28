@@ -29,10 +29,12 @@
     "test": "pnpm run ci:prepare && pnpm -r --if-present run test && pnpm exec vitest run convex/__tests__",
     "test:integration": "pnpm run test && pnpm exec vitest run scripts --exclude scripts/governed-vercel-production.test.mjs --exclude scripts/local-golden-path-candidate.test.mjs --exclude scripts/lib/agent-config-registry.test.mjs && node --test scripts/governed-vercel-production.test.mjs scripts/local-golden-path-candidate.test.mjs scripts/lib/agent-config-registry.test.mjs",
     "test:e2e:arm": "npx playwright test -c playwright.config.ts tests/e2e/arm-ui.e2e.spec.ts",
+    "test:e2e:factory-review": "playwright test -c playwright.factory-review.config.ts",
     "test:e2e:critical": "npx playwright test -c playwright.config.ts tests/e2e/critical-accessibility.e2e.spec.ts tests/e2e/dashboard-smoke.e2e.spec.ts tests/e2e/v2-routes-smoke.e2e.spec.ts",
     "lint": "pnpm run typecheck && node scripts/skill-lint.mjs",
     "docs:factory-check": "node scripts/check-factory-docs.mjs",
     "pilot:preflight": "node scripts/check-production-pilot-preflight.mjs",
+    "factory:readiness": "node --import tsx scripts/factory-readiness.mts",
     "pilot:assess": "node scripts/check-production-pilot-evidence.mjs",
     "typecheck": "pnpm run ci:prepare && pnpm -r --if-present run typecheck",
     "clean": "turbo run clean && rm -rf node_modules",
@@ -99,14 +101,14 @@
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
   "pnpm": {
     "overrides": {
       "@ai-sdk/provider-utils@<3.0.28": "3.0.28",
       "@babel/core": "7.29.6",
-      "@hono/node-server": "1.19.18",
+      "@hono/node-server": "2.1.11",
       "@modelcontextprotocol/sdk": "1.32.2",
       "@vitest/mocker": "4.1.12",
       "ajv": "8.18.0",
@@ -119,7 +121,7 @@
       "file-type": "21.3.2",
       "follow-redirects": "1.16.2",
       "form-data": "4.0.6",
-      "hono": "4.13.11",
+      "hono": "4.13.18",
       "ip-address": "10.7.4",
       "koa": "3.2.1",
       "lodash": "4.18.1",

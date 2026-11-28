@@ -459,7 +459,7 @@ export const upsertInstallation = internalMutation({
       (await ctx.db.insert("githubAppInstallations", value));
     if (existingByRepository)
       await ctx.db.patch(existingByRepository._id, value);
-    const capability = evaluateGithubAppCapabilities(args);
+    const capability = evaluateGithubAppCapabilities({ ...args, issueIntakeEnabled: existingByRepository?.issueIntakeEnabled });
     const ready =
       args.status === "CONNECTED" &&
       capability.ready &&
@@ -487,6 +487,7 @@ export const beginWebhookDelivery = internalMutation({
     repository: v.optional(v.string()),
     providerRepositoryId: v.optional(v.string()),
     installationId: v.optional(v.string()),
+    payloadDigest: v.optional(v.string()),
     signatureStatus: v.union(
       v.literal("VALID"),
       v.literal("INVALID"),
@@ -499,20 +500,7 @@ export const beginWebhookDelivery = internalMutation({
       .withIndex("by_delivery", (q) => q.eq("deliveryId", args.deliveryId))
       .first();
     const now = Date.now();
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        replayState: "DUPLICATE",
-        attemptCount: existing.attemptCount + 1,
-        lastAttemptAt: now,
-      });
-      return {
-        deliveryRecordId: existing._id,
-        duplicate: true,
-        accepted: false,
-        projectId: existing.projectId,
-        repositoryId: existing.repositoryId,
-      };
-    }
+    if (args.payloadDigest && !/^sha256=[a-f0-9]{64}$/.test(args.payloadDigest)) throw new Error("GitHub payload digest is invalid.");
 
     const installations = args.installationId
       ? await ctx.db
@@ -563,6 +551,40 @@ export const beginWebhookDelivery = internalMutation({
           : !repositoryMatches
             ? "Webhook repository does not match the registered installation."
             : "Webhook installation is not connected.";
+    if (existing) {
+      const sameSource = existing.signatureStatus === "VALID" && args.signatureStatus === "VALID"
+        && existing.event === args.event && existing.action === args.action
+        && existing.installationId === args.installationId && existing.providerRepositoryId === args.providerRepositoryId
+        && canonicalRepositoryKey(existing.repository ?? "") === canonicalRepositoryKey(args.repository ?? "")
+        && existing.repositoryId === repository?._id && existing.projectId === repository?.projectId;
+      const sameBody = Boolean(existing.payloadDigest && existing.payloadDigest === args.payloadDigest);
+      if (!accepted || !sameSource || !sameBody) return {
+        deliveryRecordId: existing._id, duplicate: false, accepted: false,
+        error: "GitHub delivery replay is unbound, changed, or unauthorized.",
+        projectId: existing.projectId, repositoryId: existing.repositoryId,
+      };
+      if (existing.status === "PROCESSED" || existing.status === "IGNORED") {
+        await ctx.db.patch(existing._id, { replayState: "DUPLICATE", lastAttemptAt: now });
+        return { deliveryRecordId: existing._id, duplicate: true, accepted: false, projectId: existing.projectId, repositoryId: existing.repositoryId };
+      }
+      if (existing.status === "RECEIVED" && (existing.processingLeaseExpiresAt ?? Infinity) > now) return {
+        deliveryRecordId: existing._id, duplicate: false, accepted: false, inFlight: true,
+        error: "GitHub delivery processing is still leased.", projectId: existing.projectId, repositoryId: existing.repositoryId,
+      };
+      if (existing.attemptCount >= 3) return {
+        deliveryRecordId: existing._id, duplicate: false, accepted: false,
+        error: "GitHub delivery processing attempts are exhausted.", projectId: existing.projectId, repositoryId: existing.repositoryId,
+      };
+      const processingAttempt = existing.attemptCount + 1;
+      await ctx.db.patch(existing._id, {
+        status: "RECEIVED", replayState: "RETRY", attemptCount: processingAttempt, lastAttemptAt: now,
+        processingLeaseExpiresAt: now + 300_000, completedAt: undefined, error: undefined,
+        failureHistory: existing.status === "RECEIVED"
+          ? [...existing.failureHistory ?? [], { attempt: existing.attemptCount, reason: "Processing lease expired before completion.", at: now }]
+          : existing.failureHistory,
+      });
+      return { deliveryRecordId: existing._id, duplicate: false, accepted: true, processingAttempt, projectId: existing.projectId, repositoryId: existing.repositoryId };
+    }
     const deliveryRecordId = await ctx.db.insert("githubWebhookDeliveries", {
       tenantId: repository?.tenantId,
       projectId: repository?.projectId,
@@ -573,6 +595,7 @@ export const beginWebhookDelivery = internalMutation({
       attemptCount: 1,
       receivedAt: now,
       lastAttemptAt: now,
+      processingLeaseExpiresAt: accepted ? now + 300_000 : undefined,
       completedAt: accepted ? undefined : now,
       result: accepted
         ? "Accepted for processing."
@@ -586,6 +609,7 @@ export const beginWebhookDelivery = internalMutation({
       error,
       projectId: repository?.projectId,
       repositoryId: repository?._id,
+      processingAttempt: 1,
     };
   },
 });
@@ -652,6 +676,7 @@ export const markInstallationChanged = internalMutation({
 export const completeWebhookDelivery = internalMutation({
   args: {
     deliveryRecordId: v.id("githubWebhookDeliveries"),
+    processingAttempt: v.number(),
     status: v.union(
       v.literal("PROCESSED"),
       v.literal("IGNORED"),
@@ -663,12 +688,15 @@ export const completeWebhookDelivery = internalMutation({
   handler: async (ctx, args) => {
     const delivery = await ctx.db.get(args.deliveryRecordId);
     if (!delivery) throw new Error("GitHub delivery record not found");
-    if (delivery.status !== "RECEIVED") return { updated: false };
+    if (delivery.status !== "RECEIVED" || delivery.attemptCount !== args.processingAttempt) return { updated: false };
     await ctx.db.patch(delivery._id, {
       status: args.status,
       result: args.result,
       error: args.error,
       completedAt: Date.now(),
+      failureHistory: args.status === "FAILED"
+        ? [...delivery.failureHistory ?? [], { attempt: args.processingAttempt, reason: args.error?.slice(0, 1_000) ?? "Processing failed.", at: Date.now() }]
+        : delivery.failureHistory,
     });
     return { updated: true };
   },

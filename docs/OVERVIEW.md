@@ -198,7 +198,7 @@ WorkOrder acceptance, and the human-gated learning continuation. This is strong
 implementation proof; it is not a claim of fleet-scale production operation or
 general Remote Sandbox certification.
 
-The current public client/backend runtime contract is **v63**. The governed
+The current public client/backend runtime contract is **v64**. The governed
 inference work adds the disabled-by-default price-book, reservation, receipt,
 reconciliation, and accepted-outcome economics contracts. Fab adds exact candidate
 verification and publication bindings plus read-only candidate recovery. Todo 062
@@ -215,6 +215,7 @@ status, and event contracts used by the isolated shadow-provider path. v60 adds
 the authenticated repository code-scope update used by pinned Factory dispatch.
 v61 adds authenticated observed-cost reconciliation for terminal Fab Attempts.
 v63 adds fail-closed host recovery quarantine and signed native lifecycle acknowledgments.
+v64 adds governed factory intake, frozen replay, and explicit measurement direction.
 
 v62 combines that contract with authenticated capability challenges and ordered
 policy proofs for Mission and WorkOrder admission. Clients and the backend must

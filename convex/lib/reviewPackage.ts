@@ -1,3 +1,6 @@
+import type { CurrentVerificationResult } from "./currentVerification";
+import { buildReviewFacets, type ReviewFacetEvidence } from "./reviewFacets";
+
 export type CriterionEvidenceStatus =
   | "PASS"
   | "FAIL"
@@ -15,14 +18,7 @@ type CriterionLike = {
   requiredEvidence?: Array<{ independent?: boolean }>;
 };
 
-type EvidenceEnvelopeLike = {
-  _id?: string;
-  workflowRunId?: string;
-  acceptanceCriterionIds?: string[];
-  sourceRevision?: string;
-  candidateRevision?: string;
-  producer?: { actorId?: string; independent?: boolean };
-};
+type EvidenceEnvelopeLike = ReviewFacetEvidence;
 
 type ReceiptLike = {
   _id?: string;
@@ -30,6 +26,8 @@ type ReceiptLike = {
   acceptanceCriterionId?: string;
   workflowRunId?: string;
   verificationRunId?: string;
+  verificationSubjectId?: string;
+  verificationPlanId?: string;
   status: string;
   verifier?: string;
   result?: string;
@@ -246,6 +244,7 @@ export function buildReviewPackage(input: {
   expectedRepository?: string | null;
   githubAppInstallationId?: string | null;
   receiptWorkflowRunId?: string;
+  currentVerification?: CurrentVerificationResult | null;
 }) {
   const workflowRunId = input.run._id ?? input.run.runId;
   const receiptWorkflowRunId = input.receiptWorkflowRunId ?? workflowRunId;
@@ -340,6 +339,24 @@ export function buildReviewPackage(input: {
 
   const blockers: string[] = [];
   const incomplete: string[] = [];
+  if (policyV2) {
+    if (!input.currentVerification) incomplete.push("Canonical current verification assessment is missing.");
+    else if (!input.currentVerification.current || !input.currentVerification.eligible) {
+      blockers.push(...(input.currentVerification.reasons.length ? input.currentVerification.reasons : ["Canonical current verification does not permit acceptance."]));
+    } else {
+      const current = input.currentVerification;
+      if (!current.exactIdentity || !current.verificationReceiptId || !current.verificationRunId
+        || !current.sourceAttemptId || !current.candidateRevision) {
+        incomplete.push("Canonical current verification identity is incomplete.");
+      } else if (current.verificationReceiptId !== gateReceipt?._id || current.verificationRunId !== gateReceipt?.verificationRunId
+        || current.sourceAttemptId !== workflowRunId || current.candidateRevision !== input.run.headSha
+        || current.exactIdentity.workOrderId !== input.workOrder?._id
+        || current.exactIdentity.workOrderRevisionNumber !== frozenRevision
+        || current.exactIdentity.sourceAttemptId !== workflowRunId) {
+        blockers.push("The inspected Attempt and receipt do not match the canonical current verification.");
+      }
+    }
+  }
   if (input.run.status === "FAILED" || input.run.status === "CANCELED") {
     blockers.push(`Attempt is ${input.run.status.toLowerCase()}.`);
   } else if (input.run.status !== "COMPLETED") {
@@ -469,6 +486,13 @@ export function buildReviewPackage(input: {
     risks,
     riskLevel: input.workOrder?.riskLevel ?? null,
     reviewerFocus,
+    reviewFacets: buildReviewFacets({
+      now: input.now, packageStatus: status, workOrderId: input.workOrder?._id, revision: frozenRevision,
+      sourceAttemptId: workflowRunId, sourceRevision: input.run.executionBaseSha, candidateRevision: input.run.headSha,
+      executionClaimedBy: input.run.executionClaimedBy, currentVerification: input.currentVerification,
+      gate: gateReceipt, criteria, changedFiles: files, deviations, rollbackApproach: input.rollbackApproach,
+      evidence: input.evidenceEnvelopes ?? [],
+    }),
     rollbackApproach: input.rollbackApproach?.trim() || null,
     recovery: {
       attempts: input.run.executionAttemptNumber ?? 0,

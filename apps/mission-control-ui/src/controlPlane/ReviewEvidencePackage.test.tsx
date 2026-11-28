@@ -63,6 +63,24 @@ const reviewIntelligence: NonNullable<ReviewEvidencePackageData["reviewIntellige
 };
 
 describe("ReviewEvidencePackage", () => {
+  it("shows unknown operational evidence and preserves a blocking mandatory result", () => {
+    render(<ReviewEvidencePackage review={{ ...ready, status: "BLOCKED", blockers: ["A newer verification failed."], reviewFacets: {
+      authority: "ADVISORY", mandatoryGateStatus: "BLOCKED", applicationRuntime: "UNVERIFIED",
+      facets: [
+        { id: "verification", label: "Verification", status: "ATTENTION", summary: "A newer verification failed.", evidenceIds: ["gate-new"] },
+        { id: "rollback", label: "Rollback cost", status: "UNKNOWN", summary: "Cost and exercised restoration are unknown.", evidenceIds: [] },
+        { id: "error-detection", label: "Error detection", status: "UNKNOWN", summary: "Application-error detection has no current observation.", evidenceIds: [] },
+      ], rollback: { observation: null, evidenceId: null }, errorDetection: { observation: null, evidenceId: null }, verifierHost: null,
+    } }} />);
+    expect(screen.getByRole("heading", { name: "Review questions" })).toBeInTheDocument();
+    expect(screen.getByText("BLOCKED")).toBeInTheDocument();
+    expect(screen.getAllByText("Unknown")).toHaveLength(2);
+    expect(screen.queryByText("gate-new")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+    expect(screen.getByText("gate-new")).toBeInTheDocument();
+    expect(screen.getByText(/Verifier host: Unknown/)).toBeInTheDocument();
+  });
+
   it("presents exact-head, criterion, rollback, and recovery evidence when ready", () => {
     render(<ReviewEvidencePackage review={ready} />);
     expect(screen.getByText("READY")).toBeInTheDocument();
