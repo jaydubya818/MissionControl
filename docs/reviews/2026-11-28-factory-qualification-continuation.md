@@ -6,9 +6,9 @@ It does not claim that the factory generated the to-do application.
 
 ## Overall state
 
-**BLOCKED at P0.** The authenticated control plane has no worker service
-identity, so no real workload has been dispatched. All unblocked work was
-completed first (P1 and a diagnostic repair).
+**IN PROGRESS at P0.** A dedicated authenticated control plane now exists (below);
+no real workload has been dispatched yet. The next step needs the owner's
+Clerk sign-in, which only the human can complete.
 
 ## Evidence gathered
 
@@ -21,6 +21,34 @@ completed first (P1 and a diagnostic repair).
 | Codex runtime | Version `codex-cli 0.146.0` and native SHA-256 match the evaluated Darwin arm64 digest | adapter `health()` READY under `TMPDIR=/var/folders/...` |
 | Hosted control plane | Preview uses `VITE_AUTH_MODE=clerk` and Convex `gallant-cassowary-27`; its environment has no `MISSION_CONTROL_SERVICE_ID` or `MISSION_CONTROL_SERVICE_COMMAND_SECRET` | `convex env list` (names only); `convex/serviceCommands.ts` validates worker envelopes against those two settings |
 | Local control plane | `.env.local` targets a local backend (`127.0.0.1:3214`) with `VITE_AUTH_MODE=demo` and anonymous company context. It is not running and is not an authenticated operator session | `.env.local` setting names; `convex/lib/companyAccess.ts` |
+
+## Environment determination and provisioning (authorized 2026-11-28)
+
+| Candidate | Finding | Decision |
+| --- | --- | --- |
+| `gallant-cassowary-27` (PR preview backend, resolves as `prod:`) | No worker service identity; hosts the real preview | Not used; unchanged |
+| `rightful-grasshopper-709` / `mission-control-integration-staging` | Exists and accessible; Clerk mode with a `pk_test_` key; anonymous access off; no WorkOrders. It holds the MyEve integration tenant/project and its backend is runtime contract **72** from PR #248's line (109 commits ahead of PR #251's base, 20+ overlapping files including `schema.ts` and `runtimeContract.ts`) | Not reused: deploying PR #251 (contract 64) would downgrade a deployment built for MyEve qualification, and a v64 worker cannot speak v72. Two service-identity variables were added and then removed; its variable set is back to the original seven |
+| `different-gopher-55` | Dev deployment, empty environment, documented as the legacy UI backend | Not used |
+| **New: `adept-goldfish-756`** (Convex project `mission-control-factory-qualification`, dev-type, no expiration) | PR #251 backend pushed (`convex dev --once`), contract **64** confirmed; anonymous access unset; Clerk dev issuer from `convex/auth.config.ts`; one tenant (`mission-control-factory-qualification`, `productionAuthority:false`) seeded through admin import; first-owner bootstrap variables set for the verified owner subject | Qualification control plane |
+| **New: Vercel project `mission-control-factory-qualification`** | PR #251 UI deployed with `VITE_AUTH_MODE=clerk`, `VITE_CONVEX_URL` set to the new deployment, deployment protection left at its default | Qualification UI |
+
+PR #248 and PR #251 are diverged histories. The staging environment and this
+one are intentionally separate so MyEve can be qualified later against #248's
+line without interference. Reconciling the two lines is a separate task.
+
+The worker service identity (`MISSION_CONTROL_SERVICE_ID`, generated
+`MISSION_CONTROL_SERVICE_COMMAND_SECRET`) lives only in the new deployment's
+environment and in a mode-600 worker file outside the repository. Revoking it
+means removing those two variables from the deployment.
+
+`scripts/factory-worker-launch.sh` loads the worker file (refusing modes other
+than 600/400) and supplies the macOS per-user `TMPDIR` before executing the
+worker. Verified under `env -i` (no `TMPDIR`), the way a service manager starts
+it: it exported the per-user directory and the real Codex adapter reported
+READY with the containment probe unchanged.
+
+Open item: the owner must complete Clerk sign-in on the qualification UI to run
+the one-time first-owner bootstrap.
 
 ## Failure → root cause → correction (learning loop)
 
@@ -57,7 +85,7 @@ not proposed: that value belongs to a different deployment.
 
 | Requirement | Result | Basis |
 | --- | --- | --- |
-| Authenticated control plane | BLOCKED | Clerk-mode preview exists; no worker identity on it |
+| Authenticated control plane | IN PROGRESS | Dedicated Clerk-mode deployment live; owner sign-in/bootstrap pending |
 | Admitted worker and runtime | BLOCKED | Runtime checks pass locally; admission unverified |
 | Real model execution | NOT RUN | |
 | Factory-generated plan / tasks / assignments | NOT RUN | |
