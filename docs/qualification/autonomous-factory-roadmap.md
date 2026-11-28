@@ -83,3 +83,33 @@ needs authenticated admin access waits on it.
 All mandatory items are NOT RUN or BLOCKED except dependency security (PASS on
 `54a36ed`, audit gate 0 advisories) and Phase 0 CI (PASS on `163decb`).
 Overall qualification: **not successful**.
+
+## Phase 6 preparation findings (Integration agent, read-only)
+
+Verified by the principal against source: PR #248 (`8b3e85b`) contains no
+`sofieExecutionPermits` code. The permit/admission server (`sofieExecutionPermits`,
+`sofieFactoryResults`, `sofiePermitControlDelivery`, `sofieConfirmations`) exists
+only on the hosted line, branch `fix/hosted-capability-policy-owner-scope`
+(`12e636d`, contract 64, base of PR #250). MyEve's consumer CI pins MC `f9bcd0d`,
+which is not an ancestor of #248. There are therefore three MC lines, and #248
+alone cannot serve MyEve's permit-gated execution path.
+
+Reported by the agent, not yet reproduced (treat as leads):
+- Contract numbers collide: #251 and the hosted line each bumped 63→64; #248 is at 72.
+  Overlapping changed files: #248×#251 24, #248×hosted 105, #251×hosted 21.
+- MyEve keeps its own Work scheduler (`lib/engineering/worker.ts`,
+  `factory-work-driver.ts`) and a legacy path for unenrolled owners; MC also runs
+  `factoryAttemptWorker.ts`. This conflicts with the single-scheduler boundary.
+- Gaps still open: random `commandId` per call (no durable correlation record),
+  poll-only status events, one-way (MC→MyEve) cancel, fixed project by env with no
+  discovery, single agent per permit, no branch/worktree readback, no in-place
+  resume, no agent-to-agent handoff, no live-provider run (deterministic mode is
+  loopback-only). Seven of nine MyEve integration tests skip without Postgres.
+- Not read: MyEve `1efc7071` (MyEveBot PR #112) is in no local checkout.
+
+Proposed sequence (decision belongs to the owner and Codex, since #248 is Codex's
+line): choose one canonical MC base; resolve the overlap in one sequenced merge
+and set the contract once (max+1); land #251 on top; re-pin the MyEve consumer CI
+to the merged SHA and make the Postgres tests non-skippable; then close the
+correlation, cancel and event gaps. No MC-line merge is performed without owner
+authorization.
