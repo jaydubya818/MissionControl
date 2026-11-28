@@ -113,3 +113,42 @@ and set the contract once (max+1); land #251 on top; re-pin the MyEve consumer C
 to the merged SHA and make the Postgres tests non-skippable; then close the
 correlation, cancel and event gaps. No MC-line merge is performed without owner
 authorization.
+
+## Phase 5 preparation findings (Infrastructure agent, read-only)
+
+Verified by the principal: `CODEX_PINNED_NATIVE_DIGESTS` in
+`apps/orchestration-server/src/codexExecutorAdapter.ts` pins only
+`darwin-arm64`, and the native path resolver is darwin-only, so a Linux worker
+reports the runtime UNAVAILABLE. A Mac digest or admission record must not be
+reused for Linux.
+
+Reported by the agent, not yet reproduced:
+- Existing cloud evidence: exe.dev Remote Sandbox (per-Attempt disposable VM) was
+  certified with limitations on 2026-08-17 (one real Codex Attempt; egress
+  unrestricted/DEGRADED; Codex via ephemeral `npx`, not a pinned image; per-VM
+  cost unknown; stays Preview and globally disabled). Hardening v1 decision is
+  HOLD (live gate 0 of 3 first pass; image identity did not match the requested
+  digest; no provider-enforced egress). Docker provider is offline-only and
+  NOT_QUALIFIED. OpenSandbox spikes are HOLD with no code. The persistent worker
+  is proven only on darwin-arm64.
+- To qualify a Linux worker the repo needs: a `linux-x64` digest entry and path
+  resolver; a digest-bound CONTAINER_IMAGE runtime artifact and Execution Profile
+  (with SBOM, provenance, egress-policy and evidence digests); a Linux
+  containment probe under namespaces; a reviewed pinned Codex image. A
+  linux-amd64 Codex 0.146.0 build exists under `infra/remote-sandbox`.
+- Authorization observed on the Mac (names only): `gh` and `vercel` authenticated;
+  `gcloud` authenticated with no project set; `aws` has only `fdlc-*` Bedrock
+  qualification profiles (restricted to that qualification); `railway` not
+  authorized; Docker Desktop daemon unhealthy (HTTP 500); `fly`/`az` absent.
+- Vercel functions are not recommended for long-running agent execution; no
+  evidence supports it.
+
+Hosting options, ranked by the agent: (1) exe.dev, already paid, only cloud target
+with live evidence, with the control worker staying on the Mac and exe.dev
+executing Attempts; (2) a GCP VM, which needs a named project and billing cap;
+(3) the Mac under launchd as a bridge, which does not satisfy Phase 5.
+
+**Pending owner decision (spend/authority):** choosing the hosting option and
+authorizing any VM allocation or live canary. The repo requires explicit Product
+Owner approval for that, and the program directive forbids new paid commitments
+without it. Phase 5 qualification stays NOT RUN until then.
