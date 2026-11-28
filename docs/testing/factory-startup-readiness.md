@@ -27,3 +27,16 @@ or an HTTP liveness response cannot replace that assessment.
 The design compares a new readiness service with a local diagnostic over
 existing startup contracts. The latter keeps admission in the control plane
 and requires no new public endpoint or persisted authority record.
+
+## Worker host environment: `TMPDIR`
+
+On macOS the worker must run with the per-user temp directory
+(`export TMPDIR="$(getconf DARWIN_USER_TEMP_DIR)"`). When `TMPDIR` is unset,
+Node falls back to `/tmp`. The Codex containment probe places its "outside"
+fixture there, `/tmp` is inside the sandbox's minimal-read set, and the probe
+correctly refuses to certify containment (`codex-runtime` FAIL, adapter
+`UNAVAILABLE`). This was observed on 2026-11-28 with the evaluated Codex
+0.146.0 binary: its digest and version matched, the same probe passed under
+`/var/folders/...`, and read/write containment held. The diagnostic now names
+`TMPDIR` in that case. Launchers that strip the environment (IDE helpers,
+tool shells) are the usual cause; interactive Terminal sessions already set it.

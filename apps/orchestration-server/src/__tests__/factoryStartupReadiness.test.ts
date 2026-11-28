@@ -51,6 +51,20 @@ describe("factory startup diagnostic", () => {
     expect(result.checks.find((check) => check.id === "codex-runtime")?.status).toBe("FAIL");
   });
 
+  it("names an unset or /tmp TMPDIR when the Codex containment probe cannot be trusted", () => {
+    const failing = (env: NodeJS.ProcessEnv, platform = "darwin") => evaluateFactoryStartupReadiness({ env, platform, architecture: "arm64", checkedAt: 123,
+      codexHealth: { status: "UNAVAILABLE" }, packageManager: { status: "PASS" } }).checks.find((check) => check.id === "codex-runtime")!;
+    for (const env of [configured, { ...configured, TMPDIR: "/tmp" }, { ...configured, TMPDIR: "/private/tmp/x" }]) {
+      expect(failing(env)).toMatchObject({ status: "FAIL", settings: ["CODEX_EXECUTABLE", "TMPDIR"] });
+      expect(failing(env).nextAction).toContain("DARWIN_USER_TEMP_DIR");
+    }
+    expect(failing({ ...configured, TMPDIR: "/var/folders/1h/abc/T/" }).nextAction).not.toContain("TMPDIR");
+    expect(failing(configured, "linux").nextAction).not.toContain("TMPDIR");
+    const ready = evaluateFactoryStartupReadiness({ env: configured, platform: "darwin", architecture: "arm64", checkedAt: 123,
+      codexHealth: { status: "READY" }, packageManager: { status: "PASS" } }).checks.find((check) => check.id === "codex-runtime")!;
+    expect(ready).toMatchObject({ status: "PASS", settings: ["CODEX_EXECUTABLE"] });
+  });
+
   it("does not qualify unprobed providers", () => {
     const result = evaluate({ ...configured, CODEX_FACTORY_WORKER_ENABLED: "false", CODEX_BEDROCK_HARNESS_ENABLED: "1" });
     expect(result.checks.find((check) => check.id === "provider-admission")?.status).toBe("UNVERIFIED");

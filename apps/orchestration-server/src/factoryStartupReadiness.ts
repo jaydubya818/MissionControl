@@ -88,9 +88,17 @@ export function evaluateFactoryStartupReadiness(input: {
   check("factory-version-bindings", bindingCount ? "PASS" : "FAIL", bindingCount ? `${bindingCount} repository-bound configuration entries parsed; server admission is unverified.` : "Factory Version bindings are missing, malformed, or bound to another repository.",
     "Use the existing admitted Factory Version bindings. The control plane validates their digests, model routes, and current qualification.", ["CODEX_WORKER_FACTORY_VERSION_BINDINGS_JSON"]);
   if (enabled.includes("codex")) {
-    check("codex-runtime", input.codexHealth?.status === "READY" ? "PASS" : input.codexHealth ? "FAIL" : "UNVERIFIED",
-      input.codexHealth?.status === "READY" ? "The existing Codex adapter health check passed." : "The existing Codex adapter has not established an admitted local runtime.",
-      "Run the evaluated Codex version and native artifact on a supported host, or qualify a new runtime through the existing admission process.", ["CODEX_EXECUTABLE"]);
+    // The adapter's containment probe writes its "outside" fixture under the temp directory. When TMPDIR is
+    // unset or points at /tmp, that fixture sits inside the sandbox's minimal-read set, so the probe correctly
+    // refuses to certify containment. Name that cause instead of leaving it to be rediscovered.
+    const tempDir = env.TMPDIR?.trim() ?? "";
+    const weakTempDir = input.platform === "darwin" && (!tempDir || /^\/(private\/)?tmp(\/|$)/.test(tempDir));
+    const codexReady = input.codexHealth?.status === "READY";
+    check("codex-runtime", codexReady ? "PASS" : input.codexHealth ? "FAIL" : "UNVERIFIED",
+      codexReady ? "The existing Codex adapter health check passed." : "The existing Codex adapter has not established an admitted local runtime.",
+      "Run the evaluated Codex version and native artifact on a supported host, or qualify a new runtime through the existing admission process."
+        + (!codexReady && weakTempDir ? " TMPDIR is unset or under /tmp; start the worker with the macOS per-user temp directory (getconf DARWIN_USER_TEMP_DIR) so the containment probe can run." : ""),
+      codexReady || !weakTempDir ? ["CODEX_EXECUTABLE"] : ["CODEX_EXECUTABLE", "TMPDIR"]);
   }
   if (enabled.includes("fab")) {
     check("fab-platform", input.platform === "darwin" ? "UNVERIFIED" : "FAIL", input.platform === "darwin" ? "The platform supports Fab's native boundary; adapter admission is unverified." : "Fab's native containment requires macOS.",
