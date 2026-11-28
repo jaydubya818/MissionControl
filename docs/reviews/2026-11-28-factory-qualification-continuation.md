@@ -66,26 +66,40 @@ Retain both: neither widens any permission or weakens a gate.
 | Human owner after workload submission | None (no workload submitted) |
 | External assistant (Claude) | Dependency pin repair `54a36ed`; readiness diagnostic and docs (this commit) |
 | Factory-managed recovery | None — no factory run exists |
-| Mandatory governance approvals | **Pending:** create a worker service identity on the hosted deployment (see below) |
-| Infrastructure configuration | None applied to hosted systems. Worker launch requires `TMPDIR` as documented |
+| Mandatory governance approvals | Granted by owner: hosted qualification environment, owner bootstrap, isolated repo. **Pending:** one GitHub confirmation click to create the dedicated App |
+| Infrastructure configuration | New Convex deployment and Vercel project, service identity vars, owner bootstrap vars (removal pending verification), isolated repo `mc-qualification-todo`. Worker launch requires `TMPDIR` (launcher handles it) |
 
-## Remaining blocker and smallest action
+## `@hono/node-server` 2.x compatibility (run on `54a36ed` + this commit)
 
-The worker authenticates to the control plane with a signed service command.
-Hosted deployment `gallant-cassowary-27` has no service ID or command secret,
-so the Mac worker cannot be admitted there. The smallest action is to set
-`MISSION_CONTROL_SERVICE_ID` and a newly generated
-`MISSION_CONTROL_SERVICE_COMMAND_SECRET` in that deployment's environment and
-use the same pair in the worker's environment, then confirm the Project,
-Repository (`CODEX_WORKER_REPOSITORY_ID`) and Factory Version bindings exist
-there. Reusing the local backend's existing secret on the hosted deployment is
-not proposed: that value belongs to a different deployment.
+| Check | Result |
+| --- | --- |
+| Surface used | `serve()` only, plus `server.on("upgrade")` for the gateway proxy; no `serveStatic`, MCP transport or SSE in the orchestration server |
+| Built artifact loads under Node ESM | PASS (`smoke:start`) |
+| Live listen, loopback binding | PASS: `/health` 200 |
+| Auth middleware | PASS: unauthenticated unknown route 401, authenticated unknown route 404, unauthenticated POST with malformed JSON 401 |
+| Readiness with no backend | PASS (expected): `/ready` 503 |
+| WebSocket upgrade path | PASS: `/gateway/ws` upgrade reaches the handler and is refused 401 without credentials |
+| SIGTERM shutdown | PASS: exit 0 in under 100 ms, no hung connections |
+| Unit tests | PASS: orchestration-server 856 passed, 11 skipped, 0 failed |
+| Supported Node | **Finding:** 2.x requires Node >= 20 but root `engines.node` said `>=18.0.0`. CI runs 20 and 24 only. Root engines raised to `>=20.0.0` so the declared contract matches what is built and tested |
+| Not applicable | MCP transport and streaming responses (not served by this package); `@modelcontextprotocol/sdk` accepts the pinned range |
+
+## GitHub App for publication (open)
+
+The existing App key in `.env.local` is not used. A dedicated App named
+"Mission Control Qualification" is required, with access to
+`jaydubya818/mc-qualification-todo` only. Creating it through GitHub's manifest
+flow needs a human click on GitHub's confirmation page; programmatic form
+submission in the owner's signed-in session was blocked and was not worked
+around. Settings and the minimum action are in the final message of this
+session. Nothing is published until this exists and the repository connection
+passes the approval gate.
 
 ## Scorecard
 
 | Requirement | Result | Basis |
 | --- | --- | --- |
-| Authenticated control plane | IN PROGRESS | Dedicated Clerk-mode deployment live; owner sign-in/bootstrap pending |
+| Authenticated control plane | PASS (partial) | Dedicated Clerk-mode deployment `adept-goldfish-756` + Vercel UI live; owner signed in and bootstrapped; service identity created off-repo (mode 600). Records not yet created |
 | Admitted worker and runtime | BLOCKED | Runtime checks pass locally; admission unverified |
 | Real model execution | NOT RUN | |
 | Factory-generated plan / tasks / assignments | NOT RUN | |
@@ -94,7 +108,7 @@ not proposed: that value belongs to a different deployment.
 | Independent verification, running-app acceptance, browser verification | NOT RUN | |
 | Factory-managed repair, recovery, durable execution, duplicate protection | NOT RUN | |
 | Clean repeat | NOT RUN | |
-| Required integration checks | IN PROGRESS | Release Security Gates passes; remaining jobs were still running when written |
+| Required integration checks | IN PROGRESS | Local orchestration tests and live hono smoke pass; CI on the final head not yet confirmed |
 | Dependency-policy gate | PASS | audit gate 0 advisories on `54a36ed` |
 | GitHub commits and pushes | PASS (for work done) | `54a36ed` pushed; this record's commit follows |
 | Accessible application and evidence | NOT RUN | no application generated |
