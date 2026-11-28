@@ -22,7 +22,7 @@ Commit rules (AGENTS.md): operator's Git identity, no AI co-author trailers.
 
 | Phase | Status | Basis |
 | --- | --- | --- |
-| 0 Security/runtime blockers | IN PROGRESS | hono 2.1.11 independently verified PASS; Codex binary wiring defect found and fixed (below); exact-candidate CI on the final head still to be confirmed |
+| 0 Security/runtime blockers | PASS | exact candidate `d0d0282`: 15/15 CI checks pass; hono 2.1.11 independently verified; Codex launcher defect fixed and re-verified (below). Known gaps, not blockers: no repo test binds `startServer()`, MCP transport over HTTP not exercised, Vercel Node 26.x setting unverified |
 | 1 Hosted control plane | IN PROGRESS | deployment and UI live; bootstrap vars set (this session); **owner Clerk sign-in pending** |
 | 2 Mac worker admission | BLOCKED | needs Phase 1 bootstrap, then Project/Repository/Factory Version bindings |
 | 3–8 | NOT RUN | critical path; preparation only |
@@ -84,8 +84,9 @@ needs authenticated admin access waits on it.
 
 ## Scorecard
 
-All mandatory items are NOT RUN or BLOCKED except dependency security (PASS on
-`54a36ed`, audit gate 0 advisories) and Phase 0 CI (PASS on `163decb`).
+All mandatory items are NOT RUN or BLOCKED except dependency security, runtime
+compatibility, security regression checks and required CI, which PASS on
+`d0d0282` (15/15 checks; audit gate 0 advisories).
 Overall qualification: **not successful**.
 
 ## Phase 6 preparation findings (Integration agent, read-only)
